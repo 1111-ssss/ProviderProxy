@@ -36,8 +36,6 @@
   .app-header p { margin: 6px 0 0; color: var(--muted); max-width: 620px; }
   .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 7px; }
   .header-status { display: grid; justify-items: end; gap: 6px; color: var(--muted); font-size: 12px; text-align: right; }
-  .live-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid rgba(105, 215, 160, .28); border-radius: 999px; background: rgba(105, 215, 160, .08); color: #b3efd0; font-weight: 650; }
-  .live-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(105, 215, 160, .13); }
   .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
   input, select, button { font: inherit; background: var(--surface); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
@@ -124,6 +122,47 @@
   .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
   .tile .v { font-size: 20px; font-weight: 600; }
   .tile .k { color: var(--muted); font-size: 12px; }
+  .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
+  .chart-card { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .chart-head h3 { margin: 0; font-size: 14px; }
+  .chart-head p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+  .chart-head .muted { white-space: nowrap; }
+  .outcome-layout { display: grid; grid-template-columns: 164px minmax(0, 1fr); align-items: center; gap: 18px; min-height: 164px; }
+  .donut-wrap { position: relative; width: 164px; height: 164px; }
+  .donut-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .donut-track, .donut-segment { fill: none; stroke-width: 13; }
+  .donut-track { stroke: #2d3b4b; }
+  .donut-segment { stroke-linecap: round; transition: stroke-dasharray .25s ease, stroke-dashoffset .25s ease; }
+  .donut-segment.ok { stroke: var(--success); }
+  .donut-segment.failed { stroke: var(--danger); }
+  .donut-segment.other { stroke: var(--accent); }
+  .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+  .donut-center strong { font-size: 26px; line-height: 1; letter-spacing: -.04em; }
+  .donut-center span { color: var(--muted); font-size: 11px; margin-top: 5px; }
+  .chart-legend { display: grid; gap: 10px; }
+  .legend-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dot.ok { background: var(--success); }
+  .legend-dot.failed { background: var(--danger); }
+  .legend-dot.other { background: var(--accent); }
+  .legend-name { color: var(--muted); }
+  .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .token-bars { display: grid; gap: 13px; }
+  .token-legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; }
+  .token-key { display: inline-flex; align-items: center; gap: 5px; }
+  .token-key::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
+  .token-key.in::before { background: #9abaff; }
+  .token-key.out::before { background: #69d7a0; }
+  .token-row { display: grid; gap: 5px; }
+  .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+  .token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .token-row-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .token-track { height: 7px; overflow: hidden; border-radius: 999px; background: #2a3746; }
+  .token-fill { display: block; height: 100%; min-width: 2px; border-radius: inherit; transition: width .25s ease; }
+  .token-fill.in { background: linear-gradient(90deg, #6f99ed, #b8ceff); }
+  .token-fill.out { background: linear-gradient(90deg, #45b984, #9be7be); }
+  .chart-empty { color: var(--muted); font-size: 12px; padding: 24px 0; text-align: center; }
   @media (max-width: 700px) {
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
     .header-status { justify-items: start; text-align: left; }
@@ -133,6 +172,9 @@
     .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
     .chain-row input, .chain-row .row-controls, .dialog-add-row input, .dialog-add-row button { grid-column: 2; }
     .dialog-add-row select { grid-column: 2; }
+    .usage-grid { grid-template-columns: 1fr; }
+    .outcome-layout { grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
+    .donut-wrap { width: 140px; height: 140px; }
   }
 </style>
 </head>
@@ -145,7 +187,6 @@
       <p>Собери устойчивые цепочки моделей и переключайся между провайдерами без ручного редактирования конфигов.</p>
     </div>
     <div class="header-status">
-      <span class="live-pill">работает локально</span>
       <span id="proxyinfo"></span>
     </div>
   </header>
@@ -155,7 +196,7 @@
     <button data-tab="models"><span class="tab-index">02</span><span>Модели</span></button>
     <button data-tab="chains"><span class="tab-index">03</span><span>Цепочки</span></button>
     <button data-tab="logs"><span class="tab-index">04</span><span>Логи</span></button>
-    <button data-tab="usage"><span class="tab-index">05</span><span>Usage</span></button>
+    <button data-tab="usage"><span class="tab-index">05</span><span>Статистика</span></button>
   </nav>
 
   <section data-tab="providers">
@@ -212,11 +253,44 @@
 
   <section data-tab="usage">
     <div class="section-head">
-      <h2>5&nbsp;·&nbsp;Usage</h2>
+      <h2>5&nbsp;·&nbsp;Статистика</h2>
       <span class="muted" id="u-info"></span>
     </div>
     <p class="section-sub">Счётчики живут в памяти прокси и обнуляются при его перезапуске. Токены видны, когда upstream их присылает.</p>
     <div class="tiles" id="u-tiles"></div>
+    <div class="usage-grid">
+      <article class="chart-card">
+        <div class="chart-head">
+          <div>
+            <h3>Результаты запросов</h3>
+            <p>Соотношение успешных ответов и ошибок</p>
+          </div>
+          <span class="muted" id="u-outcome-note"></span>
+        </div>
+        <div class="outcome-layout">
+          <div class="donut-wrap">
+            <svg viewBox="0 0 120 120" role="img" aria-label="Результаты запросов">
+              <circle class="donut-track" cx="60" cy="60" r="43"></circle>
+              <circle id="u-donut-ok" class="donut-segment ok" cx="60" cy="60" r="43"></circle>
+              <circle id="u-donut-failed" class="donut-segment failed" cx="60" cy="60" r="43"></circle>
+              <circle id="u-donut-other" class="donut-segment other" cx="60" cy="60" r="43"></circle>
+            </svg>
+            <div class="donut-center"><strong id="u-donut-total">0</strong><span>запросов</span></div>
+          </div>
+          <div class="chart-legend" id="u-outcome-legend"></div>
+        </div>
+      </article>
+      <article class="chart-card">
+        <div class="chart-head">
+          <div>
+            <h3>Токены по провайдерам</h3>
+            <p>Вход и выход по данным upstream</p>
+          </div>
+          <div class="token-legend"><span class="token-key in">вход</span><span class="token-key out">выход</span></div>
+        </div>
+        <div class="token-bars" id="u-token-chart"></div>
+      </article>
+    </div>
     <h3 style="margin-top:16px">Провайдеры</h3>
     <table id="u-providers"></table>
     <h3 style="margin-top:16px">Модели</h3>
@@ -841,9 +915,69 @@ const logCard = (line) => {
 // ---------- usage ----------
 
 const fmtTok = (n = 0) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n))
+const fmtNum = (n = 0) => Math.round(Number(n) || 0).toLocaleString("ru-RU")
 const fmtUptime = (ms = 0) => {
   const s = Math.round(ms / 1000)
   return s < 60 ? `${s} с` : s < 3600 ? `${Math.round(s / 60)} мин` : `${(s / 3600).toFixed(1)} ч`
+}
+
+function renderUsageCharts(u) {
+  const requests = Math.max(0, Number(u.requests) || 0)
+  const ok = Math.max(0, Number(u.ok) || 0)
+  const failed = Math.max(0, Number(u.failed) || 0)
+  const other = Math.max(0, requests - ok - failed)
+  const chartTotal = Math.max(1, ok + failed + other)
+  const circumference = 2 * Math.PI * 43
+  let offset = 0
+  const segments = [
+    ["u-donut-ok", ok],
+    ["u-donut-failed", failed],
+    ["u-donut-other", other],
+  ]
+  for (const [id, value] of segments) {
+    const circle = $(id)
+    const length = (value / chartTotal) * circumference
+    circle.setAttribute("stroke-dasharray", `${length.toFixed(2)} ${circumference.toFixed(2)}`)
+    circle.setAttribute("stroke-dashoffset", `${-offset.toFixed(2)}`)
+    circle.style.opacity = value > 0 ? "1" : "0"
+    offset += length
+  }
+  $("u-donut-total").textContent = fmtNum(requests)
+  $("u-outcome-note").textContent = `${fmtNum(u.failovers)} failover`
+  const outcomeRows = [
+    ["ok", "Успешные", ok],
+    ["failed", "Ошибки", failed],
+    ["other", "Другие", other],
+  ]
+  $("u-outcome-legend").innerHTML = outcomeRows
+    .map(([kind, label, value]) => {
+      const percent = requests ? Math.round((value / requests) * 100) : 0
+      return `<div class="legend-row"><span class="legend-dot ${kind}"></span><span class="legend-name">${label} · ${percent}%</span><span class="legend-value">${fmtNum(value)}</span></div>`
+    })
+    .join("")
+
+  const providers = Object.entries(u.providers ?? {}).sort(([, a], [, b]) => {
+    const at = (Number(a.tokensIn) || 0) + (Number(a.tokensOut) || 0)
+    const bt = (Number(b.tokensIn) || 0) + (Number(b.tokensOut) || 0)
+    return bt - at
+  })
+  const maxTokens = Math.max(
+    1,
+    ...providers.flatMap(([, stat]) => [Number(stat.tokensIn) || 0, Number(stat.tokensOut) || 0]),
+  )
+  $("u-token-chart").innerHTML = providers.length
+    ? providers
+        .map(([name, stat]) => {
+          const input = Number(stat.tokensIn) || 0
+          const output = Number(stat.tokensOut) || 0
+          return `<div class="token-row" title="${esc(name)}: ${fmtNum(input)} вход, ${fmtNum(output)} выход">
+            <div class="token-row-head"><span>${esc(name)}</span><span>${fmtTok(input + output)}</span></div>
+            <div class="token-track"><span class="token-fill in" style="width:${Math.max(0, (input / maxTokens) * 100).toFixed(1)}%"></span></div>
+            <div class="token-track"><span class="token-fill out" style="width:${Math.max(0, (output / maxTokens) * 100).toFixed(1)}%"></span></div>
+          </div>`
+        })
+        .join("")
+    : `<div class="chart-empty">Данных о токенах пока нет</div>`
 }
 
 function usageTable(obj, cols) {
@@ -867,6 +1001,7 @@ async function loadUsage() {
       tile("ошибок", u.failed ?? 0) +
       tile("токенов вход", fmtTok(u.tokensIn)) +
       tile("токенов выход", fmtTok(u.tokensOut))
+    renderUsageCharts(u)
     $("u-providers").innerHTML = usageTable(u.providers, [
       { h: "запросов", f: (s) => s.requests ?? 0 },
       { h: "ок", f: (s) => s.ok ?? 0 },

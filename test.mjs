@@ -221,6 +221,10 @@ try {
   assert.ok(!/<link[^>]*\shref=/.test(html.replace(/href="data:[^"]*"/g, "")), "GUI must not load external styles") // data:-URI — инлайн, не внешний ресурс
   assert.ok(!/fetch\(\s*["'`]https?:\/\//.test(html), "GUI fetch targets must be relative")
   assert.ok(!/["'`]wss?:\/\//.test(html), "GUI must not open external sockets")
+  assert.match(html, /data-tab="usage">[\s\S]*?Статистика/, "usage tab should be renamed to Статистика")
+  assert.ok(html.includes('id="u-donut-ok"'), "statistics should include the outcomes chart")
+  assert.ok(html.includes('id="u-token-chart"'), "statistics should include the token chart")
+  assert.ok(!html.includes("работает локально"), "GUI should not show the local-status label")
 
   // 9. Logs ring: served to the GUI and capped (self-cleaning).
   const logRes = await (await fetch(`${base(PROXY)}/api/logs`)).json()
