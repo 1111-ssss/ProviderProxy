@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>provider_proxy</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%233d7a53'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f141b;
+    --panel: #171e27;
+    --panel-raised: #1c2530;
+    --surface: #222d39;
+    --surface-hover: #293747;
+    --border: #304052;
+    --border-strong: #43546a;
+    --text: #edf3f8;
+    --muted: #9aaabd;
+    --faint: #718195;
+    --accent: #9abaff;
+    --accent-strong: #6f99ed;
+    --success: #69d7a0;
+    --danger: #ff9c9c;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .22);
+  }
+  * { box-sizing: border-box; }
+  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 50% -20%, #1d2a3a 0, var(--bg) 52%); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+  h1 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.03em; margin: 0; }
+  h2 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
+  h3 { font-size: 15px; margin: 0 0 14px; }
+  h4 { font-size: 13px; margin: 0; }
+  section { background: rgba(23, 30, 39, .92); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
+  .app-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 4px 2px 2px; }
+  .app-header p { margin: 6px 0 0; color: var(--muted); max-width: 620px; }
+  .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 7px; }
+  .header-status { display: grid; justify-items: end; gap: 6px; color: var(--muted); font-size: 12px; text-align: right; }
+  .live-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 9px; border: 1px solid rgba(105, 215, 160, .28); border-radius: 999px; background: rgba(105, 215, 160, .08); color: #b3efd0; font-weight: 650; }
+  .live-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(105, 215, 160, .13); }
+  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
+  input, select, button { font: inherit; background: var(--surface); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
+  input::placeholder { color: var(--faint); }
+  input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+  button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--surface-hover); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.primary { background: var(--accent-strong); border-color: #88adff; color: #07101f; font-weight: 700; }
+  button.primary:hover:not(:disabled) { background: #84aaff; }
+  button.quiet { background: transparent; border-color: transparent; color: var(--muted); }
+  button.quiet:hover:not(:disabled) { color: var(--text); background: var(--surface); border-color: var(--border); }
+  button.danger { color: var(--danger); }
+  button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .card { border: 1px solid var(--border); background: rgba(28, 37, 48, .7); border-radius: 11px; padding: 14px 16px; margin-bottom: 10px; }
+  .card:hover { border-color: #40536a; }
+  .card .chain { margin: 13px 0 0; display: grid; gap: 7px; }
+  .step { display: flex; gap: 9px; align-items: center; font-size: 13px; }
+  .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
+  .step .prov { color: #a9d6ff; font-weight: 650; }
+  code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
+  .model-card-head { display: flex; align-items: center; gap: 9px; }
+  .model-title { font-size: 15px; }
+  .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
+  .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
+  .model-actions { display: flex; gap: 6px; margin-left: auto; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  input[type="checkbox"] { accent-color: var(--accent-strong); width: 16px; height: 16px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 16px; padding: 0; width: min(680px, calc(100vw - 28px)); max-height: calc(100vh - 28px); box-shadow: var(--shadow); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+  .dialog-form { display: flex; flex-direction: column; max-height: calc(100vh - 28px); }
+  .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
+  .dialog-header h3 { margin: 0; font-size: 18px; }
+  .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+  .dialog-body { padding: 18px 24px 4px; overflow: auto; }
+  dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
+  dialog label.sr-only { display: block; margin: 0; }
+  dialog label input, dialog label select { font-size: 14px; }
+  .dialog-section { border: 1px solid var(--border); border-radius: 11px; padding: 14px; margin: 16px 0; background: rgba(28, 37, 48, .48); }
+  .dialog-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+  .dialog-section-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .dialog-count { color: var(--accent); font-size: 11px; white-space: nowrap; }
+  .chain-editor { display: grid; gap: 8px; max-height: 250px; overflow: auto; padding-right: 2px; }
+  .chain-editor:empty { display: block; }
+  .chain-row { display: grid; grid-template-columns: 24px minmax(130px, .7fr) minmax(170px, 1.3fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .7); }
+  .chain-row select, .chain-row input { width: 100%; min-width: 0; }
+  .step-number { color: var(--faint); font-variant-numeric: tabular-nums; text-align: center; }
+  .row-controls { display: flex; gap: 4px; }
+  .icon-button { min-width: 36px; padding: 6px 8px; }
+  .dialog-add-row { display: grid; grid-template-columns: minmax(130px, .75fr) minmax(170px, 1.25fr) auto; gap: 8px; }
+  .dialog-add-row select, .dialog-add-row input { min-width: 0; width: 100%; }
+  .manual-add { margin-top: 12px; }
+  .manual-add summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+  .manual-add .dialog-add-row { margin-top: 10px; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 22px; border-top: 1px solid var(--border); background: var(--panel); }
+  .fetched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-height: 220px; overflow: auto; }
+  .chip { display: inline-flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px 4px 3px 8px; }
+  .chip button { min-height: 28px; padding: 2px 7px; }
+  .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid rgba(105, 215, 160, .25); border-radius: 9px; background: #173c2b; color: #c2f3d6; display: none; z-index: 10; box-shadow: var(--shadow); }
+  .status.err { background: #4a252b; color: #ffd1d1; border-color: rgba(255, 156, 156, .3); }
+  details summary { cursor: pointer; color: var(--muted); }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; background: rgba(23, 30, 39, .72); border: 1px solid var(--border); border-radius: 12px; }
+  .tabs button { display: inline-flex; align-items: center; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 40px; }
+  .tabs button.active { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 650; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); }
+  .tab-index { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tabs button.active .tab-index { color: var(--accent); }
+  .logbox { max-height: 440px; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
+  .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
+  .log-card .t { display: flex; gap: 10px; align-items: baseline; }
+  .log-card .tm { color: #7d8796; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .log-card .b { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 10px; background: var(--surface); color: var(--muted); }
+  .log-card .m { margin-top: 3px; font-size: 12.5px; word-break: break-word; }
+  .log-card .m b { color: #d8e4f1; font-weight: 650; }
+  .log-card.ok { border-left-color: var(--success); } .log-card.ok .b { background: rgba(105, 215, 160, .12); color: #b7e2c6; }
+  .log-card.warn { border-left-color: #e5bd61; } .log-card.warn .b { background: rgba(229, 189, 97, .12); color: #edd9a0; }
+  .log-card.err { border-left-color: var(--danger); } .log-card.err .b { background: rgba(255, 156, 156, .12); color: #f0b9b9; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+  .tile .v { font-size: 20px; font-weight: 600; }
+  .tile .k { color: var(--muted); font-size: 12px; }
+  @media (max-width: 700px) {
+    .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+    .header-status { justify-items: start; text-align: left; }
+    section { padding: 16px; }
+    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
+    .dialog-actions { padding-left: 16px; padding-right: 16px; }
+    .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
+    .chain-row input, .chain-row .row-controls, .dialog-add-row input, .dialog-add-row button { grid-column: 2; }
+    .dialog-add-row select { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="app-header">
+    <div>
+      <div class="eyebrow">Локальный прокси · OpenAI-compatible</div>
+      <h1>Provider Proxy</h1>
+      <p>Собери устойчивые цепочки моделей и переключайся между провайдерами без ручного редактирования конфигов.</p>
+    </div>
+    <div class="header-status">
+      <span class="live-pill">работает локально</span>
+      <span id="proxyinfo"></span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="providers"><span class="tab-index">01</span><span>Провайдеры</span></button>
+    <button data-tab="models"><span class="tab-index">02</span><span>Модели</span></button>
+    <button data-tab="chains"><span class="tab-index">03</span><span>Цепочки</span></button>
+    <button data-tab="logs"><span class="tab-index">04</span><span>Логи</span></button>
+    <button data-tab="usage"><span class="tab-index">05</span><span>Usage</span></button>
+  </nav>
+
+  <section data-tab="providers">
+    <div class="section-head">
+      <h2>1&nbsp;·&nbsp;Провайдеры</h2>
+      <div class="row">
+        <button id="p-checkins" style="display:none">Открыть все чекины</button>
+        <button class="primary" id="p-add">+ Добавить провайдера</button>
+      </div>
+    </div>
+    <p class="section-sub">Ключ и адрес API (OpenAI-совместимый). «Чекин» — открыть checkin-страницу, если она задана. Модели провайдера выбираются в шаге&nbsp;2.</p>
+    <table id="providers"></table>
+  </section>
+
+  <section data-tab="models">
+    <div class="section-head">
+      <h2>2&nbsp;·&nbsp;Модели провайдеров</h2>
+      <span class="muted" id="pm-status"></span>
+    </div>
+    <p class="section-sub">Отметь галочками модели, которые есть у провайдера, — они сохраняются локально, и из них собираются цепочки в шаге&nbsp;3. Список берётся с его <code>/v1/models</code> и из сохранённых; отсутствующую модель можно вписать вручную.</p>
+    <div class="row">
+      <span class="muted">провайдер:</span>
+      <select id="pm-provider"></select>
+      <button type="button" id="pm-refresh">обновить с /v1/models</button>
+    </div>
+    <input id="pm-filter" placeholder="фильтр по имени…" style="width:100%;margin-top:8px">
+    <div id="pm-list" style="max-height:320px;overflow:auto;margin-top:8px;display:grid;gap:6px"></div>
+    <div class="row" style="margin-top:12px;padding:10px;border:1px dashed #3a4150;border-radius:8px">
+      <input id="pm-manual" placeholder="ID модели вручную" style="flex:1">
+      <button type="button" id="pm-add">＋ добавить</button>
+    </div>
+  </section>
+
+  <section data-tab="chains">
+    <div class="section-head">
+      <h2>3&nbsp;·&nbsp;Цепочки моделей</h2>
+      <div class="row">
+        <button id="m-sync">⟳ Синхронизировать с opencode</button>
+        <button class="primary" id="m-add">+ Добавить модель</button>
+      </div>
+    </div>
+    <p class="section-sub">Каждая цепочка — это один ID модели для OpenCode и понятный порядок запасных провайдеров. Если первый не отвечает, запрос автоматически идёт дальше по списку.</p>
+    <div id="models"></div>
+  </section>
+
+  <section data-tab="logs">
+    <div class="section-head">
+      <h2>4&nbsp;·&nbsp;Логи</h2>
+      <span class="muted" id="log-info"></span>
+    </div>
+    <p class="section-sub">Живой хвост вывода прокси. Держится в памяти и чистится само — старые строки вытесняются новыми.</p>
+    <div class="logbox" id="logbox">—</div>
+  </section>
+
+  <section data-tab="usage">
+    <div class="section-head">
+      <h2>5&nbsp;·&nbsp;Usage</h2>
+      <span class="muted" id="u-info"></span>
+    </div>
+    <p class="section-sub">Счётчики живут в памяти прокси и обнуляются при его перезапуске. Токены видны, когда upstream их присылает.</p>
+    <div class="tiles" id="u-tiles"></div>
+    <h3 style="margin-top:16px">Провайдеры</h3>
+    <table id="u-providers"></table>
+    <h3 style="margin-top:16px">Модели</h3>
+    <table id="u-models"></table>
+    <div class="muted" id="u-cooling" style="margin-top:10px"></div>
+  </section>
+
+  <section>
+    <details>
+      <summary>Настройки (port, authToken, кулдауны, таймаут)</summary>
+      <div class="row" style="margin-top:10px">
+        <label class="muted">port</label><input id="s-port" size="4">
+        <label class="muted">authToken</label><input id="s-auth" placeholder="нет" size="16">
+        <label class="muted">кулдаун 429, сек</label><input id="s-limit" size="4">
+        <label class="muted">кулдаун 5xx, сек</label><input id="s-error" size="4">
+        <label class="muted">таймаут, сек</label><input id="s-header" size="4">
+      </div>
+      <p class="muted">Смена port применяется после перезапуска прокси, остальное — сразу.</p>
+    </details>
+  </section>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+</main>
+
+<!-- Диалог: провайдер (добавить / изменить) -->
+<dialog id="dlg-provider" aria-labelledby="dp-title">
+  <form method="dialog" id="dp-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="dp-title">Добавить провайдера</h3>
+      <p>Сохрани адрес OpenAI-compatible API и ключ — модели будут доступны на следующем шаге.</p>
+    </div>
+    <div class="dialog-body">
+      <label>Имя (на него будут ссылаться модели)
+        <input id="dp-name" required placeholder="openrouter">
+      </label>
+      <label>baseURL — OpenAI-совместимый адрес
+        <input id="dp-url" required placeholder="https://openrouter.ai/api/v1">
+      </label>
+      <label>apiKey
+        <input id="dp-key" type="password" placeholder="sk-...">
+      </label>
+      <label>Ссылка для чекина — необязательно; если задана, у провайдера появится кнопка «Чекин»
+        <input id="dp-checkin" placeholder="https://provider.example/checkin">
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="dp-cancel">Отмена</button>
+      <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: модель (добавить / изменить) -->
+<dialog id="dlg-model" aria-labelledby="dm-title" aria-describedby="dm-help">
+  <form method="dialog" id="dm-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="dm-title">Добавить модель</h3>
+      <p id="dm-help">Сначала задай внешний ID модели, затем добавь провайдеры в порядке приоритета.</p>
+    </div>
+    <div class="dialog-body">
+      <label>Имя модели в OpenCode
+        <input id="dm-name" required placeholder="claude-sonnet" aria-describedby="dm-name-help">
+      </label>
+      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">В OpenCode модель будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
+
+      <section class="dialog-section" aria-labelledby="dm-chain-title">
+        <div class="dialog-section-head">
+          <div>
+            <h4 id="dm-chain-title">1. Порядок переключения</h4>
+            <p>Первый провайдер — основной, остальные используются как запасные.</p>
+          </div>
+          <span id="dm-count" class="dialog-count"></span>
+        </div>
+        <div id="dm-chain" class="chain-editor" aria-live="polite"></div>
+      </section>
+
+      <section class="dialog-section" aria-labelledby="dm-add-title">
+        <div class="dialog-section-head">
+          <div>
+            <h4 id="dm-add-title">2. Добавить провайдера</h4>
+            <p>Выбери сохранённую модель — она добавится в конец цепочки.</p>
+          </div>
+        </div>
+        <label style="margin:0">Провайдер
+          <select id="dm-pick-provider"></select>
+        </label>
+        <div id="dm-pick-list"></div>
+        <details class="manual-add">
+          <summary>Модели нет в списке? Ввести ID вручную</summary>
+          <div class="dialog-add-row">
+            <label class="sr-only" for="dm-add-provider">Провайдер</label>
+            <select id="dm-add-provider" aria-label="Провайдер для ручного добавления"></select>
+            <label class="sr-only" for="dm-add-model">ID модели у провайдера</label>
+            <input id="dm-add-model" placeholder="ID модели у провайдера">
+            <button type="button" id="dm-add">Добавить</button>
+          </div>
+        </details>
+      </section>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="dm-cancel">Отмена</button>
+      <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id)
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
+const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
+
+let cfg = { providers: {}, models: {} }
+let token = localStorage.getItem("pp_token") ?? ""
+const filters = new Map() // filter text per chips list, keyed by container id
+
+async function api(path, opts = {}, retried = false) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
+  })
+  if (r.status === 401 && !retried) {
+    token = prompt("authToken прокси:") ?? ""
+    localStorage.setItem("pp_token", token)
+    return api(path, opts, true)
+  }
+  return r
+}
+
+function flash(ok, msg) {
+  const s = $("status")
+  s.textContent = msg
+  s.className = "status" + (ok ? "" : " err")
+  s.style.display = "block"
+  clearTimeout(flash.t)
+  flash.t = setTimeout(() => (s.style.display = "none"), 2500)
+}
+
+let saveT
+function save() {
+  clearTimeout(saveT)
+  saveT = setTimeout(async () => {
+    const r = await api("/api/config", { method: "PUT", body: JSON.stringify(cfg) })
+    if (!r.ok) return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
+    const j = await r.json().catch(() => ({}))
+    flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено ✓")
+  }, 300)
+}
+
+// ---------- главная страница ----------
+
+function renderProviders() {
+  const t = $("providers")
+  const entries = Object.entries(cfg.providers)
+  t.innerHTML = entries.length ? "<tr><th>имя</th><th>baseURL</th><th>ключ</th><th>модели</th><th></th></tr>" : ""
+  let anyCheckin = false
+  for (const [name, p] of entries) {
+    const models = p.models ?? []
+    if (p.checkin) anyCheckin = true
+    const tr = t.insertRow()
+    tr.innerHTML = `
+      <td><b>${esc(name)}</b></td>
+      <td class="muted">${esc(p.baseURL ?? "")}</td>
+      <td class="muted">${p.apiKey ? "••••••" : "—"}</td>
+      <td class="muted">${models.length || "—"}</td>
+      <td style="white-space:nowrap;text-align:right">
+        ${p.checkin ? `<button data-a="checkin">Чекин</button>` : ""}
+        <button data-a="edit">Изменить</button>
+        <button data-a="del">✕</button>
+      </td>`
+    if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
+    tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
+    tr.querySelector('[data-a="del"]').onclick = () => {
+      if (!confirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`)) return
+      delete cfg.providers[name]
+      for (const m of Object.values(cfg.models)) m.upstreams = (m.upstreams ?? []).filter((u) => u.provider !== name)
+      save(); renderAll()
+    }
+  }
+  $("p-checkins").style.display = anyCheckin ? "" : "none"
+  if (!entries.length) {
+    const tr = t.insertRow()
+    tr.innerHTML = `<td colspan="5" class="muted">провайдеров пока нет — нажми «+ Добавить провайдера»</td>`
+  }
+}
+
+$("p-checkins").onclick = () => {
+  for (const p of Object.values(cfg.providers)) if (p.checkin) openUrl(p.checkin)
+}
+
+function renderModels() {
+  const box = $("models")
+  box.innerHTML = ""
+  const entries = Object.entries(cfg.models)
+  for (const [name, def] of entries) {
+    const ups = def.upstreams ?? []
+    const div = document.createElement("div")
+    div.className = "card"
+    div.innerHTML = `
+      <div class="model-card-head">
+        <b class="model-title">proxy/${esc(name)}</b>
+        <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>
+        <div class="model-actions">
+          <button data-a="edit">Изменить</button>
+          <button class="quiet danger" data-a="del">Удалить</button>
+        </div>
+      </div>
+      <div class="chain">
+        ${ups.length
+          ? ups
+              .map(
+                (u, i) => `
+        <div class="step">
+          <span class="n">${i + 1}.</span><span class="prov">${esc(u.provider ?? "")}</span><span>→</span><code>${esc(u.model ?? "")}</code>${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
+        </div>`,
+              )
+              .join("")
+          : `<div class="muted">добавь хотя бы одного провайдера — кнопка «Изменить»</div>`}
+      </div>`
+    div.querySelector('[data-a="edit"]').onclick = () => openModelDialog(name)
+    div.querySelector('[data-a="del"]').onclick = () => {
+      if (!confirm(`Удалить модель proxy/${name}?`)) return
+      delete cfg.models[name]
+      save(); renderModels()
+    }
+    box.append(div)
+  }
+  if (!entries.length) box.innerHTML = `<p class="muted">моделей пока нет — нажми «+ Добавить модель» или «Модели» у провайдера</p>`
+}
+
+function renderSettings() {
+  $("s-port").value = cfg.port ?? 8787
+  $("s-auth").value = cfg.authToken ?? ""
+  $("s-limit").value = cfg.limitCooldownSec ?? 300
+  $("s-error").value = cfg.errorCooldownSec ?? 30
+  $("s-header").value = cfg.headerTimeoutSec ?? 20
+  $("proxyinfo").textContent = `→ http://127.0.0.1:${cfg.port ?? 8787}/v1`
+}
+
+const num = (id, key) => ($(id).onchange = (e) => { cfg[key] = Number(e.target.value) || undefined; save() })
+num("s-port", "port")
+num("s-limit", "limitCooldownSec")
+num("s-error", "errorCooldownSec")
+num("s-header", "headerTimeoutSec")
+$("s-auth").onchange = (e) => {
+  const v = e.target.value.trim()
+  if (v) cfg.authToken = v
+  else delete cfg.authToken
+  token = v
+  localStorage.setItem("pp_token", v)
+  save()
+}
+
+function renderAll() {
+  renderProviders()
+  renderProviderModels()
+  renderModels()
+  renderSettings()
+}
+
+// ---------- диалог: провайдер ----------
+
+const dlgProvider = $("dlg-provider")
+let editingProvider = null
+
+function openProviderDialog(name = null) {
+  editingProvider = name
+  dlgProvider.returnValue = ""
+  $("dp-title").textContent = name ? `Провайдер «${name}»` : "Добавить провайдера"
+  $("dp-name").value = name ?? ""
+  $("dp-url").value = name ? cfg.providers[name]?.baseURL ?? "" : ""
+  $("dp-key").value = name ? cfg.providers[name]?.apiKey ?? "" : ""
+  $("dp-checkin").value = name ? cfg.providers[name]?.checkin ?? "" : ""
+  dlgProvider.showModal()
+}
+
+$("p-add").onclick = () => openProviderDialog()
+$("dp-cancel").onclick = () => dlgProvider.close()
+
+$("dp-form").addEventListener("submit", (e) => {
+  const name = $("dp-name").value.trim()
+  if (cfg.providers[name] && name !== editingProvider) {
+    e.preventDefault()
+    flash(false, "имя провайдера занято")
+  }
+})
+dlgProvider.addEventListener("close", () => {
+  if (dlgProvider.returnValue !== "save") return
+  const name = $("dp-name").value.trim()
+  // keep fields the dialog does not edit (models allowlist, headers) when renaming/editing
+  const rec = { ...(editingProvider ? cfg.providers[editingProvider] : {}), baseURL: $("dp-url").value.trim(), apiKey: $("dp-key").value.trim() }
+  const checkin = $("dp-checkin").value.trim()
+  if (checkin) rec.checkin = checkin
+  else delete rec.checkin
+  cfg.providers[name] = rec
+  if (editingProvider && editingProvider !== name) {
+    delete cfg.providers[editingProvider]
+    for (const m of Object.values(cfg.models))
+      for (const u of m.upstreams ?? []) if (u.provider === editingProvider) u.provider = name
+  }
+  save(); renderAll()
+})
+
+// ---------- диалог: модель ----------
+
+const dlgModel = $("dlg-model")
+let draft = null // { original, upstreams: [{provider, model}] }
+let pickProvider = null // провайдер, выбранный в пикере «или из выбранных моделей провайдера»
+
+function openModelDialog(name = null) {
+  const src = name ? cfg.models[name] : null
+  draft = { original: name, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [] }
+  dlgModel.returnValue = ""
+  $("dm-title").textContent = name ? `Модель proxy/${name}` : "Добавить модель"
+  $("dm-name").value = name ?? ""
+  pickProvider = null
+  filters.delete("dm-pick-list")
+  renderModelDialog()
+  dlgModel.showModal()
+}
+
+function renderModelDialog() {
+  const ups = draft.upstreams
+  const provNames = Object.keys(cfg.providers)
+
+  $("dm-chain").innerHTML = ups.length
+    ? ups
+        .map(
+          (u, i) => `
+        <div class="chain-row">
+          <span class="step-number" aria-hidden="true">${i + 1}</span>
+          <label class="sr-only" for="dm-provider-${i}">Провайдер, шаг ${i + 1}</label>
+          <select id="dm-provider-${i}" data-i="${i}" data-k="provider" aria-label="Провайдер, шаг ${i + 1}">
+            ${provNames.map((pn) => `<option ${pn === u.provider ? "selected" : ""}>${esc(pn)}</option>`).join("")}
+            ${u.provider && !cfg.providers[u.provider] ? `<option selected>${esc(u.provider)} (удалён)</option>` : ""}
+          </select>
+          <label class="sr-only" for="dm-model-${i}">ID модели, шаг ${i + 1}</label>
+          <input id="dm-model-${i}" data-i="${i}" data-k="model" value="${esc(u.model ?? "")}" placeholder="ID модели у провайдера" aria-label="ID модели, шаг ${i + 1}">
+          <div class="row-controls">
+            <button class="icon-button" type="button" data-a="up" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} выше" title="Выше">↑</button>
+            <button class="icon-button" type="button" data-a="down" data-i="${i}" ${i === ups.length - 1 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} ниже" title="Ниже">↓</button>
+            <button class="icon-button danger" type="button" data-a="rm" data-i="${i}" aria-label="Удалить шаг ${i + 1}" title="Удалить">✕</button>
+          </div>
+        </div>`,
+        )
+        .join("")
+    : `<p class="muted" style="margin:4px 0">Цепочка пуста — выбери модель ниже или введи ID вручную.</p>`
+
+  $("dm-count").textContent = ups.length ? `${ups.length} ${ups.length === 1 ? "провайдер" : ups.length < 5 ? "провайдера" : "провайдеров"}` : "нет провайдеров"
+
+  $("dm-chain").querySelectorAll("select[data-i],input[data-i]").forEach((el) => {
+    el.onchange = () => {
+      draft.upstreams[+el.dataset.i][el.dataset.k] = el.value.trim()
+    }
+  })
+  const on = (a, fn) => $("dm-chain").querySelectorAll(`[data-a="${a}"]`).forEach((b) => (b.onclick = () => fn(+b.dataset.i)))
+  on("up", (i) => { const u = draft.upstreams; [u[i - 1], u[i]] = [u[i], u[i - 1]]; renderModelDialog() })
+  on("down", (i) => { const u = draft.upstreams; [u[i + 1], u[i]] = [u[i], u[i + 1]]; renderModelDialog() })
+  on("rm", (i) => { draft.upstreams.splice(i, 1); renderModelDialog() })
+
+  // default both selects to the provider the user is most likely working with:
+  // the one picked before, else the last one in the chain
+  const prefer = pickProvider ?? draft.upstreams.at(-1)?.provider
+  const opts = provNames
+    .map((pn) => `<option ${pn === prefer ? "selected" : ""}>${esc(pn)}</option>`)
+    .join("")
+  $("dm-add-provider").innerHTML = opts || `<option value="">нет провайдеров</option>`
+  $("dm-pick-provider").innerHTML = opts || `<option value="">нет провайдеров</option>`
+  $("dm-pick-provider").onchange = (e) => {
+    pickProvider = e.target.value
+    filters.delete("dm-pick-list")
+    renderPick()
+  }
+  renderPick()
+}
+
+$("dm-add").onclick = () => {
+  const pn = $("dm-add-provider").value
+  const mid = $("dm-add-model").value.trim()
+  if (!pn || !mid) return flash(false, "выбери провайдера и впиши ID модели")
+  draft.upstreams.push({ provider: pn, model: mid })
+  $("dm-add-model").value = ""
+  renderModelDialog()
+}
+
+function renderPick() {
+  const pn = $("dm-pick-provider").value
+  if (!pn) return ($("dm-pick-list").innerHTML = "")
+  const ids = cfg.providers[pn]?.models ?? []
+  if (!ids.length)
+    return ($("dm-pick-list").innerHTML = `<span class="muted">у «${esc(pn)}» не выбраны модели — отметь их в блоке «Модели провайдеров» (шаг 2)</span>`)
+  renderChips("dm-pick-list", pn, ids, (id) => {
+    if (draft.upstreams.some((u) => u.provider === pn && u.model === id)) return flash(false, "уже в цепочке")
+    draft.upstreams.push({ provider: pn, model: id })
+    renderModelDialog()
+  })
+}
+
+$("m-add").onclick = () => openModelDialog()
+$("m-sync").onclick = async () => {
+  const r = await api("/api/opencode-sync", { method: "POST" })
+  const j = await r.json().catch(() => ({}))
+  flash(!!j.ok, j.ok ? `opencode: ${j.models} моделей провайдера обновлено` : "opencode: не обновилось — смотри вкладку «Логи»")
+}
+$("dm-cancel").onclick = () => dlgModel.close()
+
+$("dm-form").addEventListener("submit", (e) => {
+  const name = $("dm-name").value.trim()
+  if (!name || !draft.upstreams.length || (cfg.models[name] && name !== draft.original)) {
+    e.preventDefault()
+    flash(false, !name ? "впиши имя" : !draft.upstreams.length ? "добавь хотя бы одного провайдера в цепочку" : "имя занято")
+  }
+})
+dlgModel.addEventListener("close", () => {
+  if (dlgModel.returnValue !== "save") return
+  const name = $("dm-name").value.trim()
+  cfg.models[name] = { upstreams: draft.upstreams }
+  if (draft.original && draft.original !== name) delete cfg.models[draft.original]
+  save(); renderModels()
+})
+
+// ---------- блок: модели провайдеров (галочки) ----------
+
+let pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
+
+function renderProviderModels() {
+  const names = Object.keys(cfg.providers)
+  if (!names.length) {
+    pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
+    $("pm-provider").innerHTML = ""
+    $("pm-provider").disabled = true
+    $("pm-status").textContent = ""
+    $("pm-list").innerHTML = `<span class="muted">провайдеров пока нет — добавь в шаге 1</span>`
+    return
+  }
+  $("pm-provider").disabled = false
+  // выбор сброшен (первый запуск или провайдера удалили): берём сохранённые модели, без запроса
+  if (!names.includes(pmState.provider))
+    pmState = { provider: names[0], ids: [...(cfg.providers[names[0]].models ?? [])], filter: "", loading: false, error: null }
+  $("pm-provider").innerHTML = names.map((n) => `<option ${n === pmState.provider ? "selected" : ""}>${esc(n)}</option>`).join("")
+  $("pm-filter").value = pmState.filter
+  const saved = cfg.providers[pmState.provider].models ?? []
+  $("pm-status").textContent = pmState.loading
+    ? "загружаю /v1/models…"
+    : pmState.error
+      ? `не удалось загрузить (${pmState.error}) — показаны сохранённые`
+      : `выбрано ${saved.length} из ${pmState.ids.length}`
+  renderPmList()
+}
+
+async function loadPmModels(name) {
+  if (!cfg.providers[name]) return
+  pmState.loading = true
+  pmState.error = null
+  renderProviderModels()
+  const res = await fetchProviderModels(name)
+  if (pmState.provider !== name) return // пока грузилось, выбрали другого провайдера
+  pmState.loading = false
+  pmState.error = res.error ?? null
+  if (!res.error) pmState.ids = [...new Set([...(cfg.providers[name].models ?? []), ...res.ids])]
+  renderProviderModels()
+}
+
+$("pm-provider").onchange = (e) => {
+  pmState = { provider: e.target.value, ids: [...(cfg.providers[e.target.value]?.models ?? [])], filter: "", loading: false, error: null }
+  renderProviderModels()
+  loadPmModels(pmState.provider)
+}
+$("pm-refresh").onclick = () => loadPmModels(pmState.provider)
+$("pm-filter").oninput = (e) => {
+  pmState.filter = e.target.value
+  renderPmList()
+  const nf = $("pm-filter")
+  nf.focus()
+  nf.setSelectionRange(nf.value.length, nf.value.length)
+}
+$("pm-add").onclick = () => {
+  if (!pmState.provider) return flash(false, "сначала добавь провайдера")
+  const id = $("pm-manual").value.trim()
+  if (!id) return flash(false, "впиши ID модели")
+  const arr = (cfg.providers[pmState.provider].models ??= [])
+  if (arr.includes(id)) return flash(false, "уже есть")
+  arr.push(id)
+  if (!pmState.ids.includes(id)) pmState.ids.unshift(id)
+  $("pm-manual").value = ""
+  save()
+  renderProviderModels()
+}
+
+function renderPmList() {
+  const p = pmState.provider ? cfg.providers[pmState.provider] : null
+  if (!p) return ($("pm-list").innerHTML = "")
+  const saved = p.models ?? []
+  const ft = (pmState.filter ?? "").toLowerCase()
+  const shown = pmState.ids.filter((id) => id.toLowerCase().includes(ft))
+  $("pm-list").innerHTML = shown.length
+    ? shown
+        .map(
+          (id) => `
+        <label class="check">
+          <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
+          <code>${esc(id)}</code>
+        </label>`,
+        )
+        .join("")
+    : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить с /v1/models» или добавь вручную"}</span>`
+  // перерисовки на каждый клик нет — только счётчики, иначе скролл списка прыгает наверх
+  $("pm-list").querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.onchange = () => {
+      const arr = (cfg.providers[pmState.provider].models ??= [])
+      const i = arr.indexOf(cb.dataset.id)
+      if (cb.checked && i < 0) arr.push(cb.dataset.id)
+      if (!cb.checked && i >= 0) arr.splice(i, 1)
+      save()
+      renderProviders() // счётчик моделей в таблице провайдеров
+      $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
+    }
+  })
+}
+
+// ---------- общее ----------
+
+// Filterable chips list: header names the provider and counts matches, so a huge
+// aggregated catalog (OpenRouter & co) can't be mistaken for "all providers".
+function renderChips(containerId, provider, ids, onAdd) {
+  const box = $(containerId)
+  const ft = filters.get(containerId) ?? ""
+  const shown = ids.filter((id) => id.toLowerCase().includes(ft.toLowerCase()))
+  box.innerHTML = `
+    <div class="row" style="width:100%">
+      <span class="muted">провайдер «${esc(provider)}» — ${shown.length} из ${ids.length} моделей</span>
+      <input data-role="filter" placeholder="фильтр по имени…" style="flex:1;min-width:120px" value="${esc(ft)}">
+    </div>
+    <div class="fetched" style="margin-top:6px">
+      ${shown.length
+        ? shown.map((id) => `<span class="chip"><code>${esc(id)}</code><button type="button" data-id="${esc(id)}" aria-label="Добавить модель ${esc(id)}" title="Добавить в цепочку">＋</button></span>`).join("")
+        : `<span class="muted">ничего не найдено</span>`}
+    </div>`
+  const f = box.querySelector('[data-role="filter"]')
+  f.oninput = (e) => {
+    filters.set(containerId, e.target.value)
+    renderChips(containerId, provider, ids, onAdd)
+    const nf = $(containerId).querySelector('[data-role="filter"]')
+    nf.focus()
+    nf.setSelectionRange(nf.value.length, nf.value.length)
+  }
+  box.querySelectorAll("button[data-id]").forEach((b) => (b.onclick = () => onAdd(b.dataset.id)))
+}
+
+async function fetchProviderModels(name) {
+  const p = cfg.providers[name]
+  const r = await api("/api/provider-models", { method: "POST", body: JSON.stringify({ baseURL: p.baseURL, apiKey: p.apiKey }) })
+  const j = await r.json().catch(() => ({}))
+  return r.ok
+    ? { provider: name, ids: j.models ?? [] }
+    : { provider: name, ids: [], error: j.error ?? `HTTP ${r.status}` }
+}
+
+// ---------- вкладки ----------
+
+const TABS = ["providers", "models", "chains", "logs", "usage"]
+let tab = localStorage.getItem("pp_tab") ?? "providers"
+
+function showTab(name) {
+  if (!TABS.includes(name)) name = "providers"
+  tab = name
+  localStorage.setItem("pp_tab", name)
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name))
+  document.querySelectorAll("main > section[data-tab]").forEach((s) => (s.style.display = s.dataset.tab === name ? "" : "none"))
+  if (name === "logs") loadLogs()
+  if (name === "usage") loadUsage()
+}
+document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)))
+
+// ---------- логи ----------
+
+async function loadLogs() {
+  try {
+    const j = await (await api("/api/logs")).json()
+    const box = $("logbox")
+    const lines = j.lines ?? []
+    const key = lines.join("\n")
+    if (box.dataset.k === key) return // nothing new — не перестраиваем DOM, чтобы не дёргать скролл
+    box.dataset.k = key
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 60 // не дёргаем, если читаешь выше
+    box.replaceChildren(...(lines.length ? lines.map(logCard) : [document.createTextNode("—")]))
+    $("log-info").textContent = `последние ${lines.length} из ${j.max ?? "?"} · чистятся сами`
+    if (atBottom) box.scrollTop = box.scrollHeight
+  } catch {
+    /* прокси недоступен — следующий опрос повторит */
+  }
+}
+
+// Разбираем строку вида "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ..." в карточку.
+const logCard = (line) => {
+  const m = String(line).match(/^\[([^\]]+)\]\s*(.*)$/)
+  const ts = m?.[1] ?? ""
+  const rest = m?.[2] ?? line
+  const [head, ...tail] = rest.split(" → ")
+  const detail = tail.join(" → ")
+  const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
+  const card = document.createElement("div")
+  card.className = "log-card" + (cls ? ` ${cls}` : "")
+  const top = document.createElement("div")
+  top.className = "t"
+  const tm = document.createElement("span")
+  tm.className = "tm"
+  tm.textContent = ts
+  const badge = document.createElement("span")
+  badge.className = "b"
+  badge.textContent = detail ? tail[0].replace(/[:：].*$/, "") : cls === "err" ? "ошибка" : cls === "warn" ? "блок" : "инфо"
+  top.append(tm, badge)
+  const msg = document.createElement("div")
+  msg.className = "m"
+  const em = document.createElement("b")
+  em.textContent = head
+  msg.append(em)
+  if (detail) msg.append(` ${detail}`)
+  card.append(top, msg)
+  return card
+}
+
+// ---------- usage ----------
+
+const fmtTok = (n = 0) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n))
+const fmtUptime = (ms = 0) => {
+  const s = Math.round(ms / 1000)
+  return s < 60 ? `${s} с` : s < 3600 ? `${Math.round(s / 60)} мин` : `${(s / 3600).toFixed(1)} ч`
+}
+
+function usageTable(obj, cols) {
+  const names = Object.keys(obj ?? {}).sort((a, b) => (obj[b].requests ?? 0) - (obj[a].requests ?? 0))
+  if (!names.length) return `<tr><td class="muted">данных пока нет</td></tr>`
+  return (
+    `<tr><th>имя</th>${cols.map((c) => `<th>${c.h}</th>`).join("")}</tr>` +
+    names.map((n) => `<tr><td>${esc(n)}</td>${cols.map((c) => `<td class="muted">${c.f(obj[n])}</td>`).join("")}</tr>`).join("")
+  )
+}
+
+async function loadUsage() {
+  try {
+    const u = await (await api("/api/usage")).json()
+    $("u-info").textContent = `с запуска прокси: ${fmtUptime(u.uptimeMs)}`
+    const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
+    $("u-tiles").innerHTML =
+      tile("запросов", u.requests ?? 0) +
+      tile("успешных", u.ok ?? 0) +
+      tile("failover", u.failovers ?? 0) +
+      tile("ошибок", u.failed ?? 0) +
+      tile("токенов вход", fmtTok(u.tokensIn)) +
+      tile("токенов выход", fmtTok(u.tokensOut))
+    $("u-providers").innerHTML = usageTable(u.providers, [
+      { h: "запросов", f: (s) => s.requests ?? 0 },
+      { h: "ок", f: (s) => s.ok ?? 0 },
+      { h: "429", f: (s) => s.limits ?? 0 },
+      { h: "ошибок", f: (s) => s.errors ?? 0 },
+      { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
+      { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
+    ])
+    $("u-models").innerHTML = usageTable(u.models, [
+      { h: "запросов", f: (s) => s.requests ?? 0 },
+      { h: "ок", f: (s) => s.ok ?? 0 },
+      { h: "failover", f: (s) => s.failovers ?? 0 },
+      { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
+      { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
+    ])
+    const cool = u.cooldowns ?? []
+    $("u-cooling").textContent = cool.length
+      ? "в кулдауне: " + cool.map((c) => `${c.model} → ${c.upstream} (до ${new Date(c.until).toLocaleTimeString()})`).join("; ")
+      : ""
+  } catch {
+    /* прокси недоступен — следующий опрос повторит */
+  }
+}
+
+async function load() {
+  try {
+    const r = await api("/api/config")
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    cfg = await r.json()
+    cfg.providers ??= {}
+    cfg.models ??= {}
+    renderAll()
+    if (pmState.provider) loadPmModels(pmState.provider) // список моделей подтягиваем при открытии вкладки
+  } catch {
+    flash(false, "не удалось загрузить конфиг — прокси запущен?")
+  }
+}
+
+// держим сервер живым, пока открыта вкладка GUI; закрыл вкладку — сервер сам выключится
+setInterval(() => fetch("/api/ping").catch(() => {}), 5000)
+
+// логи и usage обновляем каждые 3 с, но только если вкладка страницы видна (не свёрнута в фон)
+setInterval(() => {
+  if (document.hidden) return
+  if (tab === "logs") loadLogs()
+  if (tab === "usage") loadUsage()
+}, 3000)
+
+showTab(tab)
+load()
+</script>
+</body>
+</html>
