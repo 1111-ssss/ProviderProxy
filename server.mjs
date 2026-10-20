@@ -46,10 +46,8 @@ try {
 let PORT, AUTH, LIMIT_COOLDOWN_MS, ERROR_COOLDOWN_MS, HEADER_TIMEOUT_MS
 let chains = new Map()
 
-const INDEX_HTML = (() => {
-  const p = join(here, "public", "index.html")
-  return existsSync(p) ? readFileSync(p, "utf8") : ""
-})()
+const indexPath = join(here, "public", "index.html")
+const readIndexHtml = () => (existsSync(indexPath) ? readFileSync(indexPath, "utf8") : "")
 
 // "{env:NAME}" substitution so API keys can stay out of the config file.
 const subst = (v) =>
@@ -187,9 +185,12 @@ const server = http.createServer(async (req, res) => {
   res.on("error", () => {}) // a client disconnecting mid-stream must not crash the proxy
   try {
     // The GUI page itself is public (localhost); its /api calls carry the token when authToken is set.
-    if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" })
-      return res.end(INDEX_HTML)
+    const pathname = String(req.url ?? "/").split("?", 1)[0]
+    if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) {
+      // Read the page for every request so a long-running proxy serves a freshly edited GUI
+      // without requiring a server restart. no-store also avoids a stale browser copy.
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store, max-age=0" })
+      return res.end(readIndexHtml())
     }
 
     // Liveness heartbeat from the GUI tab; exempt from authToken so the tab can always keep us alive.
