@@ -34,23 +34,74 @@
 failover, сохранение конфига, логи и usage работают из Rust. Закрытие окна прячет приложение в системный
 трей, поэтому прокси продолжает работать; в меню трея есть команды «Открыть Provider Proxy» и «Выйти».
 
+### Linux: запуск из исходников
+
+Установите Rust/Cargo, Tauri CLI и системные зависимости WebKitGTK/libSoup 3:
+
 ```bash
 cd rust-desktop
 cargo install tauri-cli --locked
+```
+
+Запуск в режиме разработки:
+
+```bash
 cargo tauri dev
 ```
 
-Можно передать существующий конфиг первым аргументом или через `PP_CONFIG_FILE`:
+Если конфиг находится в корне проекта, его можно передать явно:
 
 ```bash
 cargo tauri dev -- ../config.json
 ```
 
-Сборка установщика:
+Сборка и запуск desktop-версии без режима разработки:
 
 ```bash
 cargo tauri build
+./launch.sh
 ```
+
+`launch.sh` запускает свежий AppImage или бинарник из `target/release` и автоматически пересобирает
+Rust-приложение, если исходники новее сборки. Для альтернативного конфига:
+
+```bash
+PP_CONFIG_FILE=/path/to/config.json ./launch.sh
+```
+
+### Windows: запуск из исходников
+
+Установите Rust/Cargo, Tauri CLI и WebView2:
+
+```powershell
+cd rust-desktop
+cargo install tauri-cli --locked
+```
+
+Запуск в режиме разработки:
+
+```powershell
+cargo tauri dev -- ..\config.json
+```
+
+Сборка релизной версии:
+
+```powershell
+cargo tauri build
+```
+
+После сборки бинарник находится в `target\release\provider-proxy-desktop.exe`. Запустить его можно
+напрямую или установить ярлыки обеих версий:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\install-shortcuts.ps1
+```
+
+Команду установки ярлыков нужно выполнять из каталога `rust-desktop`. Скрипт создаёт ярлыки
+`Provider Proxy Rust` и `Provider Proxy npm` в меню «Пуск» и на рабочем столе. Rust-ярлык запускает
+собранный `.exe`, npm-ярлык запускает Node.js-сервер и открывает локальный GUI в браузере.
+Для другого конфига можно задать переменную `$env:PP_CONFIG_FILE` перед запуском.
 
 После смены названия desktop-приложения старый ярлык `Provider Proxy` может остаться
 от ранее установленного `.deb`/`.rpm`. Два актуальных ярлыка устанавливаются так:
@@ -59,17 +110,7 @@ cargo tauri build
 ./install-shortcuts.sh
 ```
 
-Для Windows после сборки Rust-приложения можно создать ярлыки обеих версий PowerShell-скриптом:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\rust-desktop\install-shortcuts.ps1
-```
-
-Скрипт создаёт ярлыки `Provider Proxy Rust` и `Provider Proxy npm` в меню «Пуск» и на рабочем
-столе. Rust-ярлык запускает собранный `provider-proxy-desktop.exe`, npm-ярлык запускает Node.js
-сервер и открывает локальный интерфейс в браузере. Файлы `config.json`, ключи и статистика в Git
-не добавляются.
+Файлы `config.json`, ключи и статистика в Git не добавляются.
 
 Если старый ярлык всё ещё виден в меню приложений, удалите старую системную запись
 от имени администратора и обновите кэш KDE:

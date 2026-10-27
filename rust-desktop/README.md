@@ -62,6 +62,8 @@ python3 tests/checkin_smoke.py "target/release/bundle/appimage/Provider Proxy Ru
 
 ## Запуск из исходников
 
+### Linux
+
 ```bash
 cargo install tauri-cli --locked
 cargo tauri dev
@@ -72,6 +74,46 @@ cargo tauri dev
 ```bash
 cargo tauri dev -- ./config.json
 ```
+
+Для релизного запуска из каталога `rust-desktop`:
+
+```bash
+cargo tauri build
+./launch.sh
+```
+
+`launch.sh` выберет свежий AppImage или бинарник из `target/release` и при необходимости
+пересоберёт приложение. Альтернативный конфиг задаётся так:
+
+```bash
+PP_CONFIG_FILE=/path/to/config.json ./launch.sh
+```
+
+### Windows
+
+В PowerShell установите Tauri CLI и запустите разработческий режим:
+
+```powershell
+cargo install tauri-cli --locked
+cargo tauri dev -- ..\config.json
+```
+
+Для релизной сборки:
+
+```powershell
+cargo tauri build
+```
+
+Готовый бинарник находится в `target\release\provider-proxy-desktop.exe`. Его можно запускать
+напрямую или создать ярлыки Rust и npm:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\install-shortcuts.ps1
+```
+
+Скрипт создаёт ярлыки в меню «Пуск» и на рабочем столе. Для другого конфига перед запуском
+можно задать `$env:PP_CONFIG_FILE`. На Windows также требуется WebView2.
 
 Также поддерживается `PP_CONFIG_FILE`. Без него приложение использует `config.json` из текущего каталога,
 а затем файл в системном каталоге конфигурации `provider-proxy`.
