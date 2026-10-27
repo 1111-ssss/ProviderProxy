@@ -1,0 +1,176 @@
+use serde_json::{json, Map, Value};
+use std::fs;
+
+use super::{config::expand_home, metrics::push_log, types::AppState};
+
+pub(crate) fn default_opencode_config_setting() -> String {
+    let dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".config")
+        .join("opencode");
+    if dir.join("opencode.jsonc").exists() {
+        "~/.config/opencode/opencode.jsonc".into()
+    } else {
+        "~/.config/opencode/opencode.json".into()
+    }
+}
+
+fn default_opencode_config_path(config: &Value) -> std::path::PathBuf {
+    if let Some(path) = config.get("opencodeConfig").and_then(Value::as_str) {
+        return expand_home(path);
+    }
+    let dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".config")
+        .join("opencode");
+    let jsonc = dir.join("opencode.jsonc");
+    let json = dir.join("opencode.json");
+    if json.exists() {
+        json
+    } else if jsonc.exists() {
+        jsonc
+    } else {
+        json
+    }
+}
+
+pub(crate) async fn sync_opencode(state: &AppState) -> bool {
+    let config = state.config.read().unwrap().clone();
+    let path = default_opencode_config_path(&config);
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(_) => {
+            push_log(
+                state,
+                format!(
+                    "opencode: нет файла {} — карта моделей не обновлена",
+                    path.display()
+                ),
+            );
+            return false;
+        }
+    };
+    let mut document: Value = match serde_json::from_str(&raw) {
+        Ok(value) => value,
+        Err(_) => {
+            push_log(
+                state,
+                format!(
+                    "opencode: {} не читается как JSON — карта моделей не обновлена",
+                    path.display()
+                ),
+            );
+            return false;
+        }
+    };
+    let provider_id = config
+        .get("opencodeProvider")
+        .and_then(Value::as_str)
+        .unwrap_or("provider-proxy");
+    let providers = document
+        .as_object_mut()
+        .and_then(|root| {
+            if !root.contains_key("providers") {
+                root.insert("providers".into(), Value::Object(Map::new()));
+            }
+            root.get_mut("providers")
+        })
+        .and_then(Value::as_object_mut);
+    let Some(providers) = providers else {
+        return false;
+    };
+    let entry = providers
+        .entry(provider_id.to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    let Some(provider) = entry.as_object_mut() else {
+        return false;
+    };
+    provider
+        .entry("package")
+        .or_insert_with(|| Value::String("aisdk:@ai-sdk/openai-compatible".into()));
+    provider
+        .entry("name")
+        .or_insert_with(|| Value::String("Provider Proxy".into()));
+    let settings = provider
+        .entry("settings")
+        .or_insert_with(|| Value::Object(Map::new()))
+        .as_object_mut();
+    let Some(settings) = settings else {
+        return false;
+    };
+    let port = state.port;
+    settings.insert(
+        "baseURL".into(),
+        Value::String(format!("http://127.0.0.1:{port}/v1")),
+    );
+    if let Some(auth) = config.get("authToken").and_then(Value::as_str) {
+        settings.insert("apiKey".into(), Value::String(auth.into()));
+    }
+    let previous = provider
+        .get("models")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let chains = state.chains.read().unwrap();
+    let mut models = Map::new();
+    if let Some(config_models) = config.get("models").and_then(Value::as_object) {
+        for (name, definition) in config_models {
+            if definition.get("enabled").and_then(Value::as_bool) == Some(false) {
+                continue;
+            }
+            let chain_len = chains.get(name).map(Vec::len).unwrap_or(0);
+            let mut item = previous.get(name).cloned().unwrap_or_else(|| json!({}));
+            if let Value::Object(object) = &mut item {
+                object.insert(
+                    "name".into(),
+                    Value::String(format!("{name} (proxy, x{chain_len})")),
+                );
+            }
+            models.insert(name.clone(), item);
+        }
+    }
+    if let Some(direct) = config.get("opencodeModels").and_then(Value::as_object) {
+        for (provider_name, definition) in direct {
+            if definition.get("enabled").and_then(Value::as_bool) == Some(false) {
+                continue;
+            }
+            for model in definition
+                .get("models")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                let name = format!("{provider_name}/{model}");
+                let mut item = previous.get(&name).cloned().unwrap_or_else(|| json!({}));
+                if let Value::Object(object) = &mut item {
+                    object.insert("name".into(), Value::String(format!("{name} (config)")));
+                }
+                models.insert(name, item);
+            }
+        }
+    }
+    provider.insert("models".into(), Value::Object(models));
+    if let Some(parent) = path.parent() {
+        if fs::create_dir_all(parent).is_err() {
+            return false;
+        }
+    }
+    let _ = fs::write(format!("{}.bak", path.display()), &raw);
+    if fs::write(
+        &path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&document).unwrap_or_else(|_| raw.clone())
+        ),
+    )
+    .is_err()
+    {
+        return false;
+    }
+    push_log(
+        state,
+        format!("opencode: карта моделей записана в {}", path.display()),
+    );
+    true
+}

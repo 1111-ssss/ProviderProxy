@@ -1,0 +1,43 @@
+{
+  "port": 8787,
+  "limitCooldownSec": 300,
+  "errorCooldownSec": 30,
+  "headerTimeoutSec": 20,
+  "providers": {
+    "anthropic": {
+      "baseURL": "https://api.anthropic.com/v1",
+      "apiKey": "{env:ANTHROPIC_API_KEY}"
+    },
+    "openrouter": {
+      "baseURL": "https://openrouter.ai/api/v1",
+      "apiKey": "{env:OPENROUTER_API_KEY}"
+    },
+    "deepseek": {
+      "baseURL": "https://api.deepseek.com/v1",
+      "apiKey": "{env:DEEPSEEK_API_KEY}"
+    }
+  },
+  "models": {
+    "claude-sonnet": {
+      "upstreams": [
+        { "provider": "anthropic", "model": "claude-sonnet-4-5" },
+        { "provider": "openrouter", "model": "anthropic/claude-sonnet-4.5" }
+      ]
+    },
+    "deepseek": {
+      "upstreams": [
+        { "provider": "deepseek", "model": "deepseek-chat" },
+        { "provider": "openrouter", "model": "deepseek/deepseek-chat-v3.1" }
+      ]
+    }
+  },
+  "imageSettings": {
+    "defaultProvider": "",
+    "defaultModel": ""
+  },
+  "opencodeModels": {
+    "openrouter": {
+      "models": ["anthropic/claude-sonnet-4.5"]
+    }
+  }
+}

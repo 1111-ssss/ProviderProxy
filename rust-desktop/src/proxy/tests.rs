@@ -1,0 +1,196 @@
+use super::config::{merge_config_secrets, merge_redacted, public_config};
+use super::metrics::{load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
+use super::routing::{build_chains, with_model};
+use super::server::start_server;
+use super::types::{ModelUsage, ProviderUsage, Usage};
+use reqwest::Client;
+use serde_json::{json, Value};
+use std::{
+    fs,
+    io::{Read, Write},
+    net::TcpStream,
+    time::Duration,
+};
+
+#[test]
+fn loads_only_the_last_seven_calendar_days_of_usage() {
+    let directory = std::env::temp_dir().join(format!("provider-proxy-usage-test-{}", now_ms()));
+    fs::create_dir_all(&directory).unwrap();
+    let stats = directory.join("usage-stats.json");
+    let today = chrono::Local::now().date_naive();
+    let day = |offset: i64| {
+        (today - chrono::Duration::days(offset))
+            .format("%Y-%m-%d")
+            .to_string()
+    };
+    let mut days = serde_json::Map::new();
+    days.insert(day(0), json!({"requests": 7}));
+    days.insert(
+        day((USAGE_RETENTION_DAYS - 1) as i64),
+        json!({"requests": 1}),
+    );
+    days.insert(day(USAGE_RETENTION_DAYS as i64), json!({"requests": 99}));
+    fs::write(
+        &stats,
+        serde_json::to_string(&json!({"version": 1, "days": days})).unwrap(),
+    )
+    .unwrap();
+
+    let (usage, history, loaded_day) = load_usage(&stats);
+    assert_eq!(loaded_day, day(0));
+    assert_eq!(usage.requests, 7);
+    assert_eq!(
+        history
+            .get(&day((USAGE_RETENTION_DAYS - 1) as i64))
+            .unwrap()
+            .requests,
+        1
+    );
+    assert!(!history.contains_key(&day(USAGE_RETENTION_DAYS as i64)));
+    let _ = fs::remove_dir_all(directory);
+}
+
+#[test]
+fn builds_chain_and_direct_models_from_config() {
+    let config = json!({
+        "providers": {
+            "a": { "baseURL": "https://a.example/v1", "apiKey": "ka" }
+        },
+        "models": {
+            "proxy-model": { "upstreams": [{ "provider": "a", "model": "a-model" }] }
+        },
+        "opencodeModels": { "a": { "models": ["direct"] } }
+    });
+    let chains = build_chains(&config);
+    assert_eq!(chains["proxy-model"][0].model, "a-model");
+    assert_eq!(chains["a/direct"][0].base_url, "https://a.example/v1");
+}
+
+#[test]
+fn normalizes_tool_arguments_before_forwarding_chat_requests() {
+    let body = json!({
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call_1",
+                    "function": { "name": "run", "arguments": { "command": "pwd" } }
+                }]
+            },
+            { "role": "tool", "tool_call_id": "call_1", "content": { "exitCode": 0 } }
+        ]
+    });
+    let normalized = with_model(&body, "provider-model");
+    assert_eq!(normalized["model"], "provider-model");
+    assert_eq!(
+        normalized["messages"][0]["tool_calls"][0]["function"]["arguments"],
+        r#"{"command":"pwd"}"#
+    );
+    assert_eq!(normalized["messages"][1]["content"], r#"{"exitCode":0}"#);
+}
+
+#[test]
+fn redacts_and_merges_secrets_without_losing_existing_values() {
+    let previous = json!({ "authToken": "secret", "providers": { "a": { "apiKey": "key" } } });
+    let public = public_config(&previous);
+    assert_eq!(public["authTokenConfigured"], true);
+    assert_eq!(public["providers"]["a"]["apiKeyConfigured"], true);
+    let merged = merge_redacted(&public, &previous);
+    assert_eq!(merged["authToken"], "secret");
+    assert_eq!(merged["providers"]["a"]["apiKey"], "key");
+}
+
+#[test]
+fn keeps_a_provider_key_when_the_gui_renames_the_provider() {
+    let previous = json!({ "providers": { "old": { "apiKey": "key" } }, "models": {} });
+    let next = json!({
+        "providers": { "new": { "apiKey": "", "apiKeyConfigured": true, "apiKeySource": "old" } },
+        "models": {}
+    });
+    let merged = merge_config_secrets(&next, &previous);
+    assert_eq!(merged["providers"]["new"]["apiKey"], "key");
+}
+
+#[test]
+fn tallies_the_last_usage_object_for_streams() {
+    let mut usage = Usage::default();
+    let mut provider = ProviderUsage::default();
+    let mut model = ModelUsage::default();
+    tally_usage(
+            "data: {\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\ndata: {\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":13}}",
+            &mut usage,
+            &mut provider,
+            &mut model,
+        );
+    assert_eq!(usage.tokens_in, 7);
+    assert_eq!(usage.tokens_out, 13);
+    assert_eq!(provider.tokens_in, 7);
+    assert_eq!(model.tokens_out, 13);
+}
+
+#[test]
+fn starts_server_without_a_caller_tokio_runtime() {
+    assert!(tokio::runtime::Handle::try_current().is_err());
+    let path = std::env::temp_dir().join(format!(
+        "provider-proxy-rust-runtime-test-{}.json",
+        now_ms()
+    ));
+    fs::write(&path, r#"{"port":0,"providers":{},"models":{}}"#).unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let address = format!("127.0.0.1:{}", server.port);
+    let mut connection = TcpStream::connect(&address).unwrap();
+    connection
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    connection
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    connection
+        .write_all(b"GET /api/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    connection.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK\r\n"), "{response}");
+    assert!(
+        response.ends_with(r#"{"apiVersion":3,"ok":true}"#),
+        "{response}"
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[tokio::test]
+async fn serves_the_desktop_api_from_a_local_port() {
+    let path = std::env::temp_dir().join(format!("provider-proxy-rust-test-{}.json", now_ms()));
+    fs::write(
+        &path,
+        r#"{"port":0,"providers":{},"models":{"one":{"upstreams":[]}}}"#,
+    )
+    .unwrap();
+    let server = start_server(path.clone()).unwrap();
+    let client = Client::new();
+    let mut config = None;
+    for _ in 0..20 {
+        if let Ok(response) = client
+            .get(format!("http://127.0.0.1:{}/api/config", server.port))
+            .send()
+            .await
+        {
+            config = Some(response);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let config = config.expect("local Rust HTTP server should start");
+    assert!(config.status().is_success());
+    let models: Value = client
+        .get(format!("http://127.0.0.1:{}/v1/models", server.port))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(models["data"][0]["id"], "one");
+    let _ = fs::remove_file(path);
+}

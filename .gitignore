@@ -1,4 +1,12 @@
 config.json
+usage-stats.json
 server.log
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
 .playwright-mcp/
 .opencode/

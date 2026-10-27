@@ -30,5 +30,14 @@
         { "provider": "openrouter", "model": "deepseek/deepseek-chat-v3.1" }
       ]
     }
+  },
+  "imageSettings": {
+    "defaultProvider": "",
+    "defaultModel": ""
+  },
+  "opencodeModels": {
+    "openrouter": {
+      "models": ["anthropic/claude-sonnet-4.5"]
+    }
   }
 }

@@ -7,7 +7,25 @@ PORT="$(node -e 'try{console.log(require(process.argv[1]+"/config.json").port??8
 # server.mjs sends Cache-Control: no-store for the GUI, so a query is not needed.
 URL="http://127.0.0.1:$PORT/"
 
-if ! curl -sf -o /dev/null "$URL"; then
+HEALTH="$(curl -sf "$URL/api/ping" 2>/dev/null || true)"
+STALE=0
+case "$HEALTH" in
+  *'"apiVersion":3'*) ;;
+  *)
+    # A previous proxy process may still be serving the old backend after an update.
+    # Release this app's port so the freshly started server gets the new routes.
+    if command -v fuser >/dev/null 2>&1; then
+      fuser -k "$PORT/tcp" >/dev/null 2>&1 || true
+    elif command -v lsof >/dev/null 2>&1; then
+      lsof -ti "TCP:$PORT" -sTCP:LISTEN | xargs -r kill >/dev/null 2>&1 || true
+    else
+      pkill -f "[n]ode .*${DIR}/server.mjs" >/dev/null 2>&1 || true
+    fi
+    STALE=1
+    ;;
+esac
+
+if [ "$STALE" -eq 1 ] || ! curl -sf -o /dev/null "$URL"; then
   nohup node "$DIR/server.mjs" >> "$DIR/server.log" 2>&1 &
   i=0
   while [ $i -lt 50 ] && ! curl -sf -o /dev/null "$URL"; do

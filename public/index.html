@@ -35,12 +35,19 @@
   .app-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 4px 2px 2px; }
   .app-header p { margin: 6px 0 0; color: var(--muted); max-width: 620px; }
   .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 7px; }
-  .header-status { display: grid; justify-items: end; gap: 6px; color: var(--muted); font-size: 12px; text-align: right; }
+  .header-status { display: grid; justify-items: end; gap: 9px; color: var(--muted); font-size: 12px; text-align: right; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .settings-button { display: inline-grid; place-items: center; min-width: 42px; padding: 8px 11px; line-height: 1; }
+  .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
-  input, select, button { font: inherit; background: var(--surface); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
+  input, select, textarea, button { font: inherit; background: var(--surface); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
+  select, select option { color: var(--text); background-color: var(--surface); }
+  select option:checked { color: var(--text); background-color: var(--surface-hover); }
+  select:disabled { color: var(--muted); opacity: 1; }
   input::placeholder { color: var(--faint); }
-  input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  textarea { width: 100%; min-height: 120px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button { cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
   button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--surface-hover); }
   button:active:not(:disabled) { transform: translateY(1px); }
@@ -57,6 +64,20 @@
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .card { border: 1px solid var(--border); background: rgba(28, 37, 48, .7); border-radius: 11px; padding: 14px 16px; margin-bottom: 10px; }
   .card:hover { border-color: #40536a; }
+  .card.chain-disabled { border-color: rgba(113, 129, 149, .38); background: linear-gradient(135deg, rgba(24, 31, 40, .78), rgba(20, 26, 34, .72)); }
+  .card.chain-disabled .model-title, .card.chain-disabled .step .prov { color: #9ba8b8; }
+  .chain-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; order: 3; margin-left: 0; padding: 5px 10px 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; user-select: none; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+  .chain-toggle:hover { transform: translateY(-1px); }
+  .chain-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .chain-toggle input:focus-visible + .chain-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .chain-toggle.is-on { color: #b9efd0; border-color: rgba(105, 215, 160, .28); background: rgba(105, 215, 160, .08); }
+  .chain-toggle.is-off { color: #aab6c5; border-color: rgba(154, 170, 190, .28); background: rgba(113, 129, 149, .08); }
+  .chain-switch { position: relative; flex: 0 0 auto; width: 31px; height: 18px; border-radius: 999px; background: #3c4a5a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); transition: background .16s ease; }
+  .chain-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #d5dde8; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .16s ease, background .16s ease; }
+  .chain-toggle.is-on .chain-switch { background: #43b77d; }
+  .chain-toggle.is-on .chain-switch::after { transform: translateX(13px); background: #f2fff7; }
+  .chain-toggle-text { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+  .chain-toggle-text small { display: block; margin-top: 1px; color: inherit; font-size: 10px; font-weight: 500; opacity: .72; }
   .card .chain { margin: 13px 0 0; display: grid; gap: 7px; }
   .step { display: flex; gap: 9px; align-items: center; font-size: 13px; }
   .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
@@ -66,7 +87,7 @@
   .model-title { font-size: 15px; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  .model-actions { display: flex; gap: 6px; margin-left: auto; }
+  .model-actions { display: flex; gap: 6px; order: 2; margin-left: auto; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   input[type="checkbox"] { accent-color: var(--accent-strong); width: 16px; height: 16px; }
@@ -95,7 +116,7 @@
   .dialog-add-row select, .dialog-add-row input { min-width: 0; width: 100%; }
   .manual-add { margin-top: 12px; }
   .manual-add summary { color: var(--muted); cursor: pointer; font-size: 12px; }
-  .manual-add .dialog-add-row { margin-top: 10px; }
+  .manual-add .dialog-add-row { grid-template-columns: minmax(0, 1fr) auto; margin-top: 10px; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 22px; border-top: 1px solid var(--border); background: var(--panel); }
   .fetched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-height: 220px; overflow: auto; }
   .chip { display: inline-flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px 4px 3px 8px; }
@@ -152,29 +173,125 @@
   .token-legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; }
   .token-key { display: inline-flex; align-items: center; gap: 5px; }
   .token-key::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
-  .token-key.in::before { background: #9abaff; }
-  .token-key.out::before { background: #69d7a0; }
+  .token-key.success::before { background: #69d7a0; }
+  .token-key.error::before { background: #ff9c9c; }
   .token-row { display: grid; gap: 5px; }
   .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
   .token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .token-row-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .token-track { height: 7px; overflow: hidden; border-radius: 999px; background: #2a3746; }
-  .token-fill { display: block; height: 100%; min-width: 2px; border-radius: inherit; transition: width .25s ease; }
-  .token-fill.in { background: linear-gradient(90deg, #6f99ed, #b8ceff); }
-  .token-fill.out { background: linear-gradient(90deg, #45b984, #9be7be); }
+  .token-row-head .problem-rate { color: #ffb0b0; }
+  .token-track { display: flex; justify-content: space-between; height: 7px; overflow: hidden; border-radius: 999px; background: #2a3746; }
+  .token-fill { display: block; height: 100%; min-width: 0; border-radius: inherit; transition: width .25s ease; }
+  .token-fill.success { background: linear-gradient(90deg, #45b984, #9be7be); }
+  .token-fill.error { background: linear-gradient(90deg, #ff8585, #ffc0c0); }
   .chart-empty { color: var(--muted); font-size: 12px; padding: 24px 0; text-align: center; }
+  .usage-days { display: flex; gap: 7px; flex-wrap: wrap; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+  .usage-day { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+  .usage-day strong { color: inherit; font-size: 12px; }
+  .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
+  .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .usage-day.active { background: rgba(111, 153, 237, .16); border-color: rgba(111, 153, 237, .5); color: #dbe7ff; }
+  .usage-day.empty { opacity: .58; }
+  .search-field { position: relative; flex: 1 1 220px; min-width: 180px; }
+  .search-field input { width: 100%; padding-right: 32px; }
+  .search-field::before { content: "⌕"; position: absolute; left: 11px; top: 7px; color: var(--faint); font-size: 18px; pointer-events: none; }
+  .search-field input { padding-left: 32px; }
+  .search-clear { position: absolute; right: 4px; top: 4px; min-height: 30px; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); }
+  .search-clear:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--text); }
+  .filter-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
+  .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  #dlg-settings { width: min(560px, calc(100vw - 28px)); }
+  .settings-form { width: 100%; }
+  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .settings-grid label { margin: 0; }
+  .settings-exit { margin-right: auto; }
+  .provider-picker { display: grid; gap: 8px; }
+  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; max-height: 184px; overflow: auto; padding: 1px 2px 2px; }
+  .provider-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 38px; text-align: left; }
+  .provider-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .provider-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .provider-option.active { border-color: var(--accent-strong); background: rgba(111, 153, 237, .16); color: #dbe7ff; }
+  .provider-current { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(34, 45, 57, .55); }
+  .provider-current strong { color: var(--text); }
+  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid rgba(111, 153, 237, .35); border-radius: 12px; background: linear-gradient(135deg, rgba(111, 153, 237, .1), rgba(28, 37, 48, .68)); }
+  .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .opencode-panel-head h3 { margin: 0; font-size: 14px; }
+  .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .opencode-config-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, .6fr); gap: 10px; margin-top: 14px; }
+  .opencode-config-grid label { margin: 0; }
+  .opencode-preview-head { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+  .opencode-preview { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .opencode-preview-toggle { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; margin-top: 2px; color: var(--muted); background: rgba(34, 45, 57, .55); border-style: dashed; }
+  .opencode-preview-toggle:hover:not(:disabled) { color: var(--text); }
+  .opencode-model { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .65); }
+  .opencode-model strong { color: #dbe7ff; font-size: 12px; }
+  .opencode-model span { color: var(--muted); font-size: 11px; }
+  .model-context { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .model-warning { color: #f2c781; font-size: 11px; white-space: nowrap; cursor: help; }
+  .check .model-context { margin-left: auto; }
+  .chip .model-context { padding-right: 4px; }
+  .provider-models { display: grid; gap: 8px; }
+  .provider-models .card { margin-bottom: 0; }
+  .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
+  .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
+  .direct-model-card .model-card-head { min-height: 38px; }
+  .direct-model-card .provider-model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-top: 14px; }
+  .direct-model-card .opencode-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 10px; background: rgba(19, 27, 36, .72); }
+  .direct-model-card .opencode-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
+  .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .image-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  .image-section-actions { display: flex; align-items: center; gap: 8px; }
+  .image-settings-button { min-width: 38px; padding: 7px 9px; }
+  .image-settings-button svg { width: 17px; height: 17px; }
+  #dlg-image-settings { width: min(620px, calc(100vw - 28px)); }
+  .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid rgba(111, 153, 237, .3); border-radius: 10px; background: rgba(34, 45, 57, .48); }
+  .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .skill-card h4 { margin: 0; }
+  .skill-card p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .skill-path { color: var(--faint); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .skill-status { color: var(--muted); font-size: 12px; }
+  .skill-status.is-ok { color: var(--success); }
+  .skill-status.is-warn { color: #f2c781; }
+  .image-form, .image-result { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .image-form { display: grid; gap: 12px; }
+  .image-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+  .image-form label input, .image-form label select { width: 100%; min-width: 0; height: 42px; }
+  .image-form .row { align-items: end; }
+  .image-form .row > label { flex: 1 1 150px; min-width: 0; }
+  .image-field-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .image-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .image-file-row { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+  .image-file-row input[type="file"] { width: 100%; padding: 7px; }
+  .image-reference-name { color: var(--faint); font-size: 11px; min-height: 16px; }
+  .image-result-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .image-result-head h3 { margin: 0; }
+  .image-result.is-error { border-color: rgba(255, 156, 156, .78); box-shadow: 0 0 0 1px rgba(255, 156, 156, .18), 0 12px 30px rgba(120, 30, 40, .14); }
+  .image-task-status { color: var(--muted); font-size: 12px; }
+  .image-preview { display: grid; place-items: center; min-height: 280px; margin-top: 14px; border: 1px dashed var(--border-strong); border-radius: 10px; overflow: hidden; background: rgba(15, 20, 27, .55); }
+  .image-preview img { display: block; max-width: 100%; max-height: 560px; object-fit: contain; }
+  .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
+  .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
+  .image-model-select { display: grid; gap: 6px; }
   @media (max-width: 700px) {
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
     .header-status { justify-items: start; text-align: left; }
+    .header-actions { flex-wrap: wrap; }
     section { padding: 16px; }
     .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
     .dialog-actions { padding-left: 16px; padding-right: 16px; }
     .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
+    .model-card-head { align-items: flex-start; flex-wrap: wrap; }
+    .chain-toggle { order: 3; margin-left: 0; }
+    .model-actions { margin-left: auto; }
     .chain-row input, .chain-row .row-controls, .dialog-add-row input, .dialog-add-row button { grid-column: 2; }
     .dialog-add-row select { grid-column: 2; }
+    .opencode-config-grid { grid-template-columns: 1fr; }
     .usage-grid { grid-template-columns: 1fr; }
     .outcome-layout { grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
     .donut-wrap { width: 140px; height: 140px; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .image-layout { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -187,16 +304,23 @@
       <p>Собери устойчивые цепочки моделей и переключайся между провайдерами без ручного редактирования конфигов.</p>
     </div>
     <div class="header-status">
-      <span id="proxyinfo"></span>
+      <div class="header-actions">
+        <span id="proxyinfo"></span>
+        <button id="settings-open" class="settings-button" type="button" aria-label="Открыть настройки" title="Настройки">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
   <nav class="tabs">
     <button data-tab="providers"><span class="tab-index">01</span><span>Провайдеры</span></button>
-    <button data-tab="models"><span class="tab-index">02</span><span>Модели</span></button>
+    <button data-tab="connections"><span class="tab-index">02</span><span>Подключения</span></button>
     <button data-tab="chains"><span class="tab-index">03</span><span>Цепочки</span></button>
-    <button data-tab="logs"><span class="tab-index">04</span><span>Логи</span></button>
-    <button data-tab="usage"><span class="tab-index">05</span><span>Статистика</span></button>
+    <button data-tab="models"><span class="tab-index">04</span><span>Модели</span></button>
+    <button data-tab="images"><span class="tab-index">05</span><span>Изображения</span></button>
+    <button data-tab="logs"><span class="tab-index">06</span><span>Логи</span></button>
+    <button data-tab="usage"><span class="tab-index">07</span><span>Статистика</span></button>
   </nav>
 
   <section data-tab="providers">
@@ -208,18 +332,38 @@
       </div>
     </div>
     <p class="section-sub">Ключ и адрес API (OpenAI-совместимый). «Чекин» — открыть checkin-страницу, если она задана. Модели провайдера выбираются в шаге&nbsp;2.</p>
+    <div class="filter-bar">
+      <label class="search-field">
+        <span class="sr-only">Поиск провайдеров</span>
+        <input id="providers-filter" placeholder="Найти провайдера…" autocomplete="off">
+        <button id="providers-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+      </label>
+      <span id="providers-filter-result" class="filter-result"></span>
+    </div>
     <table id="providers"></table>
   </section>
 
-  <section data-tab="models">
+  <section data-tab="connections">
     <div class="section-head">
       <h2>2&nbsp;·&nbsp;Модели провайдеров</h2>
       <span class="muted" id="pm-status"></span>
     </div>
     <p class="section-sub">Отметь галочками модели, которые есть у провайдера, — они сохраняются локально, и из них собираются цепочки в шаге&nbsp;3. Список берётся с его <code>/v1/models</code> и из сохранённых; отсутствующую модель можно вписать вручную.</p>
-    <div class="row">
-      <span class="muted">провайдер:</span>
-      <select id="pm-provider"></select>
+    <div class="provider-picker">
+      <div class="filter-bar">
+        <label class="search-field">
+          <span class="sr-only">Поиск провайдеров</span>
+          <input id="pm-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
+          <button id="pm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+        </label>
+        <span id="pm-provider-result" class="filter-result"></span>
+      </div>
+      <div id="pm-provider-options" class="provider-options" role="listbox" aria-label="Список провайдеров"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="muted">выбран:</span>
+      <span id="pm-provider-current" class="provider-current"><strong>—</strong></span>
+      <select id="pm-provider" class="sr-only" tabindex="-1" aria-hidden="true"></select>
       <button type="button" id="pm-refresh">обновить с /v1/models</button>
     </div>
     <input id="pm-filter" placeholder="фильтр по имени…" style="width:100%;margin-top:8px">
@@ -232,19 +376,139 @@
 
   <section data-tab="chains">
     <div class="section-head">
-      <h2>3&nbsp;·&nbsp;Цепочки моделей</h2>
-      <div class="row">
-        <button id="m-sync">⟳ Синхронизировать с opencode</button>
-        <button class="primary" id="m-add">+ Добавить модель</button>
+      <h2>3&nbsp;·&nbsp;Цепочки</h2>
+      <button class="primary" id="m-add">+ Добавить цепочку</button>
+    </div>
+    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации в OpenCode.</p>
+    <div class="opencode-panel">
+      <div class="opencode-panel-head">
+        <div>
+          <h3>Подключение к OpenCode</h3>
+          <p>Сюда записываются и прямые модели, и включённые цепочки.</p>
+        </div>
+        <button id="chain-m-sync" type="button">Синхронизировать</button>
+      </div>
+      <div class="opencode-config-grid">
+        <label>Файл конфигурации
+          <input id="chain-oc-path" placeholder="~/.config/opencode/opencode.jsonc">
+        </label>
+        <label>Имя провайдера в OpenCode
+          <input id="chain-oc-provider" placeholder="provider-proxy">
+        </label>
+      </div>
+      <div class="opencode-preview-head">
+        <span class="muted">Будет добавлено в OpenCode</span>
+        <span id="chain-oc-status" class="muted"></span>
+      </div>
+      <div id="chain-oc-preview" class="opencode-preview"></div>
+    </div>
+    <div id="models"></div>
+  </section>
+
+  <section data-tab="models">
+    <div class="section-head">
+      <h2>4&nbsp;·&nbsp;Модели</h2>
+      <button class="primary" id="om-add">+ Добавить модель</button>
+    </div>
+    <p class="section-sub">Выбери провайдера и модели, которые нужно показать в OpenCode без цепочки. В OpenCode они появятся в виде <code>provider/model (config)</code>.</p>
+    <div class="opencode-panel">
+      <div class="opencode-panel-head">
+        <div>
+          <h3>Подключение к OpenCode</h3>
+          <p>Сюда записываются и прямые модели, и включённые цепочки.</p>
+        </div>
+        <button id="m-sync" type="button">Синхронизировать</button>
+      </div>
+      <div class="opencode-config-grid">
+        <label>Файл конфигурации
+          <input id="oc-path" placeholder="~/.config/opencode/opencode.jsonc">
+        </label>
+        <label>Имя провайдера в OpenCode
+          <input id="oc-provider" placeholder="provider-proxy">
+        </label>
+      </div>
+      <div class="opencode-preview-head">
+        <span class="muted">Будет добавлено в OpenCode</span>
+        <span id="oc-status" class="muted"></span>
+      </div>
+      <div id="oc-preview" class="opencode-preview"></div>
+    </div>
+    <div id="opencode-models" class="provider-models"></div>
+  </section>
+
+  <section data-tab="images">
+    <div class="section-head">
+      <h2>5&nbsp;·&nbsp;Генерация изображений</h2>
+      <div class="image-section-actions">
+        <span class="muted" id="ig-status"></span>
+        <button id="ig-settings-open" class="settings-button image-settings-button" type="button" aria-label="Настройки изображений" title="Настройки изображений">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+        </button>
       </div>
     </div>
-    <p class="section-sub">Каждая цепочка — это один ID модели для OpenCode и понятный порядок запасных провайдеров. Если первый не отвечает, запрос автоматически идёт дальше по списку.</p>
-    <div id="models"></div>
+    <p class="section-sub">Здесь доступны модели изображений, отмеченные на вкладке «Подключения». Этот же выбор используется в skill. Прокси сам выберет <code>images/generations</code> или <code>images/tasks</code> по metadata модели.</p>
+    <div class="provider-picker">
+      <div class="filter-bar">
+        <label class="search-field">
+          <span class="sr-only">Поиск провайдеров с моделями изображений</span>
+          <input id="ig-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
+          <button id="ig-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+        </label>
+        <span id="ig-provider-result" class="filter-result"></span>
+      </div>
+      <div id="ig-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры с моделями изображений"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="muted">выбран:</span>
+      <span id="ig-provider-current" class="provider-current"><strong>—</strong></span>
+    </div>
+    <div class="image-layout" style="margin-top:16px">
+      <form id="ig-form" class="image-form">
+        <label class="image-model-select">Модель
+          <select id="ig-model"></select>
+        </label>
+        <label>Промпт
+          <textarea id="ig-prompt" required placeholder="Например: футуристический киберпанк-город ночью, кинематографичный свет"></textarea>
+        </label>
+        <div class="row">
+          <label>Соотношение сторон
+            <select id="ig-ratio">
+              <option value="square">square</option>
+              <option value="portrait">portrait</option>
+              <option value="landscape">landscape</option>
+            </select>
+          </label>
+          <label><span class="image-field-heading">Размер <span class="muted">необязательно</span></span>
+            <input id="ig-size" placeholder="1024x768">
+          </label>
+        </div>
+        <label class="image-file-row">Файл-референс <span class="muted">необязательно, загрузится как base64</span>
+          <input id="ig-image-file" type="file" accept="image/*">
+          <span id="ig-image-file-name" class="image-reference-name"></span>
+        </label>
+        <label>Или URL/base64 референса <span class="muted">необязательно</span>
+          <input id="ig-image" placeholder="https://… или data:image/png;base64,…">
+        </label>
+        <div class="image-form-actions">
+          <button type="button" id="ig-clear">Очистить результат</button>
+          <button type="submit" class="primary" id="ig-generate">Сгенерировать</button>
+        </div>
+      </form>
+      <article class="image-result">
+        <div class="image-result-head">
+          <div>
+            <h3>Результат</h3>
+            <div id="ig-task-status" class="image-task-status">задача ещё не запущена</div>
+          </div>
+        </div>
+        <div id="ig-preview" class="image-preview"><div class="image-empty">Здесь появится готовое изображение.</div></div>
+      </article>
+    </div>
   </section>
 
   <section data-tab="logs">
     <div class="section-head">
-      <h2>4&nbsp;·&nbsp;Логи</h2>
+        <h2>6&nbsp;·&nbsp;Логи</h2>
       <span class="muted" id="log-info"></span>
     </div>
     <p class="section-sub">Живой хвост вывода прокси. Держится в памяти и чистится само — старые строки вытесняются новыми.</p>
@@ -253,10 +517,11 @@
 
   <section data-tab="usage">
     <div class="section-head">
-      <h2>5&nbsp;·&nbsp;Статистика</h2>
+        <h2>7&nbsp;·&nbsp;Статистика</h2>
       <span class="muted" id="u-info"></span>
     </div>
-    <p class="section-sub">Счётчики живут в памяти прокси и обнуляются при его перезапуске. Токены видны, когда upstream их присылает.</p>
+    <p class="section-sub">История сохраняется локально за последние 7 дней и не сбрасывается при перезапуске. Токены видны, когда upstream их присылает.</p>
+    <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div class="tiles" id="u-tiles"></div>
     <div class="usage-grid">
       <article class="chart-card">
@@ -283,10 +548,10 @@
       <article class="chart-card">
         <div class="chart-head">
           <div>
-            <h3>Токены по провайдерам</h3>
-            <p>Вход и выход по данным upstream</p>
+            <h3>Результаты по провайдерам</h3>
+            <p>Успешные ответы и ошибки upstream</p>
           </div>
-          <div class="token-legend"><span class="token-key in">вход</span><span class="token-key out">выход</span></div>
+          <div class="token-legend"><span class="token-key success">успешно</span><span class="token-key error">ошибки</span></div>
         </div>
         <div class="token-bars" id="u-token-chart"></div>
       </article>
@@ -295,21 +560,11 @@
     <table id="u-providers"></table>
     <h3 style="margin-top:16px">Модели</h3>
     <table id="u-models"></table>
+    <h3 style="margin-top:16px">Генерация изображений</h3>
+    <div class="tiles" id="u-image-tiles"></div>
+    <div class="card" id="u-image-recent" style="margin-top:10px"></div>
+    <table id="u-images"></table>
     <div class="muted" id="u-cooling" style="margin-top:10px"></div>
-  </section>
-
-  <section>
-    <details>
-      <summary>Настройки (port, authToken, кулдауны, таймаут)</summary>
-      <div class="row" style="margin-top:10px">
-        <label class="muted">port</label><input id="s-port" size="4">
-        <label class="muted">authToken</label><input id="s-auth" placeholder="нет" size="16">
-        <label class="muted">кулдаун 429, сек</label><input id="s-limit" size="4">
-        <label class="muted">кулдаун 5xx, сек</label><input id="s-error" size="4">
-        <label class="muted">таймаут, сек</label><input id="s-header" size="4">
-      </div>
-      <p class="muted">Смена port применяется после перезапуска прокси, остальное — сразу.</p>
-    </details>
   </section>
 
   <div class="status" id="status" role="status" aria-live="polite"></div>
@@ -329,7 +584,7 @@
       <label>baseURL — OpenAI-совместимый адрес
         <input id="dp-url" required placeholder="https://openrouter.ai/api/v1">
       </label>
-      <label>apiKey
+      <label>apiKey <span class="muted">сохраняется в зашифрованном виде</span>
         <input id="dp-key" type="password" placeholder="sk-...">
       </label>
       <label>Ссылка для чекина — необязательно; если задана, у провайдера появится кнопка «Чекин»
@@ -371,18 +626,24 @@
         <div class="dialog-section-head">
           <div>
             <h4 id="dm-add-title">2. Добавить провайдера</h4>
-            <p>Выбери сохранённую модель — она добавится в конец цепочки.</p>
+            <p>Найди провайдера и выбери модель — она добавится в конец цепочки.</p>
           </div>
         </div>
-        <label style="margin:0">Провайдер
-          <select id="dm-pick-provider"></select>
-        </label>
+        <div class="provider-picker">
+          <div class="filter-bar">
+            <label class="search-field">
+              <span class="sr-only">Поиск провайдеров в цепочке</span>
+              <input id="dm-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
+              <button id="dm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+            </label>
+            <span id="dm-provider-result" class="filter-result"></span>
+          </div>
+          <div id="dm-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для цепочки"></div>
+        </div>
         <div id="dm-pick-list"></div>
         <details class="manual-add">
           <summary>Модели нет в списке? Ввести ID вручную</summary>
           <div class="dialog-add-row">
-            <label class="sr-only" for="dm-add-provider">Провайдер</label>
-            <select id="dm-add-provider" aria-label="Провайдер для ручного добавления"></select>
             <label class="sr-only" for="dm-add-model">ID модели у провайдера</label>
             <input id="dm-add-model" placeholder="ID модели у провайдера">
             <button type="button" id="dm-add">Добавить</button>
@@ -397,14 +658,165 @@
   </form>
 </dialog>
 
+<!-- Диалог: модель напрямую в OpenCode -->
+<dialog id="dlg-opencode-model" aria-labelledby="dom-title" aria-describedby="dom-help">
+  <form method="dialog" id="dom-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="dom-title">Добавить модель в OpenCode</h3>
+      <p id="dom-help">Выбери провайдера, затем одну или несколько моделей из списка вкладки «Подключения».</p>
+    </div>
+    <div class="dialog-body">
+      <div class="provider-picker">
+        <div class="filter-bar">
+          <label class="search-field">
+            <span class="sr-only">Поиск провайдеров</span>
+            <input id="dom-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
+            <button id="dom-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+          </label>
+          <span id="dom-provider-result" class="filter-result"></span>
+        </div>
+        <div id="dom-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для модели"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="muted">выбран:</span>
+        <span id="dom-provider-current" class="provider-current"><strong>—</strong></span>
+      </div>
+      <div class="dialog-section">
+        <div class="dialog-section-head">
+          <div>
+            <h4>Модели провайдера</h4>
+            <p>В OpenCode каждая модель будет записана как <code>provider/model (config)</code>.</p>
+          </div>
+          <span id="dom-count" class="dialog-count"></span>
+        </div>
+        <input id="dom-filter" placeholder="фильтр по имени…" style="width:100%">
+        <label class="check" style="margin-top:10px"><input id="dom-select-all" type="checkbox"> выбрать все доступные модели</label>
+        <div id="dom-model-list" style="max-height:300px;overflow:auto;margin-top:10px;display:grid;gap:7px"></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="dom-cancel">Отмена</button>
+      <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: настройки прокси -->
+<dialog id="dlg-settings" aria-labelledby="settings-title" aria-describedby="settings-help">
+  <form method="dialog" id="settings-form" class="dialog-form settings-form">
+    <div class="dialog-header">
+      <h3 id="settings-title">Настройки прокси</h3>
+      <p id="settings-help">Изменения сохраняются автоматически. Порт применится после перезапуска прокси.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="settings-grid">
+        <label>Порт
+          <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
+        </label>
+        <label>Токен доступа
+          <input id="s-auth" placeholder="не задан" autocomplete="off">
+        </label>
+        <label>Блокировка после лимита, сек
+          <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+        <label>Блокировка после ошибки, сек
+          <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+        <label>Таймаут ответа, сек
+          <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+      </div>
+      <p class="muted" style="margin:14px 0 0">Время блокировки применяется к upstream-провайдеру в цепочке: после лимита — дольше, после временной ошибки — короче.</p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="settings-shutdown" class="danger settings-exit">Выйти из приложения</button>
+      <button type="button" id="settings-cancel">Закрыть</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: настройки генерации изображений -->
+<dialog id="dlg-image-settings" aria-labelledby="image-settings-title" aria-describedby="image-settings-help">
+  <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
+    <div class="dialog-header">
+      <h3 id="image-settings-title">Настройки изображений</h3>
+      <p id="image-settings-help">Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="skill-card">
+        <div class="skill-card-head">
+          <div>
+            <h4>Skill для harness</h4>
+            <p>Инструкции для модели: использовать генерацию изображений, ждать асинхронный результат, сохранять локальный путь и не раскрывать ключи.</p>
+          </div>
+          <span id="image-skill-status" class="skill-status">проверяю…</span>
+        </div>
+        <div id="image-skill-path" class="skill-path">—</div>
+        <div class="row">
+          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
+          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
+        </div>
+      </div>
+      <div class="skill-card">
+        <div class="skill-card-head">
+          <div>
+            <h4>Модель по умолчанию</h4>
+            <p>Будет выбрана на вкладке изображений при открытии приложения.</p>
+          </div>
+        </div>
+        <div class="row">
+          <label style="flex:1">Провайдер
+            <select id="ig-default-provider"></select>
+          </label>
+          <label style="flex:1">Модель
+            <select id="ig-default-model"></select>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="image-settings-cancel">Закрыть</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 const $ = (id) => document.getElementById(id)
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
 
-let cfg = { providers: {}, models: {} }
+let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" } }
 let token = localStorage.getItem("pp_token") ?? ""
 const filters = new Map() // filter text per chips list, keyed by container id
+let providersFilter = ""
+let pmProviderFilter = ""
+
+const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
+const isImageModel = (provider, id) => {
+  const info = modelDetails(provider, id)
+  const endpoints = Array.isArray(info?.endpoints) ? info.endpoints : []
+  return info?.image === true || String(info?.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
+}
+const imageModelEndpoint = (provider, id) => (modelDetails(provider, id)?.endpoints ?? []).find((endpoint) => /images\/generations/i.test(String(endpoint))) ? "images/generations" : "images/tasks"
+const imageIcon = (label = "Модель изображений") => `<span class="model-kind-icon" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5-5 3 3 2-2 6 5"></path></svg></span>`
+const formatContext = (value) => {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return ""
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`
+  if (n >= 1000) return `${Math.round(n / 1000)}k`
+  return String(Math.round(n))
+}
+const contextBadge = (provider, id) => {
+  const context = formatContext(modelDetails(provider, id)?.contextLength)
+  return context ? `<span class="model-context">контекст ${esc(context)}</span>` : ""
+}
+const availabilityBadge = (provider, id) => {
+  const status = cfg.providers[provider]?.modelAvailability?.[id]
+  return status?.available === false
+    ? `<span class="model-warning" title="Модель не найдена в последнем успешном ответе /v1/models">⚠ не найдена</span>`
+    : ""
+}
+const imageSettings = () => (cfg.imageSettings ??= { defaultProvider: "", defaultModel: "" })
 
 async function api(path, opts = {}, retried = false) {
   const r = await fetch(path, {
@@ -419,6 +831,29 @@ async function api(path, opts = {}, retried = false) {
   return r
 }
 
+const apiErrorMessage = (payload, fallback = "неизвестная ошибка") => {
+  const text = (value) => {
+    if (typeof value === "string" && value) return value
+    if (value && typeof value === "object" && typeof value.message === "string" && value.message) return value.message
+    return ""
+  }
+  const error = payload?.error
+  return text(error) || text(payload?.detail) || text(fallback) || "неизвестная ошибка"
+}
+const imageSkillErrorMessage = (message) => /no route: .*\/api\/skills\/image-generation/i.test(String(message))
+  ? "endpoint skill недоступен — полностью перезапусти proxy"
+  : message
+
+function debugLog(event, details = {}) {
+  console.log(`[provider_proxy] ${event}`, { ...details, tab, at: new Date().toISOString() })
+}
+
+window.addEventListener("error", (event) => {
+  console.error("provider_proxy GUI error", event.error ?? event.message)
+  debugLog("js-error", { message: event.message, filename: event.filename, line: event.lineno, column: event.colno })
+  if (typeof flash === "function") flash(false, "ошибка интерфейса — обнови страницу и проверь консоль")
+})
+
 function flash(ok, msg) {
   const s = $("status")
   s.textContent = msg
@@ -431,10 +866,17 @@ function flash(ok, msg) {
 let saveT
 function save() {
   clearTimeout(saveT)
+  debugLog("save-scheduled")
   saveT = setTimeout(async () => {
+    debugLog("save-request")
     const r = await api("/api/config", { method: "PUT", body: JSON.stringify(cfg) })
-    if (!r.ok) return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
+    if (!r.ok) {
+      debugLog("save-failed", { status: r.status })
+      return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
+    }
     const j = await r.json().catch(() => ({}))
+    debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
+    if (j.opencodeSynced === false) return flash(false, "сохранено, но OpenCode не обновлён — проверь путь и вкладку «Логи»")
     flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено ✓")
   }, 300)
 }
@@ -443,7 +885,9 @@ function save() {
 
 function renderProviders() {
   const t = $("providers")
-  const entries = Object.entries(cfg.providers)
+  const allEntries = Object.entries(cfg.providers)
+  const query = providersFilter.trim().toLowerCase()
+  const entries = query ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query)) : allEntries
   t.innerHTML = entries.length ? "<tr><th>имя</th><th>baseURL</th><th>ключ</th><th>модели</th><th></th></tr>" : ""
   let anyCheckin = false
   for (const [name, p] of entries) {
@@ -453,7 +897,7 @@ function renderProviders() {
     tr.innerHTML = `
       <td><b>${esc(name)}</b></td>
       <td class="muted">${esc(p.baseURL ?? "")}</td>
-      <td class="muted">${p.apiKey ? "••••••" : "—"}</td>
+      <td class="muted">${p.apiKeyConfigured ? "••••••" : "—"}</td>
       <td class="muted">${models.length || "—"}</td>
       <td style="white-space:nowrap;text-align:right">
         ${p.checkin ? `<button data-a="checkin">Чекин</button>` : ""}
@@ -465,14 +909,16 @@ function renderProviders() {
     tr.querySelector('[data-a="del"]').onclick = () => {
       if (!confirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`)) return
       delete cfg.providers[name]
+      delete cfg.opencodeModels?.[name]
       for (const m of Object.values(cfg.models)) m.upstreams = (m.upstreams ?? []).filter((u) => u.provider !== name)
       save(); renderAll()
     }
   }
   $("p-checkins").style.display = anyCheckin ? "" : "none"
+  $("providers-filter-result").textContent = query ? `${entries.length} из ${allEntries.length}` : `${allEntries.length} ${allEntries.length === 1 ? "провайдер" : "провайдеров"}`
   if (!entries.length) {
     const tr = t.insertRow()
-    tr.innerHTML = `<td colspan="5" class="muted">провайдеров пока нет — нажми «+ Добавить провайдера»</td>`
+    tr.innerHTML = `<td colspan="5" class="muted">${allEntries.length ? "ничего не найдено — измени запрос" : "провайдеров пока нет — нажми «+ Добавить провайдера»"}</td>`
   }
 }
 
@@ -483,18 +929,25 @@ $("p-checkins").onclick = () => {
 function renderModels() {
   const box = $("models")
   box.innerHTML = ""
-  const entries = Object.entries(cfg.models)
+  const entries = Object.entries(cfg.models).sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
   for (const [name, def] of entries) {
     const ups = def.upstreams ?? []
-    const div = document.createElement("div")
-    div.className = "card"
+    const enabled = def.enabled !== false
+     const div = document.createElement("div")
+     div.className = `card${enabled ? "" : " chain-disabled"}`
+     div.dataset.model = name
     div.innerHTML = `
       <div class="model-card-head">
         <b class="model-title">proxy/${esc(name)}</b>
         <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>
+        <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из OpenCode" : "Вернуть цепочку в OpenCode"}">
+          <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
+          <span class="chain-switch" aria-hidden="true"></span>
+          <span class="chain-toggle-text">${enabled ? "В OpenCode" : "Скрыта"}<small>${enabled ? "цепочка активна" : "не публикуется"}</small></span>
+        </label>
         <div class="model-actions">
-          <button data-a="edit">Изменить</button>
-          <button class="quiet danger" data-a="del">Удалить</button>
+          <button type="button" data-a="edit">Изменить</button>
+          <button type="button" class="quiet danger" data-a="del">Удалить</button>
         </div>
       </div>
       <div class="chain">
@@ -502,31 +955,304 @@ function renderModels() {
           ? ups
               .map(
                 (u, i) => `
-        <div class="step">
-          <span class="n">${i + 1}.</span><span class="prov">${esc(u.provider ?? "")}</span><span>→</span><code>${esc(u.model ?? "")}</code>${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
+                <div class="step">
+                  <span class="n">${i + 1}.</span><span class="prov">${esc(u.provider ?? "")}</span><span>→</span><code>${esc(u.model ?? "")}</code>${contextBadge(u.provider, u.model)}${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
         </div>`,
               )
               .join("")
-          : `<div class="muted">добавь хотя бы одного провайдера — кнопка «Изменить»</div>`}
-      </div>`
-    div.querySelector('[data-a="edit"]').onclick = () => openModelDialog(name)
-    div.querySelector('[data-a="del"]').onclick = () => {
+         : `<div class="muted">добавь хотя бы одного провайдера — кнопка «Изменить»</div>`}
+       </div>`
+     div.querySelector('[data-a="edit"]').onclick = (event) => {
+       event.preventDefault()
+       event.stopPropagation()
+       debugLog("chain-edit", { name })
+       openModelDialog(name)
+     }
+     div.querySelector('[data-a="del"]').onclick = (event) => {
+       event.preventDefault()
+       event.stopPropagation()
+       debugLog("chain-delete", { name })
+       if (!confirm(`Удалить модель proxy/${name}?`)) return
+       delete cfg.models[name]
+       save(); renderModels(); renderOpenCode()
+     }
+     div.querySelector(".chain-toggle").onclick = (event) => {
+       event.preventDefault()
+       event.stopPropagation()
+       const nextEnabled = cfg.models[name].enabled === false
+       debugLog("chain-toggle", { name, enabled: nextEnabled })
+       if (nextEnabled) delete cfg.models[name].enabled
+       else cfg.models[name].enabled = false
+       save(); renderModels(); renderOpenCode()
+     }
+     box.append(div)
+   }
+   if (!entries.length) box.innerHTML = `<p class="muted">цепочек пока нет — нажми «+ Добавить цепочку»</p>`
+ }
+
+// Cards are rebuilt after every save. Keep one document-level handler so
+// actions cannot disappear when a card is re-rendered.
+document.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target : event.target?.parentElement
+  if (!target) return
+  const actionTarget = target.closest("button, [data-a], .chain-toggle")
+  if (actionTarget) debugLog("click", { target: actionTarget.id || actionTarget.dataset.a || actionTarget.dataset.tab || actionTarget.textContent?.trim().slice(0, 60) })
+
+  const chainCard = target.closest("#models .card[data-model]")
+  if (chainCard) {
+    const name = chainCard.dataset.model
+    if (target.closest('[data-a="edit"]')) {
+      event.preventDefault(); event.stopPropagation()
+      return openModelDialog(name)
+    }
+    if (target.closest('[data-a="del"]')) {
+      event.preventDefault(); event.stopPropagation()
       if (!confirm(`Удалить модель proxy/${name}?`)) return
       delete cfg.models[name]
-      save(); renderModels()
+      save(); renderModels(); renderOpenCode()
+      return
     }
-    box.append(div)
+    if (target.closest(".chain-toggle")) {
+      event.preventDefault(); event.stopPropagation()
+      const enabled = cfg.models[name].enabled !== false
+      if (enabled) cfg.models[name].enabled = false
+      else delete cfg.models[name].enabled
+      save(); renderModels(); renderOpenCode()
+      return
+    }
   }
-  if (!entries.length) box.innerHTML = `<p class="muted">моделей пока нет — нажми «+ Добавить модель» или «Модели» у провайдера</p>`
+
+  const directCard = target.closest("#opencode-models .card[data-provider]")
+  if (directCard) {
+    const provider = directCard.dataset.provider
+    if (target.closest('[data-a="edit"]')) {
+      event.preventDefault(); event.stopPropagation()
+      return openOpenCodeModelDialog(provider)
+    }
+    if (target.closest('[data-a="del"]')) {
+      event.preventDefault(); event.stopPropagation()
+      if (!confirm(`Удалить прямые модели провайдера «${provider}»?`)) return
+      delete cfg.opencodeModels[provider]
+      save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
+      return
+    }
+    if (target.closest(".chain-toggle")) {
+      event.preventDefault(); event.stopPropagation()
+      const toggle = directCard.querySelector('[data-a="toggle"]')
+      toggle.checked = !toggle.checked
+      if (toggle.checked) delete cfg.opencodeModels[provider].enabled
+      else cfg.opencodeModels[provider].enabled = false
+      save(); renderOpencodeModels(); renderOpenCode()
+    }
+  }
+})
+
+ const DEFAULT_OPENCODE_CONFIG = "~/.config/opencode/opencode.jsonc"
+const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
+
+ const previewExpanded = new Set()
+ function renderOpenCodePreview(id, entries) {
+   const box = $(id)
+   if (!entries.length) {
+     box.innerHTML = `<span class="muted">Включи хотя бы одну модель или цепочку — она появится здесь после синхронизации.</span>`
+     return
+   }
+   const expanded = previewExpanded.has(id)
+   const visible = expanded ? entries : entries.slice(0, 10)
+   box.innerHTML = visible.map(([name, suffix]) => `<div class="opencode-model"><strong>${esc(name)}</strong><span>(${esc(suffix)})</span></div>`).join("")
+   if (entries.length > 15) {
+     const toggle = document.createElement("button")
+     toggle.type = "button"
+     toggle.className = "opencode-preview-toggle"
+     toggle.innerHTML = expanded ? "↑ Свернуть список" : `↓ Показать ещё ${entries.length - 10}`
+     toggle.onclick = () => {
+       if (expanded) previewExpanded.delete(id)
+       else previewExpanded.add(id)
+       renderOpenCode()
+     }
+     box.append(toggle)
+   }
+ }
+
+ function renderOpenCode() {
+  const path = cfg.opencodeConfig ?? DEFAULT_OPENCODE_CONFIG
+  const provider = cfg.opencodeProvider ?? DEFAULT_OPENCODE_PROVIDER
+  for (const id of ["oc-path", "chain-oc-path"]) $(id).value = path
+  for (const id of ["oc-provider", "chain-oc-provider"]) $(id).value = provider
+  const chains = Object.entries(cfg.models).filter(([, def]) => def.enabled !== false)
+  const direct = Object.entries(cfg.opencodeModels ?? {}).flatMap(([provider, def]) =>
+    def?.enabled === false ? [] : (def?.models ?? []).map((model) => [`${provider}/${model}`, "config"]),
+  )
+  const entries = [...chains.map(([name, def]) => [name, `proxy, x${(def.upstreams ?? []).length}`]), ...direct]
+  const status = entries.length ? `${entries.length} ${entries.length === 1 ? "модель" : "моделей"}` : "пока пусто"
+  for (const id of ["oc-status", "chain-oc-status"]) $(id).textContent = status
+  renderOpenCodePreview("oc-preview", entries)
+  renderOpenCodePreview("chain-oc-preview", entries)
+}
+
+function renderOpencodeModels() {
+  const box = $("opencode-models")
+  const entries = Object.entries(cfg.opencodeModels ?? {})
+    .filter(([provider]) => cfg.providers[provider])
+    .sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
+  box.innerHTML = entries.length
+    ? entries
+        .map(([provider, def]) => {
+          const enabled = def?.enabled !== false
+          const ids = def?.models ?? []
+           return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
+            <div class="model-card-head">
+              <b class="model-title">${esc(provider)}</b>
+              <span class="pill ${ids.length ? "" : "empty"}">${ids.length} моделей</span>
+              <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из OpenCode" : "Вернуть модели провайдера в OpenCode"}">
+                <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
+                <span class="chain-switch" aria-hidden="true"></span>
+                <span class="chain-toggle-text">${enabled ? "В OpenCode" : "Скрыт"}<small>${enabled ? "провайдер активен" : "не публикуется"}</small></span>
+              </label>
+               <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
+            </div>
+            <div class="provider-model-list">${ids.length ? ids.map((id) => `<span class="opencode-model"><strong>${esc(provider)}/${esc(id)}</strong><span>(config)</span></span>`).join("") : `<span class="muted">модели не выбраны — нажми «Изменить»</span>`}</div>
+          </div>`
+        })
+        .join("")
+     : `<p class="muted">прямых моделей пока нет — нажми «+ Добавить модель»</p>`
+  for (const card of box.querySelectorAll(".direct-model-card")) {
+    const provider = card.dataset.provider
+    card.querySelector('[data-a="edit"]').onclick = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      debugLog("direct-edit", { provider })
+      openOpenCodeModelDialog(provider)
+    }
+    card.querySelector('[data-a="del"]').onclick = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      debugLog("direct-delete", { provider })
+      if (!confirm(`Удалить прямые модели провайдера «${provider}»?`)) return
+      delete cfg.opencodeModels[provider]
+      save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
+    }
+    card.querySelector(".chain-toggle").onclick = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const nextEnabled = cfg.opencodeModels[provider].enabled === false
+      debugLog("direct-toggle", { provider, enabled: nextEnabled })
+      if (nextEnabled) delete cfg.opencodeModels[provider].enabled
+      else cfg.opencodeModels[provider].enabled = false
+      save(); renderOpencodeModels(); renderOpenCode()
+    }
+  }
 }
 
 function renderSettings() {
   $("s-port").value = cfg.port ?? 8787
   $("s-auth").value = cfg.authToken ?? ""
+  $("s-auth").placeholder = cfg.authTokenConfigured ? "оставить текущий токен" : "не задан"
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 20
   $("proxyinfo").textContent = `→ http://127.0.0.1:${cfg.port ?? 8787}/v1`
+}
+
+const dlgSettings = $("dlg-settings")
+$("settings-open").onclick = () => dlgSettings.showModal()
+$("settings-cancel").onclick = () => dlgSettings.close()
+$("settings-shutdown").onclick = async () => {
+  if (!window.confirm("Выйти из приложения и закрыть его вкладку?")) return
+  const button = $("settings-shutdown")
+  button.disabled = true
+  button.textContent = "Выхожу…"
+  try {
+    const response = await api("/api/shutdown", { method: "POST" })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
+    flash(true, "выход из приложения…")
+    dlgSettings.close()
+    setTimeout(() => {
+      try { window.close() } catch { /* browser may forbid closing a user-opened tab */ }
+      if (!document.hidden) {
+        document.title = "Provider Proxy — закрыто"
+        document.body.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;padding:32px"><p style="color:#9aaabd">Приложение завершено. Вкладку можно закрыть.</p></main>'
+      }
+    }, 250)
+  } catch (error) {
+    button.disabled = false
+    button.textContent = "Выйти из приложения"
+    flash(false, `не удалось выйти из приложения: ${error.message}`)
+  }
+}
+
+const dlgImageSettings = $("dlg-image-settings")
+const imageSkillStatusNode = $("image-skill-status")
+const imageSkillPathNode = $("image-skill-path")
+const imageSkillInstallButton = $("image-skill-install")
+$("ig-settings-open").onclick = () => {
+  dlgImageSettings.showModal()
+  renderImageSettings()
+  loadImageSkillStatus()
+}
+$("image-settings-cancel").onclick = () => dlgImageSettings.close()
+
+function renderImageSkillStatus(state = {}) {
+  imageSkillPathNode.textContent = state.path ?? "путь пока неизвестен"
+  imageSkillStatusNode.className = "skill-status" + (state.same ? " is-ok" : state.installed ? " is-warn" : "")
+  imageSkillStatusNode.textContent = state.same ? "установлен" : state.installed ? "есть другая версия" : "не установлен"
+  imageSkillInstallButton.textContent = state.installed && !state.same ? "Обновить скилл" : "Добавить скилл"
+}
+
+async function loadImageSkillStatus() {
+  imageSkillStatusNode.className = "skill-status"
+  imageSkillStatusNode.textContent = "проверяю…"
+  try {
+    const response = await api("/api/skills/image-generation")
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
+    renderImageSkillStatus(payload)
+  } catch (error) {
+    imageSkillPathNode.textContent = "—"
+    imageSkillStatusNode.className = "skill-status is-warn"
+    imageSkillStatusNode.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
+  }
+}
+
+async function installImageSkill(overwrite = false) {
+  imageSkillInstallButton.disabled = true
+  imageSkillStatusNode.className = "skill-status"
+  imageSkillStatusNode.textContent = "устанавливаю…"
+  try {
+    const response = await api("/api/skills/image-generation", { method: "POST", body: JSON.stringify({ overwrite }) })
+    const payload = await response.json().catch(() => ({}))
+    if (response.status === 409 && !overwrite) {
+      const shouldOverwrite = window.confirm("В этом месте уже есть другая версия skill. Обновить её встроенной версией?")
+      if (shouldOverwrite) return installImageSkill(true)
+      renderImageSkillStatus(payload)
+      return
+    }
+    if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
+    renderImageSkillStatus(payload)
+    flash(true, "skill для генерации изображений добавлен ✓")
+  } catch (error) {
+    renderImageSkillStatus({ path: imageSkillPathNode.textContent, installed: false, same: false })
+    imageSkillStatusNode.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
+    flash(false, `не удалось добавить skill: ${imageSkillErrorMessage(error.message)}`)
+  } finally {
+    imageSkillInstallButton.disabled = false
+  }
+}
+
+imageSkillInstallButton.onclick = () => installImageSkill()
+
+for (const id of ["oc-path", "chain-oc-path"]) $(id).onchange = (e) => {
+  const value = e.target.value.trim()
+  if (value && value !== DEFAULT_OPENCODE_CONFIG) cfg.opencodeConfig = value
+  else delete cfg.opencodeConfig
+  renderOpenCode(); save()
+}
+for (const id of ["oc-provider", "chain-oc-provider"]) $(id).onchange = (e) => {
+  const value = e.target.value.trim()
+  if (value && value !== DEFAULT_OPENCODE_PROVIDER) cfg.opencodeProvider = value
+  else delete cfg.opencodeProvider
+  renderOpenCode(); save()
 }
 
 const num = (id, key) => ($(id).onchange = (e) => { cfg[key] = Number(e.target.value) || undefined; save() })
@@ -536,17 +1262,36 @@ num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
 $("s-auth").onchange = (e) => {
   const v = e.target.value.trim()
-  if (v) cfg.authToken = v
-  else delete cfg.authToken
+  if (v) {
+    cfg.authToken = v
+    delete cfg.authTokenConfigured
+  } else {
+    delete cfg.authToken
+    delete cfg.authTokenConfigured
+  }
   token = v
   localStorage.setItem("pp_token", v)
   save()
+}
+
+$("providers-filter").oninput = (e) => {
+  providersFilter = e.target.value
+  renderProviders()
+}
+$("providers-filter-clear").onclick = () => {
+  providersFilter = ""
+  $("providers-filter").value = ""
+  renderProviders()
+  $("providers-filter").focus()
 }
 
 function renderAll() {
   renderProviders()
   renderProviderModels()
   renderModels()
+  renderOpencodeModels()
+  renderImageGenerator()
+  renderOpenCode()
   renderSettings()
 }
 
@@ -561,7 +1306,8 @@ function openProviderDialog(name = null) {
   $("dp-title").textContent = name ? `Провайдер «${name}»` : "Добавить провайдера"
   $("dp-name").value = name ?? ""
   $("dp-url").value = name ? cfg.providers[name]?.baseURL ?? "" : ""
-  $("dp-key").value = name ? cfg.providers[name]?.apiKey ?? "" : ""
+  $("dp-key").value = ""
+  $("dp-key").placeholder = name && cfg.providers[name]?.apiKeyConfigured ? "оставить текущий ключ" : "sk-..."
   $("dp-checkin").value = name ? cfg.providers[name]?.checkin ?? "" : ""
   dlgProvider.showModal()
 }
@@ -581,12 +1327,17 @@ dlgProvider.addEventListener("close", () => {
   const name = $("dp-name").value.trim()
   // keep fields the dialog does not edit (models allowlist, headers) when renaming/editing
   const rec = { ...(editingProvider ? cfg.providers[editingProvider] : {}), baseURL: $("dp-url").value.trim(), apiKey: $("dp-key").value.trim() }
+  if (editingProvider && !rec.apiKey && cfg.providers[editingProvider]?.apiKeyConfigured) rec.apiKeySource = editingProvider
   const checkin = $("dp-checkin").value.trim()
   if (checkin) rec.checkin = checkin
   else delete rec.checkin
   cfg.providers[name] = rec
   if (editingProvider && editingProvider !== name) {
     delete cfg.providers[editingProvider]
+    if (cfg.opencodeModels?.[editingProvider]) {
+      cfg.opencodeModels[name] = cfg.opencodeModels[editingProvider]
+      delete cfg.opencodeModels[editingProvider]
+    }
     for (const m of Object.values(cfg.models))
       for (const u of m.upstreams ?? []) if (u.provider === editingProvider) u.provider = name
   }
@@ -596,16 +1347,18 @@ dlgProvider.addEventListener("close", () => {
 // ---------- диалог: модель ----------
 
 const dlgModel = $("dlg-model")
-let draft = null // { original, upstreams: [{provider, model}] }
+let draft = null // { original, enabled, upstreams: [{provider, model}] }
 let pickProvider = null // провайдер, выбранный в пикере «или из выбранных моделей провайдера»
+let chainProviderFilter = ""
 
 function openModelDialog(name = null) {
   const src = name ? cfg.models[name] : null
-  draft = { original: name, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [] }
+  draft = { original: name, enabled: src?.enabled !== false, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [] }
   dlgModel.returnValue = ""
   $("dm-title").textContent = name ? `Модель proxy/${name}` : "Добавить модель"
   $("dm-name").value = name ?? ""
   pickProvider = null
+  chainProviderFilter = ""
   filters.delete("dm-pick-list")
   renderModelDialog()
   dlgModel.showModal()
@@ -650,50 +1403,79 @@ function renderModelDialog() {
   on("down", (i) => { const u = draft.upstreams; [u[i + 1], u[i]] = [u[i], u[i + 1]]; renderModelDialog() })
   on("rm", (i) => { draft.upstreams.splice(i, 1); renderModelDialog() })
 
-  // default both selects to the provider the user is most likely working with:
-  // the one picked before, else the last one in the chain
-  const prefer = pickProvider ?? draft.upstreams.at(-1)?.provider
-  const opts = provNames
-    .map((pn) => `<option ${pn === prefer ? "selected" : ""}>${esc(pn)}</option>`)
-    .join("")
-  $("dm-add-provider").innerHTML = opts || `<option value="">нет провайдеров</option>`
-  $("dm-pick-provider").innerHTML = opts || `<option value="">нет провайдеров</option>`
-  $("dm-pick-provider").onchange = (e) => {
-    pickProvider = e.target.value
-    filters.delete("dm-pick-list")
-    renderPick()
+  // Use the same searchable provider picker as the provider-models tab.
+  const prefer = pickProvider ?? draft.upstreams.at(-1)?.provider ?? provNames[0]
+  if (!pickProvider && prefer) pickProvider = prefer
+  const providerQuery = chainProviderFilter.trim().toLowerCase()
+  const shownProviders = providerQuery ? provNames.filter((pn) => pn.toLowerCase().includes(providerQuery)) : provNames
+  $("dm-provider-result").textContent = providerQuery ? `${shownProviders.length} из ${provNames.length}` : `${provNames.length} ${provNames.length === 1 ? "провайдер" : "провайдеров"}`
+  $("dm-provider-options").innerHTML = shownProviders.length
+    ? shownProviders
+        .map(
+          (pn) => `<button type="button" class="provider-option ${pn === pickProvider ? "active" : ""}" data-provider="${esc(pn)}" role="option" aria-selected="${pn === pickProvider}">
+            <strong>${esc(pn)}</strong><small>${(cfg.providers[pn].models ?? []).length} моделей</small>
+          </button>`,
+        )
+        .join("")
+    : `<span class="muted">провайдер не найден — измени запрос</span>`
+  $("dm-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
+    button.onclick = () => {
+      pickProvider = button.dataset.provider
+      filters.delete("dm-pick-list")
+      renderModelDialog()
+    }
+  })
+  $("dm-provider-filter").value = chainProviderFilter
+  $("dm-provider-filter").oninput = (e) => {
+    chainProviderFilter = e.target.value
+    renderModelDialog()
+    const input = $("dm-provider-filter")
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+  $("dm-provider-filter-clear").onclick = () => {
+    chainProviderFilter = ""
+    renderModelDialog()
+    $("dm-provider-filter").focus()
   }
   renderPick()
 }
 
 $("dm-add").onclick = () => {
-  const pn = $("dm-add-provider").value
+  const pn = pickProvider
   const mid = $("dm-add-model").value.trim()
-  if (!pn || !mid) return flash(false, "выбери провайдера и впиши ID модели")
+  if (!pn || !mid) return flash(false, !pn ? "сначала выбери провайдера" : "впиши ID модели")
+  if (isImageModel(pn, mid)) return flash(false, "image-модели нельзя добавлять в цепочки — используй вкладку «Изображения»")
   draft.upstreams.push({ provider: pn, model: mid })
   $("dm-add-model").value = ""
   renderModelDialog()
 }
 
 function renderPick() {
-  const pn = $("dm-pick-provider").value
+  const pn = pickProvider
   if (!pn) return ($("dm-pick-list").innerHTML = "")
-  const ids = cfg.providers[pn]?.models ?? []
+  const allIds = (cfg.providers[pn]?.models ?? []).filter((id) => !isImageModel(pn, id))
+  const used = new Set(draft.upstreams.filter((u) => u.provider === pn).map((u) => u.model))
+  const ids = allIds.filter((id) => !used.has(id))
+  if (!allIds.length)
+    return ($("dm-pick-list").innerHTML = `<span class="muted">у «${esc(pn)}» нет доступных для цепочки моделей — image-модели добавляются только на вкладке «Изображения»</span>`)
   if (!ids.length)
-    return ($("dm-pick-list").innerHTML = `<span class="muted">у «${esc(pn)}» не выбраны модели — отметь их в блоке «Модели провайдеров» (шаг 2)</span>`)
+    return ($("dm-pick-list").innerHTML = `<span class="muted">Все модели провайдера «${esc(pn)}» уже добавлены в цепочку.</span>`)
   renderChips("dm-pick-list", pn, ids, (id) => {
     if (draft.upstreams.some((u) => u.provider === pn && u.model === id)) return flash(false, "уже в цепочке")
     draft.upstreams.push({ provider: pn, model: id })
     renderModelDialog()
-  })
+  }, cfg.providers[pn]?.modelInfo ?? {})
 }
 
 $("m-add").onclick = () => openModelDialog()
-$("m-sync").onclick = async () => {
+const syncOpenCode = async () => {
   const r = await api("/api/opencode-sync", { method: "POST" })
   const j = await r.json().catch(() => ({}))
-  flash(!!j.ok, j.ok ? `opencode: ${j.models} моделей провайдера обновлено` : "opencode: не обновилось — смотри вкладку «Логи»")
+  flash(!!j.ok, j.ok ? `OpenCode: провайдер и ${j.models} моделей добавлены` : "OpenCode: не обновилось — смотри вкладку «Логи»")
 }
+$("m-sync").onclick = syncOpenCode
+$("chain-m-sync").onclick = syncOpenCode
 $("dm-cancel").onclick = () => dlgModel.close()
 
 $("dm-form").addEventListener("submit", (e) => {
@@ -706,9 +1488,116 @@ $("dm-form").addEventListener("submit", (e) => {
 dlgModel.addEventListener("close", () => {
   if (dlgModel.returnValue !== "save") return
   const name = $("dm-name").value.trim()
-  cfg.models[name] = { upstreams: draft.upstreams }
+  cfg.models[name] = { ...(draft.enabled ? {} : { enabled: false }), upstreams: draft.upstreams }
   if (draft.original && draft.original !== name) delete cfg.models[draft.original]
-  save(); renderModels()
+  save(); renderModels(); renderOpenCode()
+})
+
+// ---------- прямые модели OpenCode ----------
+
+const dlgOpenCodeModel = $("dlg-opencode-model")
+let directDraft = null // { provider, models, filter, providerFilter }
+
+function openOpenCodeModelDialog(provider = null) {
+  const names = Object.keys(cfg.providers)
+  const selectedProvider = provider ?? names[0] ?? ""
+  const current = (cfg.opencodeModels?.[selectedProvider]?.models ?? []).filter((id) => !isImageModel(selectedProvider, id))
+  directDraft = { provider: selectedProvider, models: [...current], filter: "", providerFilter: "" }
+  dlgOpenCodeModel.returnValue = ""
+  renderOpenCodeModelDialog()
+  dlgOpenCodeModel.showModal()
+}
+
+function renderOpenCodeModelDialog() {
+  const names = Object.keys(cfg.providers)
+  const providerQuery = directDraft.providerFilter.trim().toLowerCase()
+  const shownProviders = providerQuery ? names.filter((name) => name.toLowerCase().includes(providerQuery)) : names
+  $("dom-provider-result").textContent = providerQuery
+    ? `${shownProviders.length} из ${names.length}`
+    : `${names.length} ${names.length === 1 ? "провайдер" : "провайдеров"}`
+  $("dom-provider-options").innerHTML = shownProviders.length
+    ? shownProviders
+        .map(
+          (name) => `<button type="button" class="provider-option ${name === directDraft.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === directDraft.provider}">
+            <strong>${esc(name)}</strong><small>${(cfg.providers[name].models ?? []).length} моделей</small>
+          </button>`,
+        )
+        .join("")
+    : `<span class="muted">${names.length ? "провайдер не найден — измени запрос" : "провайдеров пока нет — добавь их на вкладке «Провайдеры»"}</span>`
+  $("dom-provider-current").innerHTML = directDraft.provider ? `<strong>${esc(directDraft.provider)}</strong>` : "<strong>—</strong>"
+  $("dom-provider-filter").value = directDraft.providerFilter
+  $("dom-provider-filter").oninput = (e) => {
+    directDraft.providerFilter = e.target.value
+    renderOpenCodeModelDialog()
+    const input = $("dom-provider-filter")
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+  $("dom-provider-filter-clear").onclick = () => {
+    directDraft.providerFilter = ""
+    renderOpenCodeModelDialog()
+    $("dom-provider-filter").focus()
+  }
+  $("dom-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
+    button.onclick = () => {
+      directDraft.provider = button.dataset.provider
+      directDraft.models = [...(cfg.opencodeModels?.[directDraft.provider]?.models ?? [])]
+      directDraft.filter = ""
+      renderOpenCodeModelDialog()
+    }
+  })
+  const p = cfg.providers[directDraft.provider]
+  const all = (p?.models ?? []).filter((id) => !isImageModel(directDraft.provider, id))
+  const filter = directDraft.filter.trim().toLowerCase()
+  const ids = all.filter((id) => id.toLowerCase().includes(filter))
+  $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
+  const selectAll = $("dom-select-all")
+  selectAll.checked = all.length > 0 && directDraft.models.length === all.length
+  selectAll.indeterminate = directDraft.models.length > 0 && directDraft.models.length < all.length
+  selectAll.onchange = () => {
+    directDraft.models = selectAll.checked ? [...all] : []
+    renderOpenCodeModelDialog()
+  }
+  $("dom-model-list").innerHTML = ids.length
+    ? ids
+        .map(
+            (id) => `<label class="check"><input type="checkbox" data-id="${esc(id)}" ${directDraft.models.includes(id) ? "checked" : ""}><code>${esc(id)}</code>${isImageModel(directDraft.provider, id) ? imageIcon() : ""}${contextBadge(directDraft.provider, id)}${availabilityBadge(directDraft.provider, id)}</label>`,
+        )
+        .join("")
+    : `<span class="muted">${all.length ? "ничего не найдено" : "у провайдера нет выбранных моделей — добавь их на вкладке «Подключения»"}</span>`
+  $("dom-model-list").querySelectorAll("input[data-id]").forEach((cb) => {
+    cb.onchange = () => {
+      const id = cb.dataset.id
+      const i = directDraft.models.indexOf(id)
+      if (cb.checked && i < 0) directDraft.models.push(id)
+      if (!cb.checked && i >= 0) directDraft.models.splice(i, 1)
+      $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
+    }
+  })
+  $("dom-filter").value = directDraft.filter
+  $("dom-filter").oninput = (e) => {
+    directDraft.filter = e.target.value
+    renderOpenCodeModelDialog()
+    const input = $("dom-filter")
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }
+}
+
+$("om-add").onclick = () => openOpenCodeModelDialog()
+$("dom-cancel").onclick = () => dlgOpenCodeModel.close()
+$("dom-form").addEventListener("submit", (e) => {
+  if (!directDraft?.provider || !directDraft.models.length) {
+    e.preventDefault()
+    flash(false, !directDraft?.provider ? "сначала добавь провайдера" : "выбери хотя бы одну модель")
+  }
+})
+dlgOpenCodeModel.addEventListener("close", () => {
+  if (dlgOpenCodeModel.returnValue !== "save" || !directDraft?.provider) return
+  cfg.opencodeModels ??= {}
+  const prev = cfg.opencodeModels[directDraft.provider] ?? {}
+  cfg.opencodeModels[directDraft.provider] = { ...prev, models: [...new Set(directDraft.models.filter((id) => !isImageModel(directDraft.provider, id)))] }
+  save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
 })
 
 // ---------- блок: модели провайдеров (галочки) ----------
@@ -716,20 +1605,45 @@ dlgModel.addEventListener("close", () => {
 let pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
 
 function renderProviderModels() {
-  const names = Object.keys(cfg.providers)
-  if (!names.length) {
+  const allNames = Object.keys(cfg.providers)
+  const query = pmProviderFilter.trim().toLowerCase()
+  const names = query ? allNames.filter((name) => name.toLowerCase().includes(query)) : allNames
+  if (!allNames.length) {
     pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
     $("pm-provider").innerHTML = ""
     $("pm-provider").disabled = true
+    $("pm-provider-current").innerHTML = "<strong>—</strong>"
+    $("pm-provider-result").textContent = ""
     $("pm-status").textContent = ""
-    $("pm-list").innerHTML = `<span class="muted">провайдеров пока нет — добавь в шаге 1</span>`
+    $("pm-provider-options").innerHTML = `<span class="muted">провайдеров пока нет — добавь в шаге 1</span>`
+    $("pm-list").innerHTML = ""
     return
   }
+  if (!allNames.includes(pmState.provider))
+    pmState = { provider: allNames[0], ids: [...(cfg.providers[allNames[0]].models ?? [])], filter: "", loading: false, error: null }
   $("pm-provider").disabled = false
-  // выбор сброшен (первый запуск или провайдера удалили): берём сохранённые модели, без запроса
-  if (!names.includes(pmState.provider))
-    pmState = { provider: names[0], ids: [...(cfg.providers[names[0]].models ?? [])], filter: "", loading: false, error: null }
-  $("pm-provider").innerHTML = names.map((n) => `<option ${n === pmState.provider ? "selected" : ""}>${esc(n)}</option>`).join("")
+  $("pm-provider").innerHTML = allNames.map((name) => `<option ${name === pmState.provider ? "selected" : ""}>${esc(name)}</option>`).join("")
+  $("pm-provider-current").innerHTML = `<strong>${esc(pmState.provider)}</strong>`
+  $("pm-provider-result").textContent = query ? `${names.length} из ${allNames.length}` : `${allNames.length} ${allNames.length === 1 ? "провайдер" : "провайдеров"}`
+  $("pm-provider-options").innerHTML = names.length
+    ? names
+        .map(
+          (name) => `<button type="button" class="provider-option ${name === pmState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === pmState.provider}">
+            <strong>${esc(name)}</strong><small>${(cfg.providers[name].models ?? []).length} моделей</small>
+          </button>`,
+        )
+        .join("")
+    : `<span class="muted">провайдер не найден — измени запрос</span>`
+  $("pm-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
+    button.onclick = () => {
+      const name = button.dataset.provider
+      pmState = { provider: name, ids: [...(cfg.providers[name].models ?? [])], filter: "", loading: false, error: null }
+      pmProviderFilter = ""
+      $("pm-provider-filter").value = ""
+      renderProviderModels()
+      loadPmModels(name)
+    }
+  })
   $("pm-filter").value = pmState.filter
   const saved = cfg.providers[pmState.provider].models ?? []
   $("pm-status").textContent = pmState.loading
@@ -749,8 +1663,38 @@ async function loadPmModels(name) {
   if (pmState.provider !== name) return // пока грузилось, выбрали другого провайдера
   pmState.loading = false
   pmState.error = res.error ?? null
-  if (!res.error) pmState.ids = [...new Set([...(cfg.providers[name].models ?? []), ...res.ids])]
+  if (!res.error) {
+    const provider = cfg.providers[name]
+    const ids = [...new Set([...(provider.models ?? []), ...res.ids])]
+    const returned = new Set(res.ids)
+    const availability = (provider.modelAvailability ??= {})
+    for (const id of ids) availability[id] = { available: returned.has(id), checkedAt: new Date().toISOString() }
+    provider.modelInfo ??= {}
+    Object.assign(provider.modelInfo, res.details ?? {})
+    pmState.ids = ids
+    const chainsChanged = removeImageModelsFromChains()
+    save()
+    if (chainsChanged) {
+      renderModels()
+      renderOpenCode()
+    }
+  }
   renderProviderModels()
+  renderImageGenerator()
+}
+
+$("pm-provider-filter").oninput = (e) => {
+  pmProviderFilter = e.target.value
+  renderProviderModels()
+  const input = $("pm-provider-filter")
+  input.focus()
+  input.setSelectionRange(input.value.length, input.value.length)
+}
+$("pm-provider-filter-clear").onclick = () => {
+  pmProviderFilter = ""
+  $("pm-provider-filter").value = ""
+  renderProviderModels()
+  $("pm-provider-filter").focus()
 }
 
 $("pm-provider").onchange = (e) => {
@@ -777,6 +1721,27 @@ $("pm-add").onclick = () => {
   $("pm-manual").value = ""
   save()
   renderProviderModels()
+  renderImageGenerator()
+}
+
+function removeModelFromChains(provider, id) {
+  let changed = false
+  for (const def of Object.values(cfg.models ?? {})) {
+    const before = def.upstreams?.length ?? 0
+    def.upstreams = (def.upstreams ?? []).filter((upstream) => !(upstream.provider === provider && upstream.model === id))
+    changed ||= def.upstreams.length !== before
+  }
+  return changed
+}
+
+function removeImageModelsFromChains() {
+  let changed = false
+  for (const def of Object.values(cfg.models ?? {})) {
+    const before = def.upstreams?.length ?? 0
+    def.upstreams = (def.upstreams ?? []).filter((upstream) => !isImageModel(upstream.provider, upstream.model))
+    changed ||= def.upstreams.length !== before
+  }
+  return changed
 }
 
 function renderPmList() {
@@ -788,10 +1753,10 @@ function renderPmList() {
   $("pm-list").innerHTML = shown.length
     ? shown
         .map(
-          (id) => `
+           (id) => `
         <label class="check">
           <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
-          <code>${esc(id)}</code>
+            <code>${esc(id)}</code>${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}
         </label>`,
         )
         .join("")
@@ -802,9 +1767,15 @@ function renderPmList() {
       const arr = (cfg.providers[pmState.provider].models ??= [])
       const i = arr.indexOf(cb.dataset.id)
       if (cb.checked && i < 0) arr.push(cb.dataset.id)
-      if (!cb.checked && i >= 0) arr.splice(i, 1)
+      if (!cb.checked && i >= 0) {
+        arr.splice(i, 1)
+        removeModelFromChains(pmState.provider, cb.dataset.id)
+      }
       save()
       renderProviders() // счётчик моделей в таблице провайдеров
+      renderModels()
+      renderOpenCode()
+      renderImageGenerator()
       $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
     }
   })
@@ -814,7 +1785,7 @@ function renderPmList() {
 
 // Filterable chips list: header names the provider and counts matches, so a huge
 // aggregated catalog (OpenRouter & co) can't be mistaken for "all providers".
-function renderChips(containerId, provider, ids, onAdd) {
+function renderChips(containerId, provider, ids, onAdd, details = {}) {
   const box = $(containerId)
   const ft = filters.get(containerId) ?? ""
   const shown = ids.filter((id) => id.toLowerCase().includes(ft.toLowerCase()))
@@ -824,14 +1795,14 @@ function renderChips(containerId, provider, ids, onAdd) {
       <input data-role="filter" placeholder="фильтр по имени…" style="flex:1;min-width:120px" value="${esc(ft)}">
     </div>
     <div class="fetched" style="margin-top:6px">
-      ${shown.length
-        ? shown.map((id) => `<span class="chip"><code>${esc(id)}</code><button type="button" data-id="${esc(id)}" aria-label="Добавить модель ${esc(id)}" title="Добавить в цепочку">＋</button></span>`).join("")
+       ${shown.length
+         ? shown.map((id) => `<span class="chip"><code>${esc(id)}</code>${isImageModel(provider, id) ? imageIcon() : ""}${formatContext(details[id]?.contextLength) ? `<span class="model-context">ctx ${esc(formatContext(details[id]?.contextLength))}</span>` : ""}<button type="button" data-id="${esc(id)}" aria-label="Добавить модель ${esc(id)}" title="Добавить в цепочку">＋</button></span>`).join("")
         : `<span class="muted">ничего не найдено</span>`}
     </div>`
   const f = box.querySelector('[data-role="filter"]')
   f.oninput = (e) => {
     filters.set(containerId, e.target.value)
-    renderChips(containerId, provider, ids, onAdd)
+    renderChips(containerId, provider, ids, onAdd, details)
     const nf = $(containerId).querySelector('[data-role="filter"]')
     nf.focus()
     nf.setSelectionRange(nf.value.length, nf.value.length)
@@ -841,21 +1812,211 @@ function renderChips(containerId, provider, ids, onAdd) {
 
 async function fetchProviderModels(name) {
   const p = cfg.providers[name]
-  const r = await api("/api/provider-models", { method: "POST", body: JSON.stringify({ baseURL: p.baseURL, apiKey: p.apiKey }) })
+  const r = await api("/api/provider-models", { method: "POST", body: JSON.stringify({ provider: name }) })
   const j = await r.json().catch(() => ({}))
   return r.ok
-    ? { provider: name, ids: j.models ?? [] }
-    : { provider: name, ids: [], error: j.error ?? `HTTP ${r.status}` }
+    ? { provider: name, ids: j.models ?? [], details: j.details ?? {} }
+    : { provider: name, ids: [], details: {}, error: j.error ?? `HTTP ${r.status}` }
+}
+
+// ---------- генерация изображений ----------
+
+let imageProviderFilter = ""
+const imageState = { provider: null, taskId: null, pollTimer: null, referenceImage: "" }
+
+function imageModelIds(provider) {
+  // Connections is the single source of truth; cached catalog entries are not selected models.
+  return [...new Set(cfg.providers[provider]?.models ?? [])].filter((id) => isImageModel(provider, id)).sort()
+}
+
+function imageProviders() {
+  return Object.keys(cfg.providers).filter((name) => imageModelIds(name).length)
+}
+
+function renderImageGenerator() {
+  const allNames = imageProviders()
+  const query = imageProviderFilter.trim().toLowerCase()
+  const shownNames = query ? allNames.filter((name) => name.toLowerCase().includes(query)) : allNames
+  const settings = imageSettings()
+  if (!allNames.includes(imageState.provider)) imageState.provider = allNames.includes(settings.defaultProvider) ? settings.defaultProvider : allNames[0] ?? null
+  $("ig-provider-result").textContent = query ? `${shownNames.length} из ${allNames.length}` : `${allNames.length} ${allNames.length === 1 ? "провайдер" : "провайдеров"}`
+  $("ig-provider-options").innerHTML = shownNames.length
+    ? shownNames
+        .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong><small>${imageModelIds(name).length} image-моделей</small></button>`)
+        .join("")
+    : `<span class="muted">${allNames.length ? "провайдер не найден — измени запрос" : "моделей изображений пока нет — обнови список на вкладке «Подключения» и отметь image-модель"}</span>`
+  $("ig-provider-current").innerHTML = imageState.provider ? `<strong>${esc(imageState.provider)}</strong>` : "<strong>—</strong>"
+  const ids = imageState.provider ? imageModelIds(imageState.provider) : []
+  const selectedModel = $("ig-model").value
+  $("ig-model").innerHTML = ids.length ? ids.map((id) => `<option value="${esc(id)}">${esc(id)}</option>`).join("") : `<option value="">нет доступных моделей</option>`
+  const preferredModel = ids.includes(selectedModel) ? selectedModel : ids.includes(settings.defaultModel) ? settings.defaultModel : ids[0]
+  if (preferredModel) $("ig-model").value = preferredModel
+  $("ig-model").disabled = !ids.length
+  $("ig-status").textContent = imageState.provider ? `${ids.length} image-моделей` : "нет доступных моделей"
+  $("ig-provider-filter").value = imageProviderFilter
+  $("ig-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
+    button.onclick = () => {
+      imageState.provider = button.dataset.provider
+      renderImageGenerator()
+    }
+  })
+}
+
+function renderImageSettings() {
+  const settings = imageSettings()
+  const providers = imageProviders()
+  const providerSelect = $("ig-default-provider")
+  providerSelect.innerHTML = providers.length ? providers.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("") : `<option value="">нет image-провайдеров</option>`
+  if (providers.includes(settings.defaultProvider)) providerSelect.value = settings.defaultProvider
+  else if (providers[0]) { settings.defaultProvider = providers[0]; providerSelect.value = providers[0] }
+  const renderDefaultModels = () => {
+    const ids = providerSelect.value ? imageModelIds(providerSelect.value) : []
+    $("ig-default-model").innerHTML = ids.length ? ids.map((id) => `<option value="${esc(id)}">${esc(id)}</option>`).join("") : `<option value="">нет image-моделей</option>`
+    if (ids.includes(settings.defaultModel)) $("ig-default-model").value = settings.defaultModel
+    else if (ids[0]) { settings.defaultModel = ids[0]; $("ig-default-model").value = ids[0] }
+  }
+  renderDefaultModels()
+  providerSelect.onchange = () => { settings.defaultProvider = providerSelect.value; settings.defaultModel = ""; renderDefaultModels(); save(); renderImageGenerator() }
+  $("ig-default-model").onchange = (event) => { settings.defaultModel = event.target.value; save(); renderImageGenerator() }
+}
+
+function imageResultValue(payload) {
+  const read = (value) => {
+    if (typeof value === "string" && value) return value
+    if (Array.isArray(value)) return value.map(read).find(Boolean) ?? null
+    if (!value || typeof value !== "object") return null
+    return value.url ?? value.image_url?.url ?? value.image_url ?? value.b64_json ?? value.base64 ?? read(value.result) ?? read(value.data) ?? read(value.output) ?? null
+  }
+  return read(payload?.result ?? payload?.data ?? payload?.output ?? payload)
+}
+
+function imageTaskStatus(payload) {
+  return String(payload?.status ?? payload?.result?.status ?? payload?.data?.status ?? "").toLowerCase()
+}
+function imageErrorMessage(payload, response) {
+  const error = payload?.error
+  const message = typeof error === "string" ? error : error?.message ?? payload?.detail ?? `HTTP ${response?.status ?? "?"}`
+  const endpoint = payload?.endpoint ? ` · ${payload.endpoint}` : ""
+  const size = payload?.requestBytes ? ` · ${payload.requestBytes} bytes` : ""
+  const suggestions = Array.isArray(payload?.suggestedModels) && payload.suggestedModels.length ? ` · попробуй: ${payload.suggestedModels.join(", ")}` : ""
+  return `${message}${endpoint}${size}${suggestions}`
+}
+
+function renderImageResult(message = "задача ещё не запущена", value = null) {
+  $("ig-task-status").textContent = message
+  $("ig-preview").closest(".image-result").classList.toggle("is-error", /^ошибка/i.test(message))
+  if (!value) {
+    $("ig-preview").innerHTML = `<div class="image-empty">${esc(message === "задача ещё не запущена" ? "Здесь появится готовое изображение." : "Результат ещё не готов.")}</div>`
+    return
+  }
+  const src = /^(https?:|data:|blob:)/i.test(value) ? value : `data:image/png;base64,${value}`
+  $("ig-preview").innerHTML = `<img src="${esc(src)}" alt="Сгенерированное изображение"><a href="${esc(src)}" target="_blank" rel="noreferrer">Открыть результат отдельно</a>`
+}
+
+function clearImagePolling() {
+  if (imageState.pollTimer) clearTimeout(imageState.pollTimer)
+  imageState.pollTimer = null
+}
+
+async function pollImageTask(provider, taskId) {
+  if (imageState.provider !== provider || imageState.taskId !== taskId) return
+  try {
+    const response = await api(`/api/image-tasks/${encodeURIComponent(provider)}/${encodeURIComponent(taskId)}`)
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(imageErrorMessage(payload, response))
+    const result = imageResultValue(payload)
+    const status = imageTaskStatus(payload)
+    if (result && (!status || ["completed", "complete", "success", "succeeded", "done"].includes(status))) {
+      clearImagePolling()
+      renderImageResult("готово", result)
+      return
+    }
+    if (["failed", "error", "cancelled", "canceled"].includes(status)) {
+      clearImagePolling()
+      renderImageResult(`ошибка: ${apiErrorMessage(payload, payload.result?.error ?? "задача завершилась неуспешно")}`)
+      return
+    }
+    renderImageResult(`статус: ${status || "обрабатывается"} · следующая проверка через 3,5 с`)
+    imageState.pollTimer = setTimeout(() => pollImageTask(provider, taskId), 3500)
+  } catch (error) {
+    clearImagePolling()
+    renderImageResult(`ошибка проверки: ${error.message}`)
+    flash(false, `Генерация изображения: ${error.message}`)
+  }
+}
+
+$("ig-provider-filter").oninput = (e) => {
+  imageProviderFilter = e.target.value
+  renderImageGenerator()
+  const input = $("ig-provider-filter")
+  input.focus()
+  input.setSelectionRange(input.value.length, input.value.length)
+}
+$("ig-provider-filter-clear").onclick = () => {
+  imageProviderFilter = ""
+  $("ig-provider-filter").value = ""
+  renderImageGenerator()
+  $("ig-provider-filter").focus()
+}
+$("ig-image-file").onchange = () => {
+  const file = $("ig-image-file").files?.[0]
+  imageState.referenceImage = ""
+  $("ig-image-file-name").textContent = ""
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    imageState.referenceImage = String(reader.result ?? "")
+    $("ig-image-file-name").textContent = `${file.name} · ${(file.size / 1024).toFixed(0)} КБ`
+  }
+  reader.readAsDataURL(file)
+}
+$("ig-form").onsubmit = async (event) => {
+  event.preventDefault()
+  const provider = imageState.provider
+  const model = $("ig-model").value
+  const prompt = $("ig-prompt").value.trim()
+  if (!provider || !model) return flash(false, "сначала выбери провайдера и image-модель")
+  if (!prompt) return flash(false, "впиши промпт")
+  clearImagePolling()
+  imageState.taskId = null
+  renderImageResult(`отправляю в ${imageModelEndpoint(provider, model)}…`)
+  const referenceImage = $("ig-image").value.trim() || imageState.referenceImage
+  const body = { provider, model, prompt, ratio: $("ig-ratio").value, size: $("ig-size").value.trim(), image: referenceImage }
+  for (const key of ["size", "image"]) if (!body[key]) delete body[key]
+  try {
+    const response = await api("/api/image-tasks", { method: "POST", body: JSON.stringify(body) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(imageErrorMessage(payload, response))
+    const taskId = payload.task_id ?? payload.taskId ?? payload.id ?? payload.data?.task_id ?? payload.data?.taskId ?? payload.data?.id
+    const immediate = imageResultValue(payload)
+    if (immediate && !taskId) return renderImageResult("готово", immediate)
+    if (!taskId) throw new Error("провайдер не вернул task_id")
+    imageState.taskId = String(taskId)
+    renderImageResult(`задача ${imageState.taskId} создана · ожидаю результат`)
+    imageState.pollTimer = setTimeout(() => pollImageTask(provider, imageState.taskId), 1000)
+  } catch (error) {
+    renderImageResult(`ошибка создания: ${error.message}`)
+    flash(false, `Генерация изображения: ${error.message}`)
+  }
+}
+$("ig-clear").onclick = () => {
+  clearImagePolling()
+  imageState.taskId = null
+  imageState.referenceImage = ""
+  $("ig-image-file").value = ""
+  $("ig-image-file-name").textContent = ""
+  renderImageResult()
 }
 
 // ---------- вкладки ----------
 
-const TABS = ["providers", "models", "chains", "logs", "usage"]
+const TABS = ["providers", "connections", "chains", "models", "images", "logs", "usage"]
 let tab = localStorage.getItem("pp_tab") ?? "providers"
 
 function showTab(name) {
   if (!TABS.includes(name)) name = "providers"
   tab = name
+  debugLog("tab", { name })
   localStorage.setItem("pp_tab", name)
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name))
   document.querySelectorAll("main > section[data-tab]").forEach((s) => (s.style.display = s.dataset.tab === name ? "" : "none"))
@@ -914,7 +2075,21 @@ const logCard = (line) => {
 
 // ---------- usage ----------
 
-const fmtTok = (n = 0) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n))
+const fmtTok = (raw = 0) => {
+  const n = Math.max(0, Number(raw) || 0)
+  const units = [["", 1], ["k", 1e3], ["m", 1e6], ["b", 1e9], ["t", 1e12]]
+  let i = 0
+  while (i < units.length - 1 && n >= units[i + 1][1]) i++
+  let value = n / units[i][1]
+  let rounded = Number(value.toFixed(value >= 100 ? 0 : 1))
+  // 999,999 should become 1m rather than 1000k after rounding.
+  if (rounded >= 1000 && i < units.length - 1) {
+    i++
+    value = n / units[i][1]
+    rounded = Number(value.toFixed(value >= 100 ? 0 : 1))
+  }
+  return `${rounded}${units[i][0]}`
+}
 const fmtNum = (n = 0) => Math.round(Number(n) || 0).toLocaleString("ru-RU")
 const fmtUptime = (ms = 0) => {
   const s = Math.round(ms / 1000)
@@ -957,27 +2132,28 @@ function renderUsageCharts(u) {
     .join("")
 
   const providers = Object.entries(u.providers ?? {}).sort(([, a], [, b]) => {
-    const at = (Number(a.tokensIn) || 0) + (Number(a.tokensOut) || 0)
-    const bt = (Number(b.tokensIn) || 0) + (Number(b.tokensOut) || 0)
+    const at = (Number(a.ok) || 0) + (Number(a.errors) || 0) + (Number(a.limits) || 0)
+    const bt = (Number(b.ok) || 0) + (Number(b.errors) || 0) + (Number(b.limits) || 0)
     return bt - at
   })
-  const maxTokens = Math.max(
+  const maxRequests = Math.max(
     1,
-    ...providers.flatMap(([, stat]) => [Number(stat.tokensIn) || 0, Number(stat.tokensOut) || 0]),
+    ...providers.map(([, stat]) => (Number(stat.ok) || 0) + (Number(stat.errors) || 0) + (Number(stat.limits) || 0)),
   )
   $("u-token-chart").innerHTML = providers.length
     ? providers
         .map(([name, stat]) => {
-          const input = Number(stat.tokensIn) || 0
-          const output = Number(stat.tokensOut) || 0
-          return `<div class="token-row" title="${esc(name)}: ${fmtNum(input)} вход, ${fmtNum(output)} выход">
-            <div class="token-row-head"><span>${esc(name)}</span><span>${fmtTok(input + output)}</span></div>
-            <div class="token-track"><span class="token-fill in" style="width:${Math.max(0, (input / maxTokens) * 100).toFixed(1)}%"></span></div>
-            <div class="token-track"><span class="token-fill out" style="width:${Math.max(0, (output / maxTokens) * 100).toFixed(1)}%"></span></div>
+          const success = Number(stat.ok) || 0
+          const errors = (Number(stat.errors) || 0) + (Number(stat.limits) || 0)
+          const total = success + errors
+          const problemRate = total ? Math.round((errors / total) * 100) : 0
+          return `<div class="token-row" title="${esc(name)}: ${fmtNum(success)} успешно, ${fmtNum(errors)} ошибок/лимитов">
+            <div class="token-row-head"><span>${esc(name)}</span><span class="problem-rate">${problemRate}% проблемности</span></div>
+            <div class="token-track"><span class="token-fill success" style="width:${Math.max(0, (success / maxRequests) * 100).toFixed(1)}%"></span><span class="token-fill error" style="width:${Math.max(0, (errors / maxRequests) * 100).toFixed(1)}%"></span></div>
           </div>`
         })
         .join("")
-    : `<div class="chart-empty">Данных о токенах пока нет</div>`
+    : `<div class="chart-empty">Данных о результатах пока нет</div>`
 }
 
 function usageTable(obj, cols) {
@@ -989,38 +2165,76 @@ function usageTable(obj, cols) {
   )
 }
 
+let usageReport = null
+let usageDay = ""
+const usageDayLabel = (date, today) => {
+  if (date === today) return "Сегодня"
+  return new Date(`${date}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }).replace(".", "")
+}
+const usageDayHasData = (day) => (Number(day.requests) || 0) + (Number(day.tokensIn) || 0) + (Number(day.tokensOut) || 0) + Object.keys(day.providers ?? {}).length + Object.keys(day.images ?? {}).length > 0
+
+function renderUsageReport(report) {
+  const days = Array.isArray(report.days) && report.days.length ? report.days : [{ date: report.today ?? "", ...report }]
+  const today = report.today ?? days[0]?.date ?? ""
+  if (!usageDay || !days.some((day) => day.date === usageDay)) usageDay = today
+  $("u-days").innerHTML = days
+    .map((day) => `<button type="button" class="usage-day${day.date === usageDay ? " active" : ""}${usageDayHasData(day) ? "" : " empty"}" data-date="${esc(day.date)}" role="tab" aria-selected="${day.date === usageDay}"><strong>${usageDayLabel(day.date, today)}</strong><small>${usageDayHasData(day) ? `${fmtNum(day.requests ?? 0)} запросов` : "нет запросов"}</small></button>`)
+    .join("")
+  $("u-days").querySelectorAll("[data-date]").forEach((button) => {
+    button.onclick = () => {
+      usageDay = button.dataset.date
+      renderUsageReport(report)
+    }
+  })
+  const selected = days.find((day) => day.date === usageDay) ?? days[0]
+  const u = {
+    ...selected,
+    cooldowns: selected.date === today ? report.cooldowns ?? [] : [],
+    uptimeMs: selected.date === today ? report.uptimeMs ?? 0 : 0,
+  }
+  $("u-info").textContent = selected.date === today ? `${usageDayLabel(selected.date, today)} · сессия ${fmtUptime(u.uptimeMs)} · хранится 7 дней` : `${usageDayLabel(selected.date, today)} · сохранено между сессиями`
+  const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
+  $("u-tiles").innerHTML =
+    tile("запросов", u.requests ?? 0) +
+    tile("успешных", u.ok ?? 0) +
+    tile("failover", u.failovers ?? 0) +
+    tile("ошибок", u.failed ?? 0) +
+    tile("токенов вход", fmtTok(u.tokensIn)) +
+    tile("токенов выход", fmtTok(u.tokensOut))
+  renderUsageCharts(u)
+  $("u-providers").innerHTML = usageTable(u.providers, [
+    { h: "запросов", f: (s) => s.requests ?? 0 },
+    { h: "ок", f: (s) => s.ok ?? 0 },
+    { h: "429", f: (s) => s.limits ?? 0 },
+    { h: "ошибок", f: (s) => s.errors ?? 0 },
+    { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
+    { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
+  ])
+  $("u-models").innerHTML = usageTable(u.models, [
+    { h: "запросов", f: (s) => s.requests ?? 0 },
+    { h: "ок", f: (s) => s.ok ?? 0 },
+    { h: "failover", f: (s) => s.failovers ?? 0 },
+    { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
+    { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
+  ])
+  const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
+  $("u-image-tiles").innerHTML = tile("запросов", imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)) + tile("сгенерировано", u.imagesGenerated ?? 0) + tile("успешных", imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)) + tile("ошибок", imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0))
+  const recent = (u.recentImages ?? []).slice().reverse()
+  const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"
+  $("u-image-recent").innerHTML = `<strong>Последние модели</strong><div class="muted" style="margin-top:6px">Последняя: ${esc(last(u.lastImageModel))} · последняя edit: ${esc(last(u.lastEditImageModel))}</div>${recent.length ? `<div class="provider-model-list" style="margin-top:10px">${recent.slice(0, 10).map((item) => `<span class="opencode-model"><strong>${esc(item.provider)}/${esc(item.model)}</strong><span>${esc(item.mode ?? "generate")} · ${esc(item.status ?? "pending")} · ${esc(item.at ?? "")}</span></span>`).join("")}</div>` : `<div class="muted" style="margin-top:6px">Изображений ещё не запускали.</div>`}`
+  $("u-images").innerHTML = imageEntries.length
+    ? `<tr><th>провайдер</th><th>модель</th><th>запросов</th><th>успешных</th><th>ошибок</th><th>последний HTTP</th></tr>${imageEntries.map(([, s]) => `<tr><td>${esc(s.provider)}</td><td>${esc(s.model)}</td><td class="muted">${s.requests ?? 0}</td><td class="muted">${s.ok ?? 0}</td><td class="muted">${s.errors ?? 0}</td><td class="muted">${s.lastStatus || "—"}</td></tr>`).join("")}`
+    : `<tr><td class="muted">генераций пока не было</td></tr>`
+  const cool = u.cooldowns ?? []
+  $("u-cooling").textContent = cool.length
+    ? "в кулдауне: " + cool.map((c) => `${c.model} → ${c.upstream} (до ${new Date(c.until).toLocaleTimeString()})`).join("; ")
+    : ""
+}
+
 async function loadUsage() {
   try {
-    const u = await (await api("/api/usage")).json()
-    $("u-info").textContent = `с запуска прокси: ${fmtUptime(u.uptimeMs)}`
-    const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
-    $("u-tiles").innerHTML =
-      tile("запросов", u.requests ?? 0) +
-      tile("успешных", u.ok ?? 0) +
-      tile("failover", u.failovers ?? 0) +
-      tile("ошибок", u.failed ?? 0) +
-      tile("токенов вход", fmtTok(u.tokensIn)) +
-      tile("токенов выход", fmtTok(u.tokensOut))
-    renderUsageCharts(u)
-    $("u-providers").innerHTML = usageTable(u.providers, [
-      { h: "запросов", f: (s) => s.requests ?? 0 },
-      { h: "ок", f: (s) => s.ok ?? 0 },
-      { h: "429", f: (s) => s.limits ?? 0 },
-      { h: "ошибок", f: (s) => s.errors ?? 0 },
-      { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
-      { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
-    ])
-    $("u-models").innerHTML = usageTable(u.models, [
-      { h: "запросов", f: (s) => s.requests ?? 0 },
-      { h: "ок", f: (s) => s.ok ?? 0 },
-      { h: "failover", f: (s) => s.failovers ?? 0 },
-      { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
-      { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
-    ])
-    const cool = u.cooldowns ?? []
-    $("u-cooling").textContent = cool.length
-      ? "в кулдауне: " + cool.map((c) => `${c.model} → ${c.upstream} (до ${new Date(c.until).toLocaleTimeString()})`).join("; ")
-      : ""
+    usageReport = await (await api("/api/usage")).json()
+    renderUsageReport(usageReport)
   } catch {
     /* прокси недоступен — следующий опрос повторит */
   }
@@ -1033,9 +2247,14 @@ async function load() {
     cfg = await r.json()
     cfg.providers ??= {}
     cfg.models ??= {}
+    cfg.opencodeModels ??= {}
+    const chainsChanged = removeImageModelsFromChains()
+    if (chainsChanged) save()
     renderAll()
+    debugLog("boot-ok", { providers: Object.keys(cfg.providers).length, chains: Object.keys(cfg.models).length })
     if (pmState.provider) loadPmModels(pmState.provider) // список моделей подтягиваем при открытии вкладки
   } catch {
+    debugLog("boot-failed")
     flash(false, "не удалось загрузить конфиг — прокси запущен?")
   }
 }
