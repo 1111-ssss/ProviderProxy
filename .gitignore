@@ -1,6 +1,7 @@
 config.json
 usage-stats.json
 server.log
+server-error.log
 *.key
 *.pem
 *.p12

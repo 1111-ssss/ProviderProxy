@@ -84,6 +84,18 @@ cargo tauri dev -- ./config.json
 ./install-shortcuts.sh
 ```
 
+Windows-ярлыки устанавливаются из PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\install-shortcuts.ps1
+```
+
+Скрипт создаёт ярлыки в меню «Пуск» и на рабочем столе. Rust-ярлык запускает
+`target\release\provider-proxy-desktop.exe`, а npm-ярлык запускает `server.mjs` и открывает
+локальный GUI. Для Rust сначала соберите приложение командой `cargo tauri build` или
+`cargo build --release`.
+
 Ярлык вызывает `launch.sh`. Перед запуском он сравнивает время изменения исходников Rust/Tauri и AppImage.
 Если AppImage отсутствует или устарел, выполняется `cargo tauri build -- --locked`, после чего запускается свежая
 сборка. Лог сборки находится в `~/.local/state/provider-proxy/rust-desktop-build.log`, лог запуска — в

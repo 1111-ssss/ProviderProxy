@@ -59,6 +59,18 @@ cargo tauri build
 ./install-shortcuts.sh
 ```
 
+Для Windows после сборки Rust-приложения можно создать ярлыки обеих версий PowerShell-скриптом:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\rust-desktop\install-shortcuts.ps1
+```
+
+Скрипт создаёт ярлыки `Provider Proxy Rust` и `Provider Proxy npm` в меню «Пуск» и на рабочем
+столе. Rust-ярлык запускает собранный `provider-proxy-desktop.exe`, npm-ярлык запускает Node.js
+сервер и открывает локальный интерфейс в браузере. Файлы `config.json`, ключи и статистика в Git
+не добавляются.
+
 Если старый ярлык всё ещё виден в меню приложений, удалите старую системную запись
 от имени администратора и обновите кэш KDE:
 
