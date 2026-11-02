@@ -2,7 +2,7 @@
 # KRunner entry point: start provider_proxy, open its GUI, exit.
 # The server shuts itself down once the GUI tab is closed (see README).
 DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT="$(node -e 'try{console.log(require(process.argv[1]+"/config.json").port??8787)}catch{console.log(8787)}' "$DIR")"
+PORT="$(node -e 'try{const dbPath=process.env.PP_DB_FILE??process.argv[1]+"/config.db",legacy=process.argv[1]+"/config.json";const {DatabaseSync}=require("node:sqlite");const db=new DatabaseSync(dbPath);const row=db.prepare("SELECT value FROM settings WHERE key = '\''config'\''").get();console.log(row?.value?JSON.parse(row.value).port??8787:require(legacy).port??8787);db.close()}catch{try{console.log(require(process.argv[1]+"/config.json").port??8787)}catch{console.log(8787)}}' "$DIR")"
 # Keep the pathname stable for older already-running proxy processes. Current
 # server.mjs sends Cache-Control: no-store for the GUI, so a query is not needed.
 URL="http://127.0.0.1:$PORT/"

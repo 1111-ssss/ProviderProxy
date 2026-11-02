@@ -1,4 +1,6 @@
-use super::config::{merge_config_secrets, merge_redacted, public_config};
+use super::config::{
+    database_path, merge_config_secrets, merge_redacted, open_storage, public_config,
+};
 use super::metrics::{load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
 use super::server::start_server;
@@ -36,7 +38,8 @@ fn loads_only_the_last_seven_calendar_days_of_usage() {
     )
     .unwrap();
 
-    let (usage, history, loaded_day) = load_usage(&stats);
+    let storage = open_storage(&directory.join("state.db")).unwrap();
+    let (usage, history, loaded_day) = load_usage(&storage, &stats);
     assert_eq!(loaded_day, day(0));
     assert_eq!(usage.requests, 7);
     assert_eq!(
@@ -156,7 +159,9 @@ fn starts_server_without_a_caller_tokio_runtime() {
         response.ends_with(r#"{"apiVersion":3,"ok":true}"#),
         "{response}"
     );
-    let _ = fs::remove_file(path);
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
 }
 
 #[tokio::test]
@@ -192,5 +197,7 @@ async fn serves_the_desktop_api_from_a_local_port() {
         .await
         .unwrap();
     assert_eq!(models["data"][0]["id"], "one");
-    let _ = fs::remove_file(path);
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
 }

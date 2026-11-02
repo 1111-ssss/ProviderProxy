@@ -1,5 +1,5 @@
 use chrono::Local;
-use serde::Deserialize;
+use rusqlite::params;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
@@ -8,7 +8,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use super::types::{AppState, ModelUsage, ProviderUsage, Usage};
+use super::{
+    config::Storage,
+    types::{AppState, ModelUsage, ProviderUsage, Usage},
+};
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
 
@@ -35,19 +38,53 @@ fn usage_day_keys(today: &str) -> Vec<String> {
     keys
 }
 
-#[derive(Debug, Deserialize, Default)]
-struct StoredUsage {
-    #[serde(default)]
-    days: HashMap<String, Usage>,
-}
-
-pub(crate) fn load_usage(path: &Path) -> (Usage, HashMap<String, Usage>, String) {
+pub(crate) fn load_usage(
+    storage: &Storage,
+    legacy_path: &Path,
+) -> (Usage, HashMap<String, Usage>, String) {
     let today = local_day_key();
-    let mut history = fs::read_to_string(path)
-        .ok()
-        .and_then(|text| serde_json::from_str::<StoredUsage>(&text).ok())
-        .map(|stored| stored.days)
-        .unwrap_or_default();
+    let mut history = HashMap::new();
+    let Ok(mut connection) = storage.connection.lock() else {
+        return (Usage::default(), history, today);
+    };
+    let count = connection
+        .query_row("SELECT COUNT(*) FROM usage_days", [], |row| {
+            row.get::<_, u64>(0)
+        })
+        .unwrap_or(0);
+    if count == 0 {
+        if let Ok(text) = fs::read_to_string(legacy_path) {
+            if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                if let Some(days) = value.get("days").and_then(Value::as_object) {
+                    if let Ok(transaction) = connection.transaction() {
+                        {
+                            if let Ok(mut insert) = transaction.prepare(
+                                "INSERT OR IGNORE INTO usage_days(day, payload) VALUES(?1, ?2)",
+                            ) {
+                                for (date, snapshot) in days {
+                                    if chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok() {
+                                        let _ = insert.execute(params![date, snapshot.to_string()]);
+                                    }
+                                }
+                            }
+                        }
+                        let _ = transaction.commit();
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(mut rows) = connection.prepare("SELECT day, payload FROM usage_days") {
+        if let Ok(iter) = rows.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        }) {
+            for row in iter.flatten() {
+                if let Ok(snapshot) = serde_json::from_str::<Usage>(&row.1) {
+                    history.insert(row.0, snapshot);
+                }
+            }
+        }
+    }
     let keep: std::collections::HashSet<_> = usage_day_keys(&today).into_iter().collect();
     history.retain(|date, _| keep.contains(date));
     let mut usage = history.get(&today).cloned().unwrap_or_default();
@@ -87,31 +124,50 @@ pub(crate) fn persist_usage(state: &AppState) {
     history.insert(today.clone(), current);
     let keep: std::collections::HashSet<_> = usage_day_keys(&today).into_iter().collect();
     history.retain(|date, _| keep.contains(date));
-    let stored = json!({
-        "version": 1,
-        "retentionDays": USAGE_RETENTION_DAYS,
-        "days": &*history,
-    });
-    if let Some(parent) = state.stats_path.parent() {
-        // A test/app shutdown may remove a temporary config directory while the
-        // persistence worker is still winding down. Do not recreate it.
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            return;
+    let Ok(mut connection) = state.storage.connection.lock() else {
+        push_log(state, "usage: SQLite storage lock poisoned");
+        return;
+    };
+    let Ok(transaction) = connection.transaction() else {
+        push_log(state, "usage: не удалось начать транзакцию SQLite");
+        return;
+    };
+    let result = (|| {
+        {
+            let mut insert = transaction.prepare("INSERT INTO usage_days(day, payload) VALUES(?1, ?2) ON CONFLICT(day) DO UPDATE SET payload = excluded.payload")?;
+            for (date, snapshot) in history.iter() {
+                insert.execute(params![date, serde_json::to_string(snapshot)?])?;
+            }
         }
-    }
-    if let Err(err) = fs::write(
-        &*state.stats_path,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&stored).unwrap_or_else(|_| "{}".into())
-        ),
-    ) {
+        {
+            let mut rows = transaction.prepare("SELECT day FROM usage_days")?;
+            let existing = rows
+                .query_map([], |row| row.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            drop(rows);
+            let mut remove = transaction.prepare("DELETE FROM usage_days WHERE day = ?1")?;
+            for date in existing {
+                if !history.contains_key(&date) {
+                    remove.execute(params![date])?;
+                }
+            }
+        }
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })();
+    if let Err(err) = result {
         push_log(
             state,
             format!(
-                "usage: не удалось сохранить историю {}: {err}",
-                state.stats_path.display()
+                "usage: не удалось сохранить историю SQLite {}: {err}",
+                state.storage.path.display()
             ),
+        );
+        return;
+    }
+    if let Err(err) = transaction.commit() {
+        push_log(
+            state,
+            format!("usage: не удалось завершить транзакцию SQLite: {err}"),
         );
     }
 }

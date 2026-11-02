@@ -117,7 +117,7 @@ pub(crate) async fn put_config(
     let merged = merge_config_secrets(&body, &previous);
     let old_port = previous.get("port").and_then(Value::as_u64).unwrap_or(8787) as u16;
     let new_chains = super::routing::build_chains(&merged);
-    if let Err(err) = save_config(&state.config_path, &merged) {
+    if let Err(err) = save_config(&state.storage, &merged) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, err);
     }
     *state.config.write().unwrap() = merged.clone();

@@ -35,6 +35,12 @@
     "defaultProvider": "",
     "defaultModel": ""
   },
+  "appSettings": {
+    "theme": "dark",
+    "autoUpdate": false,
+    "autoRestart": false,
+    "autostart": false
+  },
   "opencodeModels": {
     "openrouter": {
       "models": ["anthropic/claude-sonnet-4.5"]

@@ -1,5 +1,8 @@
 config.json
 usage-stats.json
+*.db
+*.db-wal
+*.db-shm
 server.log
 server-error.log
 *.key

@@ -95,13 +95,13 @@ PP_CONFIG_FILE=/path/to/config.json ./launch.sh
 
 ```powershell
 cargo install tauri-cli --locked
-cargo tauri dev -- ..\config.json
+cargo tauri dev -- ..\config.db
 ```
 
 Для релизной сборки:
 
 ```powershell
-cargo tauri build
+.\build-windows.ps1
 ```
 
 Готовый бинарник находится в `target\release\provider-proxy-desktop.exe`. Его можно запускать
@@ -115,8 +115,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 Скрипт создаёт ярлыки в меню «Пуск» и на рабочем столе. Для другого конфига перед запуском
 можно задать `$env:PP_CONFIG_FILE`. На Windows также требуется WebView2.
 
-Также поддерживается `PP_CONFIG_FILE`. Без него приложение использует `config.json` из текущего каталога,
-а затем файл в системном каталоге конфигурации `provider-proxy`.
+Также поддерживается `PP_CONFIG_FILE`. Без него приложение использует `config.db` из текущего каталога,
+а затем SQLite-базу в системном каталоге конфигурации `provider-proxy`.
 
 ## Ярлык и автоматическая пересборка
 
@@ -138,6 +138,41 @@ Set-ExecutionPolicy -Scope Process Bypass
 локальный GUI. Для Rust сначала соберите приложение командой `cargo tauri build` или
 `cargo build --release`.
 
+## Автоматические обновления и GitHub Releases
+
+В production-сборке приложение через Tauri Updater проверяет
+`https://github.com/1111-ssss/ProviderProxy/releases/latest/download/latest.json`. Если найден
+подписанный релиз, GUI показывает предложение в правом верхнем углу обновить приложение и
+перезапустить его. Автоматическую загрузку и автоматический перезапуск можно включить отдельно
+в настройках. Debug-сборки проверку не выполняют. Для локальной релизной сборки без публикации
+проверку можно отключить переменной `PP_DISABLE_UPDATES=1`.
+
+В настройках desktop-версии также можно включить автозапуск. На Windows это пользовательский
+ключ `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, на Linux —
+`$XDG_CONFIG_HOME/autostart/provider-proxy.desktop`.
+
+Для подготовки подписи:
+
+```powershell
+cargo tauri signer generate -- -w "$HOME/.tauri/provider-proxy.key"
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME/.tauri/provider-proxy.key" -Raw
+```
+
+Содержимое `.pub` нужно записать в `plugins.updater.pubkey` в `tauri.conf.json`. Публичный ключ
+можно хранить в Git, а приватный ключ — только в GitHub Actions Secret
+`TAURI_SIGNING_PRIVATE_KEY` (и `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, если есть пароль). Workflow
+`.github/workflows/release.yml` по тегу `app-vX.Y.Z` публикует Windows `.exe`, Linux AppImage и
+`latest.json`; `tauri-action` подписывает updater-артефакты автоматически.
+
+Для установщика с updater-артефактами:
+
+```powershell
+.\build-windows.ps1 -Installer
+```
+
+Для локального exe без подписи достаточно `.\build-windows.ps1`. На Linux доступны
+`./build-linux.sh` и `./build-linux.sh --bundle`.
+
 Ярлык вызывает `launch.sh`. Перед запуском он сравнивает время изменения исходников Rust/Tauri и AppImage.
 Если AppImage отсутствует или устарел, выполняется `cargo tauri build -- --locked`, после чего запускается свежая
 сборка. Лог сборки находится в `~/.local/state/provider-proxy/rust-desktop-build.log`, лог запуска — в
@@ -158,7 +193,7 @@ WebKitGTK, Windows — WebView2.
 
 ## Конфиг и миграция
 
-Формат конфига совместим с текущей версией проекта: `providers`, `models`, `opencodeModels`, `opencodeConfig`,
+Формат конфига совместим с текущей версией проекта и хранится в SQLite: `providers`, `models`, `opencodeModels`, `opencodeConfig`,
 `opencodeProvider`, `authToken`, кулдауны и таймауты. Секреты сохраняются в зашифрованном виде AES-256-GCM,
-ключ хранится отдельно в системном config-каталоге. Уже существующий `config.json` можно передать первым
-аргументом или через `PP_CONFIG_FILE`.
+ключ хранится отдельно в системном config-каталоге. Уже существующий `config.json` используется только
+как источник одноразовой миграции; передавать его первым аргументом или через `PP_CONFIG_FILE` по-прежнему можно.

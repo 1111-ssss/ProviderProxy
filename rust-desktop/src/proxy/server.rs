@@ -14,7 +14,7 @@ use tokio::net::TcpListener as TokioTcpListener;
 
 use super::{
     chat,
-    config::{load_config, LOG_MAX_DEFAULT},
+    config::{load_config, open_storage, LOG_MAX_DEFAULT},
     handlers,
     metrics::{load_usage, push_log},
     routing::build_chains,
@@ -24,7 +24,13 @@ use super::{
 pub fn start_server(
     config_path: PathBuf,
 ) -> Result<ServerHandle, Box<dyn std::error::Error + Send + Sync>> {
-    let raw = load_config(&config_path)?;
+    let storage = Arc::new(open_storage(&config_path)?);
+    let legacy_config_path = if config_path.extension().is_some_and(|extension| extension == "db") {
+        config_path.with_extension("json")
+    } else {
+        config_path.clone()
+    };
+    let raw = load_config(&storage, &legacy_config_path)?;
     let config = Arc::new(RwLock::new(raw.clone()));
     let chains = Arc::new(RwLock::new(build_chains(&raw)));
     let port = raw
@@ -35,7 +41,7 @@ pub fn start_server(
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(LOG_MAX_DEFAULT);
-    let stats_path = std::env::var_os("PP_STATS_FILE")
+    let legacy_stats_path = std::env::var_os("PP_STATS_FILE")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             config_path
@@ -43,9 +49,10 @@ pub fn start_server(
                 .unwrap_or_else(|| std::path::Path::new("."))
                 .join("usage-stats.json")
         });
-    let (usage, usage_history, usage_day) = load_usage(&stats_path);
+    let (usage, usage_history, usage_day) = load_usage(&storage, &legacy_stats_path);
     let state = AppState {
         config_path: Arc::new(config_path),
+        storage,
         config,
         chains,
         cooldowns: Arc::new(Mutex::new(HashMap::new())),
@@ -53,7 +60,6 @@ pub fn start_server(
             log_max,
         ))),
         usage: Arc::new(Mutex::new(usage)),
-        stats_path: Arc::new(stats_path),
         usage_history: Arc::new(Mutex::new(usage_history)),
         usage_day: Arc::new(Mutex::new(usage_day)),
         image_tasks: Arc::new(Mutex::new(HashMap::new())),

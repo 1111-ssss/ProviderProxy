@@ -7,7 +7,7 @@ license = "MIT"
 
 [features]
 default = ["desktop"]
-desktop = ["dep:tauri", "dep:tauri-plugin-opener"]
+desktop = ["dep:tauri", "dep:tauri-plugin-opener", "dep:tauri-plugin-updater"]
 
 [lib]
 name = "provider_proxy_desktop"
@@ -31,11 +31,13 @@ dirs = "6"
 futures-util = "0.3"
 rand = "0.9"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 tauri = { version = "2", optional = true, features = ["tray-icon"] }
 tauri-plugin-opener = { version = "2", optional = true }
+tauri-plugin-updater = { version = "2", optional = true }
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"

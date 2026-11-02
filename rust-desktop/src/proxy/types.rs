@@ -7,6 +7,8 @@ use std::{
     time::Instant,
 };
 
+use super::config::Storage;
+
 #[derive(Debug, Clone)]
 pub(crate) struct Upstream {
     pub(crate) name: String,
@@ -108,12 +110,12 @@ impl Default for Usage {
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) config_path: Arc<PathBuf>,
+    pub(crate) storage: Arc<Storage>,
     pub(crate) config: Arc<RwLock<Value>>,
     pub(crate) chains: Arc<RwLock<HashMap<String, Vec<Upstream>>>>,
     pub(crate) cooldowns: Arc<Mutex<HashMap<String, Instant>>>,
     pub(crate) logs: Arc<Mutex<VecDeque<String>>>,
     pub(crate) usage: Arc<Mutex<Usage>>,
-    pub(crate) stats_path: Arc<PathBuf>,
     pub(crate) usage_history: Arc<Mutex<HashMap<String, Usage>>>,
     pub(crate) usage_day: Arc<Mutex<String>>,
     pub(crate) image_tasks: Arc<Mutex<HashMap<String, String>>>,

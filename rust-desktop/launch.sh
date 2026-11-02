@@ -5,20 +5,25 @@ set -u
 
 DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH= cd -- "$DIR/.." && pwd)"
-CONFIG="${PP_CONFIG_FILE:-$ROOT/config.json}"
+CONFIG="${PP_CONFIG_FILE:-$ROOT/config.db}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/provider-proxy"
 LOG="$STATE_DIR/rust-desktop.log"
 BINARY="$DIR/target/release/provider-proxy-desktop"
 BUILD_LOG="$STATE_DIR/rust-desktop-build.log"
 LOCK_DIR="$STATE_DIR/rust-desktop-build.lock"
-if [ -n "${CARGO_BIN:-}" ]; then
-  CARGO_BIN="$CARGO_BIN"
-elif [ -x "$HOME/.cargo/bin/cargo" ]; then
-  CARGO_BIN="$HOME/.cargo/bin/cargo"
-elif [ -x "/root/.cargo/bin/cargo" ]; then
-  CARGO_BIN="/root/.cargo/bin/cargo"
-else
-  CARGO_BIN="$(command -v cargo || true)"
+if [ -z "${CARGO_BIN:-}" ]; then
+  CARGO_BIN=""
+  for candidate in "$HOME/.cargo/bin/cargo" "/root/.cargo/bin/cargo" "$(command -v cargo || true)"; do
+    [ -x "$candidate" ] || continue
+    version="$($candidate --version 2>/dev/null | sed -n 's/^cargo \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1 \2/p')"
+    [ -n "$version" ] || continue
+    major="${version% *}"
+    minor="${version#* }"
+    if [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -ge 78 ]; }; then
+      CARGO_BIN="$candidate"
+      break
+    fi
+  done
 fi
 
 mkdir -p "$STATE_DIR"
@@ -67,6 +72,22 @@ source_is_newer() {
   return 1
 }
 
+artifact_has_missing_runtime() {
+  [ -x "$BINARY" ] || return 1
+  command -v ldd >/dev/null 2>&1 || return 1
+  ldd "$BINARY" 2>&1 | grep -q "not found"
+}
+
+artifact_requires_newer_glibc() {
+  [ -x "$BINARY" ] || return 1
+  command -v ldd >/dev/null 2>&1 || return 1
+  command -v readelf >/dev/null 2>&1 || return 1
+  runtime_glibc="$(ldd --version 2>/dev/null | sed -n '1s/.* \([0-9][0-9.]*\).*/\1/p')"
+  required_glibc="$(readelf --version-info "$BINARY" 2>/dev/null | grep -o 'GLIBC_[0-9][0-9.]*' | sed 's/^GLIBC_//' | sort -V | tail -1)"
+  [ -n "$runtime_glibc" ] && [ -n "$required_glibc" ] || return 1
+  [ "$(printf '%s\n' "$runtime_glibc" "$required_glibc" | sort -V | tail -1)" != "$runtime_glibc" ]
+}
+
 # The old browser shortcut starts the Node backend from this same project. It
 # owns the configured port, so replace only that exact process when switching
 # to the Rust desktop build; unrelated Node processes are left untouched.
@@ -96,7 +117,7 @@ run_failed() {
 NEEDS_BUILD=0
 if [ ! -x "$ARTIFACT" ]; then
   NEEDS_BUILD=1
-elif source_is_newer; then
+elif source_is_newer || artifact_has_missing_runtime || artifact_requires_newer_glibc; then
   NEEDS_BUILD=1
 fi
 
@@ -108,7 +129,7 @@ if [ "$NEEDS_BUILD" -eq 1 ]; then
 
   # Another shortcut invocation may have finished the build while we waited.
   pick_artifact
-  if [ ! -x "$ARTIFACT" ] || source_is_newer; then
+   if [ ! -x "$ARTIFACT" ] || source_is_newer || artifact_has_missing_runtime || artifact_requires_newer_glibc; then
     printf '%s\n' "Rust build required; compiling latest sources" >>"$LOG"
     if [ -z "$CARGO_BIN" ]; then
       printf '%s\n' "cargo not found; cannot rebuild Rust desktop app" >>"$LOG"

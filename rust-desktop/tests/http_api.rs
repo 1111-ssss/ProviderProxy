@@ -377,10 +377,22 @@ async fn updates_config_models_and_an_isolated_opencode_file() {
     assert_eq!(result["opencodeSynced"], true);
     assert_eq!(result["restartRequired"], false);
 
-    let saved: Value =
+    let database = rusqlite::Connection::open(proxy.directory.join("config.db")).unwrap();
+    let saved: Value = serde_json::from_str(
+        &database
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'config'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(saved, config);
+    let legacy: Value =
         serde_json::from_str(&fs::read_to_string(proxy.directory.join("config.json")).unwrap())
             .unwrap();
-    assert_eq!(saved, config);
+    assert_eq!(legacy["models"], json!({}));
     let models: Value = proxy
         .client
         .get(proxy.url("/v1/models"))
@@ -418,9 +430,16 @@ async fn updates_config_models_and_an_isolated_opencode_file() {
         .await
         .unwrap();
     assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
-    let unchanged: Value =
-        serde_json::from_str(&fs::read_to_string(proxy.directory.join("config.json")).unwrap())
-            .unwrap();
+    let unchanged: Value = serde_json::from_str(
+        &database
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'config'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(unchanged, config);
 }
 

@@ -1,26 +1,80 @@
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::{json, Map, Value};
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use super::crypto::{decrypt_secret, encrypt_secret};
 
 pub(crate) const LOG_MAX_DEFAULT: usize = 500;
 
+pub(crate) struct Storage {
+    pub(crate) path: PathBuf,
+    pub(crate) connection: Mutex<Connection>,
+}
+
+pub(crate) fn database_path(config_path: &Path) -> PathBuf {
+    if let Ok(path) = std::env::var("PP_DB_FILE") {
+        return PathBuf::from(path);
+    }
+    if config_path
+        .extension()
+        .is_some_and(|extension| extension == "db")
+    {
+        return config_path.to_path_buf();
+    }
+    let mut path = config_path.to_path_buf();
+    path.set_extension("db");
+    path
+}
+
+pub(crate) fn open_storage(
+    config_path: &Path,
+) -> Result<Storage, Box<dyn std::error::Error + Send + Sync>> {
+    let path = database_path(config_path);
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        fs::create_dir_all(parent)?;
+    }
+    let connection = Connection::open(&path)?;
+    #[cfg(unix)]
+    fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o600))?;
+    connection.busy_timeout(std::time::Duration::from_secs(5))?;
+    connection.execute_batch(
+        "CREATE TABLE IF NOT EXISTS settings (\
+             key TEXT PRIMARY KEY,\
+             value TEXT NOT NULL\
+         );\
+         CREATE TABLE IF NOT EXISTS usage_days (\
+             day TEXT PRIMARY KEY,\
+             payload TEXT NOT NULL\
+         );",
+    )?;
+    Ok(Storage {
+        path,
+        connection: Mutex::new(connection),
+    })
+}
+
 pub fn default_config_path() -> PathBuf {
     if let Ok(path) = std::env::var("PP_CONFIG_FILE") {
         return PathBuf::from(path);
     }
-    if let Ok(path) = std::env::current_dir().map(|p| p.join("config.json")) {
-        if path.exists() {
-            return path;
+    if let Ok(directory) = std::env::current_dir() {
+        let database = directory.join("config.db");
+        if database.exists() {
+            return database;
+        }
+        let legacy = directory.join("config.json");
+        if legacy.exists() {
+            return legacy;
         }
     }
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("provider-proxy")
-        .join("config.json")
+        .join("config.db")
 }
 
 fn is_secret_key(key: &str, parent: &str) -> bool {
@@ -86,42 +140,71 @@ fn transform_secrets(value: &Value, parent: &str, encrypt: bool) -> Result<Value
     }
 }
 
-pub(crate) fn load_config(path: &Path) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
-    if !path.exists() {
+pub(crate) fn load_config(
+    storage: &Storage,
+    legacy_path: &Path,
+) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
+    let stored = storage
+        .connection
+        .lock()
+        .map_err(|_| std::io::Error::other("SQLite storage lock poisoned"))?
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'config'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    if let Some(raw) = stored {
+        let value: Value = serde_json::from_str(&raw)?;
+        return match transform_secrets(&value, "", false) {
+            Ok(value) => Ok(value),
+            Err(error) if error.contains("cannot read config key") => {
+                eprintln!(
+                    "provider_proxy: {error}; encrypted credentials were cleared in memory — re-enter them in Settings"
+                );
+                Ok(clear_unreadable_encrypted_secrets(&value, ""))
+            }
+            Err(error) => Err(std::io::Error::other(error).into()),
+        };
+    }
+
+    let value = if !legacy_path.exists() {
         let example = Path::new(env!("CARGO_MANIFEST_DIR")).join("config.example.json");
-        let value = if example.exists() {
+        if example.exists() {
             serde_json::from_str(&fs::read_to_string(example)?)?
         } else {
             json!({ "port": 8787, "providers": {}, "models": {} })
-        };
-        return Ok(value);
-    }
-    let raw: Value = serde_json::from_str(&fs::read_to_string(path)?)?;
-    match transform_secrets(&raw, "", false) {
-        Ok(value) => Ok(value),
-        Err(error) if error.contains("cannot read config key") => {
-            eprintln!(
-                "provider_proxy: {error}; encrypted credentials were cleared in memory — re-enter them in Settings"
-            );
-            Ok(clear_unreadable_encrypted_secrets(&raw, ""))
         }
-        Err(error) => Err(std::io::Error::other(error).into()),
-    }
+    } else {
+        let raw: Value = serde_json::from_str(&fs::read_to_string(legacy_path)?)?;
+        match transform_secrets(&raw, "", false) {
+            Ok(value) => value,
+            Err(error) if error.contains("cannot read config key") => {
+                eprintln!(
+                    "provider_proxy: {error}; encrypted credentials were cleared in memory — re-enter them in Settings"
+                );
+                clear_unreadable_encrypted_secrets(&raw, "")
+            }
+            Err(error) => return Err(std::io::Error::other(error).into()),
+        }
+    };
+    save_config(storage, &value).map_err(std::io::Error::other)?;
+    Ok(value)
 }
 
-pub(crate) fn save_config(path: &Path, value: &Value) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
+pub(crate) fn save_config(storage: &Storage, value: &Value) -> Result<(), String> {
     let encrypted = transform_secrets(value, "", true)?;
-    fs::write(
-        path,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&encrypted).map_err(|e| e.to_string())?
-        ),
-    )
-    .map_err(|e| e.to_string())
+    let serialized = serde_json::to_string(&encrypted).map_err(|e| e.to_string())?;
+    storage
+        .connection
+        .lock()
+        .map_err(|_| "SQLite storage lock poisoned".to_string())?
+        .execute(
+            "INSERT INTO settings(key, value) VALUES('config', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![serialized],
+        )
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 pub(crate) fn public_config(value: &Value) -> Value {

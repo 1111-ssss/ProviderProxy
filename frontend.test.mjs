@@ -32,6 +32,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
   }`)
   run(script.slice(script.indexOf("const modelDetails ="), script.indexOf("async function api(")))
   run(script.slice(script.indexOf('let imageProviderFilter = ""'), script.indexOf("function imageResultValue(")))
+  run(script.slice(script.indexOf("function removeModelFromChains"), script.indexOf("function removeImageModelsFromChains")))
 
   test(`${file}: script parses and the redundant model permission UI is gone`, () => {
     new vm.Script(script)
@@ -43,6 +44,14 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.match(html, /\.image-form \.row \{ align-items: end; \}/)
     assert.ok(html.includes('id="u-days"'), "usage should expose the seven-day selector")
     assert.ok(html.includes("сохранено между сессиями"), "usage should explain persisted history")
+    assert.ok(html.includes('data-tab="settings"'), "settings should be a navigation tab")
+    assert.ok(html.includes('id="tabs-collapse"'), "navigation should be collapsible")
+    assert.ok(html.includes('class="tab-group-toggle"'), "navigation groups should be collapsible")
+    assert.ok(html.includes('id="s-base-url"'), "proxy base URL should live in the settings page")
+    assert.ok(!html.includes('id="settings-open"'), "duplicate header settings button should be gone")
+    assert.match(html, /class="settings-nav-button" data-tab="settings"/)
+    assert.ok(!html.includes('data-group="settings"'), "settings should be outside collapsible groups")
+    assert.ok(!html.includes('<h1>Provider Proxy</h1>'), "redundant page title should be removed")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {
@@ -62,5 +71,23 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.equal(element("ig-provider-current").innerHTML, "<strong>—</strong>")
     assert.equal(element("ig-default-model").innerHTML, '<option value="">нет image-моделей</option>')
     assert.match(element("ig-provider-options").innerHTML, /«Подключения»/)
+  })
+
+  test(`${file}: removing connection models cleans chains and direct models`, () => {
+    run(`cfg.opencodeModels = { selected: { models: ["chat", "keep"] }, unselected: { models: ["cached-image"] } }`)
+    run(`cfg.models = { chain: { upstreams: [{ provider: "selected", model: "chat" }, { provider: "selected", model: "keep" }] } }`)
+    run(`cfg.imageSettings = { defaultProvider: "selected", defaultModel: "chat", skillModels: { selected: ["chat"] } }`)
+
+    run('removeModelReferences("selected", "chat")')
+    assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.models.chain.upstreams)")), [{ provider: "selected", model: "keep" }])
+    assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.opencodeModels.selected.models)")), ["keep"])
+    assert.equal(run("cfg.imageSettings.defaultModel"), "")
+    assert.equal(run("cfg.imageSettings.skillModels.selected"), undefined)
+
+    run('removeModelReferences("selected", "keep")')
+    assert.equal(run("cfg.opencodeModels.selected"), undefined, "empty direct provider should be removed")
+
+    run('removeProviderReferences("unselected")')
+    assert.equal(run("cfg.opencodeModels.unselected"), undefined)
   })
 }

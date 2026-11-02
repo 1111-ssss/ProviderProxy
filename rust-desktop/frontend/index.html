@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>provider_proxy</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%233d7a53'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAARklEQVR42mMQk5D9P5CYYdA4QE3LmK541AGjDiDaAbZVwRThUQeMOmDUAaMOGHXAqANGHTDqgKHvgNE24agD6OaAEds7BgDTgWu7q0wBGgAAAABJRU5ErkJggg==">
 <style>
   :root {
     color-scheme: dark;
@@ -23,25 +23,36 @@
     --success: #69d7a0;
     --danger: #ff9c9c;
     --shadow: 0 20px 60px rgba(0, 0, 0, .22);
+    --body-background: radial-gradient(circle at 50% -20%, #1d2a3a 0, var(--bg) 52%);
+    --section-background: rgba(23, 30, 39, .92);
+    --control-background: var(--surface);
+    --control-hover: var(--surface-hover);
+  }
+  body[data-theme="light"] {
+    color-scheme: light;
+    --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4;
+    --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf;
+    --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca;
+    --accent-strong: #4d82df; --success: #218b59; --danger: #c54848;
+    --shadow: 0 20px 60px rgba(31, 55, 80, .15);
+    --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%);
+    --section-background: rgba(255, 255, 255, .9);
+  }
+  @media (prefers-color-scheme: light) {
+    body[data-theme="system"] { color-scheme: light; --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4; --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf; --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca; --accent-strong: #4d82df; --success: #218b59; --danger: #c54848; --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%); --section-background: rgba(255, 255, 255, .9); }
   }
   * { box-sizing: border-box; }
-  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 50% -20%, #1d2a3a 0, var(--bg) 52%); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; }
-  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--body-background); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; }
+  main { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: minmax(210px, 224px) minmax(0, 1fr); align-items: start; gap: 18px; transition: grid-template-columns .2s ease; }
+  main.nav-collapsed { grid-template-columns: 44px minmax(0, 1fr); }
   h1 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.03em; margin: 0; }
   h2 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
   h3 { font-size: 15px; margin: 0 0 14px; }
   h4 { font-size: 13px; margin: 0; }
-  section { background: rgba(23, 30, 39, .92); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
-  .app-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding: 4px 2px 2px; }
-  .app-header p { margin: 6px 0 0; color: var(--muted); max-width: 620px; }
-  .eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 7px; }
-  .header-status { display: grid; justify-items: end; gap: 9px; color: var(--muted); font-size: 12px; text-align: right; }
-  .header-actions { display: flex; align-items: center; gap: 10px; }
-  .settings-button { display: inline-grid; place-items: center; min-width: 42px; padding: 8px 11px; line-height: 1; }
-  .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  section { background: var(--section-background); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
   .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
-  input, select, textarea, button { font: inherit; background: var(--surface); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
+  input, select, textarea, button { font: inherit; background: var(--control-background); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
   select, select option { color: var(--text); background-color: var(--surface); }
   select option:checked { color: var(--text); background-color: var(--surface-hover); }
   select:disabled { color: var(--muted); opacity: 1; }
@@ -49,7 +60,8 @@
   textarea { width: 100%; min-height: 120px; resize: vertical; }
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button { cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
-  button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--surface-hover); }
+  button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
+  button:disabled { cursor: not-allowed; opacity: .58; }
   button:active:not(:disabled) { transform: translateY(1px); }
   button.primary { background: var(--accent-strong); border-color: #88adff; color: #07101f; font-weight: 700; }
   button.primary:hover:not(:disabled) { background: #84aaff; }
@@ -124,11 +136,43 @@
   .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid rgba(105, 215, 160, .25); border-radius: 9px; background: #173c2b; color: #c2f3d6; display: none; z-index: 10; box-shadow: var(--shadow); }
   .status.err { background: #4a252b; color: #ffd1d1; border-color: rgba(255, 156, 156, .3); }
   details summary { cursor: pointer; color: var(--muted); }
-  .tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 5px; background: rgba(23, 30, 39, .72); border: 1px solid var(--border); border-radius: 12px; }
-  .tabs button { display: inline-flex; align-items: center; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 40px; }
+  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-height: calc(100vh - 32px); padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border: 1px solid var(--border); border-radius: 12px; }
+  .tabs-brand { display: flex; align-items: center; gap: 9px; padding: 3px 5px 12px; border-bottom: 1px solid var(--border); }
+  .tabs-brand-mark { display: block; flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--accent-strong); border-radius: 8px; object-fit: cover; }
+  .tabs-brand strong { display: block; font-size: 13px; line-height: 1.2; }
+  .tabs-brand-text { min-width: 0; }
+  .tabs button.tabs-collapse { display: grid; place-items: center; width: auto; min-width: 30px; min-height: 30px; flex: 0 0 auto; margin-left: auto; padding: 5px; background: transparent; border-color: transparent; color: var(--muted); }
+  .tabs-collapse svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+  .tab-group { display: grid; gap: 5px; padding: 7px 6px 8px; border: 1px solid rgba(67, 84, 106, .55); border-radius: 11px; background: rgba(23, 30, 39, .28); transition: background .16s ease, border-color .16s ease, box-shadow .16s ease; }
+  .tab-group-toggle { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 24px; padding: 1px 4px; border: 0; border-radius: 5px; background: transparent; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-align: left; text-transform: uppercase; }
+  .tab-group-toggle:hover:not(:disabled) { background: rgba(111, 153, 237, .08); border-color: transparent; color: var(--accent); }
+  .tab-group-chevron { margin-left: auto; color: inherit; font-size: 14px; line-height: 1; transition: transform .16s ease; }
+  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-90deg); }
+  .tab-group.is-collapsed .tab-group-tabs { display: none; }
+  .tab-group.is-active { background: rgba(111, 153, 237, .08); border-color: rgba(111, 153, 237, .48); box-shadow: 0 0 0 1px rgba(111, 153, 237, .08); }
+  .tab-group-tabs { display: grid; gap: 4px; padding-top: 2px; }
+  .tabs button { display: flex; width: 100%; align-items: center; justify-content: flex-start; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 36px; padding: 8px 10px; text-align: left; }
   .tabs button.active { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 650; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); }
   .tab-index { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
   .tabs button.active .tab-index { color: var(--accent); }
+  .settings-nav-button { margin-top: auto; border-color: var(--border); background: rgba(34, 45, 57, .42) !important; color: var(--text) !important; font-weight: 650; }
+  .settings-nav-icon { display: inline-flex; color: var(--accent); }
+  .settings-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: 6px; }
+  main.nav-collapsed .tabs-brand { width: 100%; justify-content: center; padding: 0; border-bottom: 0; }
+  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tab-group, main.nav-collapsed .settings-nav-button { display: none; }
+  main.nav-collapsed .tabs button.tabs-collapse { margin: 0; padding: 5px; }
+  main.nav-collapsed .tabs-collapse svg { transform: rotate(180deg); }
+  main.nav-collapsed .tab-group { padding: 3px 0; border-bottom: 0; }
+  main.nav-collapsed .tab-group-tabs { display: grid; }
+  main.nav-collapsed .tabs button { justify-content: center; padding: 8px 4px; }
+  main.nav-collapsed .tabs button > span:not(.tab-index):not(.settings-nav-icon) { display: none; }
+  main.nav-collapsed .tab-index { font-weight: 700; }
+  .update-banner { display: flex; align-items: center; gap: 9px; max-width: min(460px, 100%); padding: 7px 8px 7px 11px; border: 1px solid rgba(111, 153, 237, .52); border-radius: 9px; background: rgba(111, 153, 237, .12); color: var(--text); }
+  .update-banner[hidden] { display: none; }
+  .update-banner-message { min-width: 0; color: var(--muted); font-size: 12px; }
+  .update-banner-message strong { color: var(--text); }
+  .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
   .logbox { max-height: 440px; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
   .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
   .log-card .t { display: flex; gap: 10px; align-items: baseline; }
@@ -200,10 +244,29 @@
   .search-clear:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--text); }
   .filter-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
   .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  #dlg-settings { width: min(560px, calc(100vw - 28px)); }
   .settings-form { width: 100%; }
+  .settings-page { min-height: calc(100vh - 60px); }
+  .settings-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .48); }
+  .settings-block.wide { grid-column: 1 / -1; }
+  .settings-block h3 { margin: 0; font-size: 14px; }
+  .settings-block > p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; }
+  .settings-page label { display: grid; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; }
+  .settings-page .setting-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
+  .settings-page .setting-option span { display: grid; gap: 2px; }
+  .settings-page .setting-option small { color: var(--muted); font-size: 11px; }
+  .settings-page .setting-option.is-disabled { opacity: .6; }
+  .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
+  .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .settings-grid label { margin: 0; }
+  .settings-grid .setting-option { display: flex; align-items: flex-start; gap: 9px; grid-column: 1 / -1; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-grid .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
+  .settings-grid .setting-option span { display: grid; gap: 2px; }
+  .settings-grid .setting-option small { color: var(--muted); font-size: 11px; }
+  .settings-grid .setting-option.is-disabled { opacity: .6; }
+  .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
   .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; max-height: 184px; overflow: auto; padding: 1px 2px 2px; }
@@ -241,6 +304,8 @@
   .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
   .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .image-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  .settings-button { display: inline-grid; place-items: center; min-width: 42px; padding: 8px 11px; line-height: 1; }
+  .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .image-section-actions { display: flex; align-items: center; gap: 8px; }
   .image-settings-button { min-width: 38px; padding: 7px 9px; }
   .image-settings-button svg { width: 17px; height: 17px; }
@@ -273,10 +338,14 @@
   .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
   .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
   .image-model-select { display: grid; gap: 6px; }
+  .app-header, main > section { grid-column: 2; }
   @media (max-width: 700px) {
+    main, main.nav-collapsed { grid-template-columns: 1fr; }
+    .app-header, main > section { grid-column: 1; }
+    .tabs { grid-column: 1; grid-row: auto; position: static; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    .tabs-brand { display: none; }
+    main.nav-collapsed .tabs-brand { display: flex; }
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
-    .header-status { justify-items: start; text-align: left; }
-    .header-actions { flex-wrap: wrap; }
     section { padding: 16px; }
     .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
     .dialog-actions { padding-left: 16px; padding-right: 16px; }
@@ -290,37 +359,56 @@
     .usage-grid { grid-template-columns: 1fr; }
     .outcome-layout { grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
     .donut-wrap { width: 140px; height: 140px; }
-    .settings-grid { grid-template-columns: 1fr; }
+    .settings-grid, .settings-page-grid { grid-template-columns: 1fr; }
     .image-layout { grid-template-columns: 1fr; }
+    .tab-group { flex: 1 1 auto; padding: 6px; border-bottom: 1px solid rgba(67, 84, 106, .55); }
+    .tab-group-tabs { display: flex; flex-wrap: wrap; }
+    .tab-group:last-child { padding-bottom: 6px; }
+    .tabs button { width: auto; }
   }
 </style>
 </head>
 <body>
 <main>
-  <header class="app-header">
-    <div>
-      <div class="eyebrow">Локальный прокси · OpenAI-compatible</div>
-      <h1>Provider Proxy</h1>
-      <p>Собери устойчивые цепочки моделей и переключайся между провайдерами без ручного редактирования конфигов.</p>
+  <nav class="tabs" aria-label="Разделы приложения">
+    <div class="tabs-brand">
+      <img class="tabs-brand-mark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAARklEQVR42mMQk5D9P5CYYdA4QE3LmK541AGjDiDaAbZVwRThUQeMOmDUAaMOGHXAqANGHTDqgKHvgNE24agD6OaAEds7BgDTgWu7q0wBGgAAAABJRU5ErkJggg==" alt="Provider Proxy">
+      <span class="tabs-brand-text"><strong>Provider Proxy</strong></span>
+      <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"></path></svg></button>
     </div>
-    <div class="header-status">
-      <div class="header-actions">
-        <span id="proxyinfo"></span>
-        <button id="settings-open" class="settings-button" type="button" aria-label="Открыть настройки" title="Настройки">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-        </button>
+    <div class="tab-group" role="group" aria-label="Провайдеры">
+      <button class="tab-group-toggle" type="button" data-group="providers" aria-expanded="true"><span>Провайдеры</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <div class="tab-group-tabs">
+        <button data-tab="providers"><span class="tab-index">01</span><span class="tab-label">Провайдеры</span></button>
       </div>
     </div>
-  </header>
-
-  <nav class="tabs">
-    <button data-tab="providers"><span class="tab-index">01</span><span>Провайдеры</span></button>
-    <button data-tab="connections"><span class="tab-index">02</span><span>Подключения</span></button>
-    <button data-tab="chains"><span class="tab-index">03</span><span>Цепочки</span></button>
-    <button data-tab="models"><span class="tab-index">04</span><span>Модели</span></button>
-    <button data-tab="images"><span class="tab-index">05</span><span>Изображения</span></button>
-    <button data-tab="logs"><span class="tab-index">06</span><span>Логи</span></button>
-    <button data-tab="usage"><span class="tab-index">07</span><span>Статистика</span></button>
+    <div class="tab-group" role="group" aria-label="Подключения">
+      <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <div class="tab-group-tabs">
+        <button data-tab="connections"><span class="tab-index">02</span><span class="tab-label">Подключения</span></button>
+      </div>
+    </div>
+    <div class="tab-group" role="group" aria-label="Модели">
+      <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <div class="tab-group-tabs">
+        <button data-tab="chains"><span class="tab-index">03</span><span class="tab-label">Цепочки</span></button>
+        <button data-tab="models"><span class="tab-index">04</span><span class="tab-label">Модели</span></button>
+      </div>
+    </div>
+    <div class="tab-group" role="group" aria-label="Инструменты">
+      <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <div class="tab-group-tabs">
+        <button data-tab="images"><span class="tab-index">05</span><span class="tab-label">Изображения</span></button>
+      </div>
+    </div>
+    <div class="tab-group" role="group" aria-label="Статистика и логи">
+      <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <div class="tab-group-tabs">
+        <button data-tab="logs"><span class="tab-index">06</span><span class="tab-label">Логи</span></button>
+        <button data-tab="usage"><span class="tab-index">07</span><span class="tab-label">Статистика</span></button>
+      </div>
+    </div>
+    <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
   </nav>
 
   <section data-tab="providers">
@@ -567,6 +655,89 @@
     <div class="muted" id="u-cooling" style="margin-top:10px"></div>
   </section>
 
+  <section data-tab="settings" class="settings-page">
+    <div class="section-head">
+      <div>
+        <h2>8&nbsp;·&nbsp;Настройки</h2>
+        <p class="section-sub" style="margin-bottom:0">Параметры прокси, внешний вид приложения и обновления разделены по группам.</p>
+      </div>
+    </div>
+    <div id="update-banner" class="update-banner" hidden style="margin-top:16px">
+      <span id="update-banner-message" class="update-banner-message"></span>
+      <button id="update-banner-action" type="button"></button>
+    </div>
+    <div class="settings-page-grid" style="margin-top:16px">
+      <div class="settings-block">
+        <h3>Сервер</h3>
+        <p>Основные параметры локального прокси.</p>
+        <div class="settings-grid">
+          <label>Порт
+            <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
+          </label>
+          <label>Токен доступа
+            <input id="s-auth" placeholder="не задан" autocomplete="off">
+          </label>
+        </div>
+      </div>
+      <div class="settings-block">
+        <h3>Подключение</h3>
+        <p>Используй этот адрес в OpenCode или другом клиенте.</p>
+        <label>Base URL прокси
+          <code id="s-base-url" class="settings-value">—</code>
+        </label>
+      </div>
+      <div class="settings-block wide">
+        <h3>Защита от сбоев</h3>
+        <p>Время блокировки upstream после лимита или временной ошибки.</p>
+        <div class="settings-grid">
+          <label>Блокировка после лимита, сек
+            <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
+          </label>
+          <label>Блокировка после ошибки, сек
+            <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
+          </label>
+          <label>Таймаут ответа, сек
+            <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
+          </label>
+        </div>
+      </div>
+      <div class="settings-block">
+        <h3>Внешний вид и запуск</h3>
+        <p>Настрой интерфейс и запуск приложения.</p>
+        <div class="settings-grid">
+          <label>Тема интерфейса
+            <select id="s-theme">
+              <option value="dark">Тёмная</option>
+              <option value="light">Светлая</option>
+              <option value="system">Как в системе</option>
+            </select>
+          </label>
+          <label class="setting-option" id="s-autostart-wrap">
+            <input id="s-autostart" type="checkbox">
+            <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
+          </label>
+        </div>
+      </div>
+      <div class="settings-block">
+        <h3>Обновления</h3>
+        <p>Проверяй и устанавливай новые версии desktop-приложения.</p>
+        <div class="settings-grid">
+          <label class="setting-option" id="s-auto-update-wrap">
+            <input id="s-auto-update" type="checkbox">
+            <span>Автоматически загружать обновления<small id="s-auto-update-help">Проверка выполняется после запуска приложения.</small></span>
+          </label>
+          <label class="setting-option" id="s-auto-restart-wrap">
+            <input id="s-auto-restart" type="checkbox">
+            <span>Перезапускать после обновления автоматически<small>Без перезапуска обновлённая версия не активируется.</small></span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="settings-page-actions">
+      <button type="button" id="settings-shutdown" class="danger">Выйти из приложения</button>
+    </div>
+  </section>
+
   <div class="status" id="status" role="status" aria-live="polite"></div>
 </main>
 
@@ -701,40 +872,6 @@
   </form>
 </dialog>
 
-<!-- Диалог: настройки прокси -->
-<dialog id="dlg-settings" aria-labelledby="settings-title" aria-describedby="settings-help">
-  <form method="dialog" id="settings-form" class="dialog-form settings-form">
-    <div class="dialog-header">
-      <h3 id="settings-title">Настройки прокси</h3>
-      <p id="settings-help">Изменения сохраняются автоматически. Порт применится после перезапуска прокси.</p>
-    </div>
-    <div class="dialog-body">
-      <div class="settings-grid">
-        <label>Порт
-          <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
-        </label>
-        <label>Токен доступа
-          <input id="s-auth" placeholder="не задан" autocomplete="off">
-        </label>
-        <label>Блокировка после лимита, сек
-          <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
-        </label>
-        <label>Блокировка после ошибки, сек
-          <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
-        </label>
-        <label>Таймаут ответа, сек
-          <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
-        </label>
-      </div>
-      <p class="muted" style="margin:14px 0 0">Время блокировки применяется к upstream-провайдеру в цепочке: после лимита — дольше, после временной ошибки — короче.</p>
-    </div>
-    <div class="dialog-actions">
-      <button type="button" id="settings-shutdown" class="danger settings-exit">Выйти из приложения</button>
-      <button type="button" id="settings-cancel">Закрыть</button>
-    </div>
-  </form>
-</dialog>
-
 <!-- Диалог: настройки генерации изображений -->
 <dialog id="dlg-image-settings" aria-labelledby="image-settings-title" aria-describedby="image-settings-help">
   <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
@@ -773,7 +910,7 @@ const $ = (id) => document.getElementById(id)
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
 
-let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" } }
+let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" }, appSettings: { theme: "dark", autoUpdate: false, autoRestart: false, autostart: false } }
 let token = localStorage.getItem("pp_token") ?? ""
 const filters = new Map() // filter text per chips list, keyed by container id
 let providersFilter = ""
@@ -805,6 +942,27 @@ const availabilityBadge = (provider, id) => {
     : ""
 }
 const imageSettings = () => (cfg.imageSettings ??= { defaultProvider: "", defaultModel: "" })
+const appSettings = () => {
+  const settings = (cfg.appSettings ??= {})
+  settings.theme ??= "dark"
+  settings.autoUpdate ??= false
+  settings.autoRestart ??= false
+  settings.autostart ??= false
+  return settings
+}
+const tauriInvoke = (command, args) => {
+  const invoke = window.__TAURI__?.core?.invoke
+  return typeof invoke === "function" ? invoke(command, args) : null
+}
+const isDesktopApp = () => typeof window.__TAURI__?.core?.invoke === "function"
+function applyTheme(theme) {
+  if (typeof document === "undefined") return
+  const next = ["dark", "light", "system"].includes(theme) ? theme : "dark"
+  document.body.dataset.theme = next
+  document.documentElement.style.colorScheme = next === "light" ? "light" : next === "dark" ? "dark" : "normal"
+  localStorage.setItem("pp_theme", next)
+}
+applyTheme(typeof localStorage === "undefined" ? "dark" : localStorage.getItem("pp_theme") ?? "dark")
 
 async function api(path, opts = {}, retried = false) {
   const r = await fetch(path, {
@@ -897,8 +1055,7 @@ function renderProviders() {
     tr.querySelector('[data-a="del"]').onclick = () => {
       if (!confirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`)) return
       delete cfg.providers[name]
-      delete cfg.opencodeModels?.[name]
-      for (const m of Object.values(cfg.models)) m.upstreams = (m.upstreams ?? []).filter((u) => u.provider !== name)
+      removeProviderReferences(name)
       save(); renderAll()
     }
   }
@@ -1133,18 +1290,88 @@ function renderOpencodeModels() {
 }
 
 function renderSettings() {
+  const settings = appSettings()
   $("s-port").value = cfg.port ?? 8787
   $("s-auth").value = cfg.authToken ?? ""
   $("s-auth").placeholder = cfg.authTokenConfigured ? "оставить текущий токен" : "не задан"
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 20
-  $("proxyinfo").textContent = `→ http://127.0.0.1:${cfg.port ?? 8787}/v1`
+  $("s-theme").value = settings.theme
+  $("s-auto-update").checked = settings.autoUpdate
+  $("s-auto-restart").checked = settings.autoRestart
+  $("s-auto-restart").disabled = !settings.autoUpdate
+  $("s-auto-restart-wrap").classList.toggle("is-disabled", !settings.autoUpdate)
+  const desktop = isDesktopApp()
+  $("s-auto-update").disabled = !desktop
+  $("s-auto-update-wrap").classList.toggle("is-disabled", !desktop)
+  $("s-auto-update-help").textContent = desktop ? "Проверка выполняется после запуска приложения." : "доступно в desktop-версии"
+  $("s-autostart").checked = settings.autostart
+  $("s-autostart").disabled = !desktop
+  $("s-autostart-wrap").classList.toggle("is-disabled", !desktop)
+  $("s-autostart-help").textContent = desktop ? "Windows и Linux" : "доступно в desktop-версии"
+  $("s-base-url").textContent = `http://127.0.0.1:${cfg.port ?? 8787}/v1`
 }
 
-const dlgSettings = $("dlg-settings")
-$("settings-open").onclick = () => dlgSettings.showModal()
-$("settings-cancel").onclick = () => dlgSettings.close()
+let updateInfo = null
+let updateBusy = false
+function setUpdateBanner(message, actionLabel = "", action = null) {
+  const banner = $("update-banner")
+  const button = $("update-banner-action")
+  $("update-banner-message").innerHTML = message
+  button.textContent = actionLabel
+  button.disabled = !action
+  button.onclick = action
+  banner.hidden = !message
+}
+function restartDesktop() {
+  if (isDesktopApp()) tauriInvoke("restart_app")
+}
+async function installDesktopUpdate(restart = true) {
+  if (!isDesktopApp() || updateBusy) return
+  updateBusy = true
+  setUpdateBanner("<strong>Загружаю обновление…</strong>")
+  try {
+    const installed = await tauriInvoke("install_update", { restart })
+    if (!installed) {
+      updateInfo = null
+      setUpdateBanner("")
+    } else if (!restart) {
+      setUpdateBanner("<strong>Обновление установлено.</strong> Перезапусти приложение, чтобы применить его.", "Перезапустить", restartDesktop)
+    }
+  } catch (error) {
+    setUpdateBanner(`Не удалось обновить: ${esc(error.message ?? error)}`, "Повторить", () => installDesktopUpdate(restart))
+  } finally {
+    updateBusy = false
+  }
+}
+async function checkForDesktopUpdate() {
+  if (!isDesktopApp() || updateBusy) return
+  try {
+    const info = await tauriInvoke("check_for_update")
+    if (!info) {
+      updateInfo = null
+      setUpdateBanner("")
+      return
+    }
+    updateInfo = info
+    if (appSettings().autoUpdate) return installDesktopUpdate(appSettings().autoRestart)
+    setUpdateBanner(`<strong>Доступна новая версия ${esc(info.version)}.</strong>`, "Обновить", () => installDesktopUpdate(true))
+  } catch (error) {
+    debugLog("update-check-failed", { message: error.message ?? String(error) })
+  }
+}
+async function syncAutostartSetting() {
+  if (!isDesktopApp()) return
+  try {
+    appSettings().autostart = Boolean(await tauriInvoke("autostart_enabled"))
+    renderSettings()
+  } catch (error) {
+    $("s-autostart").disabled = true
+    $("s-autostart-help").textContent = `ошибка: ${error.message ?? error}`
+  }
+}
+
 $("settings-shutdown").onclick = async () => {
   if (!window.confirm("Выйти из приложения и закрыть его вкладку?")) return
   const button = $("settings-shutdown")
@@ -1155,7 +1382,7 @@ $("settings-shutdown").onclick = async () => {
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
     flash(true, "выход из приложения…")
-    dlgSettings.close()
+    showTab("providers")
     setTimeout(() => {
       try { window.close() } catch { /* browser may forbid closing a user-opened tab */ }
       if (!document.hidden) {
@@ -1248,6 +1475,34 @@ num("s-port", "port")
 num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
+$("s-theme").onchange = (e) => {
+  appSettings().theme = e.target.value
+  applyTheme(e.target.value)
+  save()
+}
+$("s-auto-update").onchange = (e) => {
+  appSettings().autoUpdate = e.target.checked
+  renderSettings()
+  save()
+  if (e.target.checked) checkForDesktopUpdate()
+}
+$("s-auto-restart").onchange = (e) => {
+  appSettings().autoRestart = e.target.checked
+  save()
+}
+$("s-autostart").onchange = async (e) => {
+  const enabled = e.target.checked
+  e.target.disabled = true
+  try {
+    appSettings().autostart = Boolean(await tauriInvoke("set_autostart", { enabled }))
+    save()
+  } catch (error) {
+    e.target.checked = !enabled
+    flash(false, `автозапуск: ${error.message ?? error}`)
+  } finally {
+    renderSettings()
+  }
+}
 $("s-auth").onchange = (e) => {
   const v = e.target.value.trim()
   if (v) {
@@ -1722,6 +1977,44 @@ function removeModelFromChains(provider, id) {
   return changed
 }
 
+function removeModelReferences(provider, id) {
+  let changed = removeModelFromChains(provider, id)
+  const direct = cfg.opencodeModels?.[provider]
+  if (direct) {
+    const models = Array.isArray(direct.models) ? direct.models : []
+    const next = models.filter((model) => model !== id)
+    if (next.length !== models.length) changed = true
+    if (next.length) direct.models = next
+    else {
+      delete cfg.opencodeModels[provider]
+      changed = true
+    }
+  }
+  const settings = cfg.imageSettings
+  if (settings?.defaultProvider === provider && settings.defaultModel === id) {
+    settings.defaultModel = ""
+    changed = true
+  }
+  if (Array.isArray(settings?.skillModels?.[provider])) {
+    const next = settings.skillModels[provider].filter((model) => model !== id)
+    if (next.length !== settings.skillModels[provider].length) changed = true
+    if (next.length) settings.skillModels[provider] = next
+    else delete settings.skillModels[provider]
+  }
+  return changed
+}
+
+function removeProviderReferences(provider) {
+  delete cfg.opencodeModels?.[provider]
+  for (const m of Object.values(cfg.models ?? {})) m.upstreams = (m.upstreams ?? []).filter((u) => u.provider !== provider)
+  const settings = cfg.imageSettings
+  if (settings?.defaultProvider === provider) {
+    settings.defaultProvider = ""
+    settings.defaultModel = ""
+  }
+  if (settings?.skillModels) delete settings.skillModels[provider]
+}
+
 function removeImageModelsFromChains() {
   let changed = false
   for (const def of Object.values(cfg.models ?? {})) {
@@ -1757,11 +2050,12 @@ function renderPmList() {
       if (cb.checked && i < 0) arr.push(cb.dataset.id)
       if (!cb.checked && i >= 0) {
         arr.splice(i, 1)
-        removeModelFromChains(pmState.provider, cb.dataset.id)
+        removeModelReferences(pmState.provider, cb.dataset.id)
       }
       save()
       renderProviders() // счётчик моделей в таблице провайдеров
       renderModels()
+      renderOpencodeModels()
       renderOpenCode()
       renderImageGenerator()
       $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
@@ -1998,20 +2292,59 @@ $("ig-clear").onclick = () => {
 
 // ---------- вкладки ----------
 
-const TABS = ["providers", "connections", "chains", "models", "images", "logs", "usage"]
+const TABS = ["providers", "connections", "chains", "models", "images", "logs", "usage", "settings"]
 let tab = localStorage.getItem("pp_tab") ?? "providers"
+
+const navigation = document.querySelector("main")
+const navigationCollapseButton = $("tabs-collapse")
+const navigationCollapsed = localStorage.getItem("pp_navigation_collapsed") === "1"
+function setNavigationCollapsed(collapsed) {
+  navigation.classList.toggle("nav-collapsed", collapsed)
+  navigationCollapseButton.setAttribute("aria-expanded", String(!collapsed))
+  navigationCollapseButton.setAttribute("aria-label", collapsed ? "Развернуть навигацию" : "Свернуть навигацию")
+  navigationCollapseButton.title = collapsed ? "Развернуть навигацию" : "Свернуть навигацию"
+  localStorage.setItem("pp_navigation_collapsed", collapsed ? "1" : "0")
+}
+setNavigationCollapsed(navigationCollapsed)
+navigationCollapseButton.onclick = () => setNavigationCollapsed(!navigation.classList.contains("nav-collapsed"))
+
+let collapsedGroups = {}
+try { collapsedGroups = JSON.parse(localStorage.getItem("pp_collapsed_groups") ?? "{}") || {} } catch { collapsedGroups = {} }
+function setGroupCollapsed(group, collapsed) {
+  const button = document.querySelector(`.tab-group-toggle[data-group="${group}"]`)
+  const node = button?.closest(".tab-group")
+  if (!button || !node) return
+  node.classList.toggle("is-collapsed", collapsed)
+  button.setAttribute("aria-expanded", String(!collapsed))
+  collapsedGroups[group] = collapsed
+  localStorage.setItem("pp_collapsed_groups", JSON.stringify(collapsedGroups))
+}
+document.querySelectorAll(".tab-group-toggle").forEach((button) => {
+  const group = button.dataset.group
+  setGroupCollapsed(group, Boolean(collapsedGroups[group]))
+  button.onclick = () => setGroupCollapsed(group, !button.closest(".tab-group").classList.contains("is-collapsed"))
+})
 
 function showTab(name) {
   if (!TABS.includes(name)) name = "providers"
   tab = name
   debugLog("tab", { name })
   localStorage.setItem("pp_tab", name)
-  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name))
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    const isActive = b.dataset.tab === name
+    b.classList.toggle("active", isActive)
+  })
+  const activeGroup = document.querySelector(`.tabs button[data-tab="${name}"]`)?.closest(".tab-group")
+  if (activeGroup?.classList.contains("is-collapsed")) setGroupCollapsed(activeGroup.querySelector(".tab-group-toggle")?.dataset.group, false)
+  document.querySelectorAll(".tab-group").forEach((group) => {
+    group.classList.toggle("is-active", Boolean(group.querySelector("button.active")))
+  })
   document.querySelectorAll("main > section[data-tab]").forEach((s) => (s.style.display = s.dataset.tab === name ? "" : "none"))
+  if (name === "settings") renderSettings()
   if (name === "logs") loadLogs()
   if (name === "usage") loadUsage()
 }
-document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)))
+document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)))
 
 // ---------- логи ----------
 
@@ -2237,8 +2570,11 @@ async function load() {
     const chainsChanged = removeImageModelsFromChains()
     if (chainsChanged) save()
     renderAll()
+    applyTheme(appSettings().theme)
     debugLog("boot-ok", { providers: Object.keys(cfg.providers).length, chains: Object.keys(cfg.models).length })
     if (pmState.provider) loadPmModels(pmState.provider) // список моделей подтягиваем при открытии вкладки
+    syncAutostartSetting()
+    setTimeout(checkForDesktopUpdate, 1500)
   } catch {
     debugLog("boot-failed")
     flash(false, "не удалось загрузить конфиг — прокси запущен?")

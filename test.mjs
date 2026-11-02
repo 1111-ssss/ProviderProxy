@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync, statSync, existsSync,
 import { tmpdir } from "node:os"
 import { join, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { DatabaseSync } from "node:sqlite"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const PROXY = 48787,
@@ -388,9 +389,12 @@ try {
   assert.equal(safeConfig.providers.B.apiKey, "", "GUI config must not receive the plaintext provider key")
   assert.equal(safeConfig.providers.B.apiKeyConfigured, true)
   assert.equal(safeConfig.models.paused.enabled, false, "disabled chain state should persist")
-  const storedConfig = readFileSync(cfg, "utf8")
-  assert.ok(storedConfig.includes("enc:v1:"), "provider keys should be encrypted at rest")
-  assert.ok(!storedConfig.includes('"apiKey": "key-b"'), "plaintext provider key must not remain in config")
+  const database = new DatabaseSync(join(cfgDir, "config.db"))
+  const storedConfig = database.prepare("SELECT value FROM settings WHERE key = 'config'").get()?.value ?? ""
+  assert.ok(storedConfig.includes("enc:v1:"), "provider keys should be encrypted at rest in SQLite")
+  assert.ok(!storedConfig.includes('"apiKey": "key-b"'), "plaintext provider key must not remain in SQLite")
+  assert.ok(database.prepare("SELECT COUNT(*) AS count FROM usage_days").get().count > 0, "usage history should be stored in SQLite")
+  database.close()
 
   // 6b. opencode sync: the chain list lands in opencode's config (opencode cannot fetch /v1/models itself).
   const oc = JSON.parse(readFileSync(ocCfg, "utf8"))
@@ -470,7 +474,10 @@ try {
   assert.match(html, /\["m", 1e6\]/, "token formatter should support millions")
   assert.ok(html.includes("999,999 should become 1m"), "token formatter should promote rounded 1000k to 1m")
   assert.ok(!html.includes("работает локально"), "GUI should not show the local-status label")
-  assert.ok(html.includes('id="settings-open"'), "settings should be available from the top-right button")
+   assert.ok(html.includes('id="settings-open"'), "settings should be available from the top-right button")
+   assert.ok(html.includes('id="update-banner"') && html.includes("checkForDesktopUpdate"), "desktop updates should be offered in the top-right banner")
+   assert.ok(html.includes('id="s-theme"') && html.includes('id="s-autostart"'), "settings should expose theme and autostart")
+   assert.ok(html.includes('id="s-auto-update"') && html.includes('id="s-auto-restart"'), "settings should expose automatic update controls")
   assert.ok(html.includes('<svg viewBox="0 0 24 24"'), "settings button should use an inline vector icon")
   assert.ok(!html.includes("⚙"), "settings button should not use an emoji icon")
   assert.ok(html.includes('id="providers-filter"'), "providers tab should include a provider search")

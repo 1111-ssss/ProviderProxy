@@ -8,6 +8,7 @@
 import http from "node:http"
 import { once } from "node:events"
 import { Readable } from "node:stream"
+import { DatabaseSync } from "node:sqlite"
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
 import { homedir } from "node:os"
@@ -15,8 +16,24 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const here = dirname(fileURLToPath(import.meta.url))
-const configPath = process.argv[2] ?? join(here, "config.json")
-const statsPath = process.env.PP_STATS_FILE ?? join(dirname(configPath), "usage-stats.json")
+const configPath = process.argv[2] ?? join(here, "config.db")
+const legacyConfigPath = /\.db$/i.test(configPath) ? configPath.replace(/\.db$/i, ".json") : configPath
+const legacyStatsPath = process.env.PP_STATS_FILE ?? join(dirname(configPath), "usage-stats.json")
+const dbPath = process.env.PP_DB_FILE ?? (/\.db$/i.test(configPath) ? configPath : configPath.replace(/\.[^/.]+$/, ".db"))
+mkdirSync(dirname(dbPath), { recursive: true })
+const database = new DatabaseSync(dbPath)
+database.exec(`
+  PRAGMA busy_timeout = 5000;
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS usage_days (
+    day TEXT PRIMARY KEY,
+    payload TEXT NOT NULL
+  );
+`)
+try { chmodSync(dbPath, 0o600) } catch { /* Windows or a read-only existing database */ }
 const CONFIG_KEY_PREFIX = "enc:v1:"
 const API_VERSION = 3
 const configKeyPath = process.env.PP_CONFIG_KEY_FILE ?? join(homedir(), ".config", "provider-proxy", "master.key")
@@ -54,9 +71,22 @@ const imageEndpointName = (value) => {
   return ""
 }
 const hasEncryptedSecrets = (value) => {
+  if (typeof value === "string") return isEncryptedSecret(value)
   if (Array.isArray(value)) return value.some(hasEncryptedSecrets)
   if (!value || typeof value !== "object") return false
   return Object.values(value).some(hasEncryptedSecrets)
+}
+const clearUnreadableEncryptedSecrets = (value, parentKey = "") => {
+  if (Array.isArray(value)) return value.map((item) => clearUnreadableEncryptedSecrets(item, parentKey))
+  if (!value || typeof value !== "object") return value
+  const out = {}
+  for (const [key, item] of Object.entries(value)) {
+    const sensitive = key === "apiKey" || key === "authToken" || parentKey === "headers"
+    out[key] = sensitive && typeof item === "string" && isEncryptedSecret(item)
+      ? ""
+      : clearUnreadableEncryptedSecrets(item, key)
+  }
+  return out
 }
 const keyFromRaw = (raw) => createHash("sha256").update(raw).digest()
 function configKey({ required = false } = {}) {
@@ -107,16 +137,19 @@ function transformConfigSecrets(value, transform, parentKey = "") {
   }
   return out
 }
-function hasPlainSecrets(value, parentKey = "") {
-  if (Array.isArray(value)) return value.some((item) => hasPlainSecrets(item, parentKey))
-  if (!value || typeof value !== "object") return false
-  return Object.entries(value).some(([key, item]) => {
-    const sensitive = key === "apiKey" || key === "authToken" || parentKey === "headers"
-    return (sensitive && typeof item === "string" && item && !isEnvSecret(item) && !isEncryptedSecret(item)) || hasPlainSecrets(item, key)
-  })
-}
 const decryptConfig = (value) => transformConfigSecrets(value, decryptSecret)
 const encryptConfig = (value) => transformConfigSecrets(value, encryptSecret)
+const decryptConfigWithFallback = (value) => {
+  try {
+    return decryptConfig(value)
+  } catch (err) {
+    // Keep the GUI usable when the key was removed while encrypted config remains.
+    if (!hasEncryptedSecrets(value) || process.env.PP_CONFIG_KEY || existsSync(configKeyPath)) throw err
+    const cleared = clearUnreadableEncryptedSecrets(value)
+    log(`${err.message}; encrypted credentials were cleared in memory — re-enter them in Settings`)
+    return cleared
+  }
+}
 function cloneConfig(value) {
   return JSON.parse(JSON.stringify(value))
 }
@@ -174,21 +207,38 @@ function mergeConfigSecrets(next, previous) {
   delete out.authTokenConfigured
   return mergeRedactedSecrets(out, previous)
 }
+function readStoredConfig() {
+  const row = database.prepare("SELECT value FROM settings WHERE key = 'config'").get()
+  return row?.value ? JSON.parse(row.value) : null
+}
+function saveStoredConfig(value) {
+  database
+    .prepare("INSERT INTO settings(key, value) VALUES('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(JSON.stringify(encryptConfig(value)))
+}
 try {
-  const rawConfig = JSON.parse(readFileSync(configPath, "utf8"))
-  config = decryptConfig(rawConfig)
-  if (hasEncryptedSecrets(rawConfig)) configKey({ required: true })
-  if (hasPlainSecrets(rawConfig)) {
-    writeFileSync(configPath, JSON.stringify(encryptConfig(config), null, 2) + "\n")
+  const storedConfig = readStoredConfig()
+  if (storedConfig) {
+    config = decryptConfigWithFallback(storedConfig)
+  } else {
+    let rawConfig
+    try {
+      rawConfig = JSON.parse(readFileSync(legacyConfigPath, "utf8"))
+      config = decryptConfigWithFallback(rawConfig)
+      saveStoredConfig(config)
+      log(`migrated config from ${legacyConfigPath} to ${dbPath}`)
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err
+      // No config yet: start from the example (shape + {env:...} keys) or scratch.
+      const example = join(here, "config.example.json")
+      config = existsSync(example) ? JSON.parse(readFileSync(example, "utf8")) : {}
+      saveStoredConfig(config)
+      log(`no config at ${legacyConfigPath}; initialized SQLite storage at ${dbPath} from ${existsSync(example) ? "config.example.json" : "scratch"}`)
+    }
   }
 } catch (err) {
-  if (err.code !== "ENOENT") throw err
-  // No config yet: start from the example (shape + {env:...} keys) or scratch, and let the GUI fill it in.
-  const example = join(here, "config.example.json")
-  config = existsSync(example) ? JSON.parse(readFileSync(example, "utf8")) : {}
-  log(
-    `no config at ${configPath}; starting from ${existsSync(example) ? "config.example.json" : "scratch"} — first GUI save writes ${configPath}`,
-  )
+  database.close()
+  throw err
 }
 let PORT, AUTH, LIMIT_COOLDOWN_MS, ERROR_COOLDOWN_MS, HEADER_TIMEOUT_MS
 let chains = new Map()
@@ -298,8 +348,8 @@ const cooldowns = new Map()
 const cooling = (key) => (cooldowns.get(key) ?? 0) > Date.now()
 const cool = (key, ms) => cooldowns.set(key, Date.now() + ms)
 
-// Usage counters for the GUI dashboard. Daily snapshots are kept locally for seven calendar days,
-// separately from config.json so usage history never contains provider credentials.
+// Usage counters for the GUI dashboard. Daily snapshots are kept locally for seven calendar days
+// in SQLite, separately from the config row so usage history never contains provider credentials.
 const USAGE_RETENTION_DAYS = 7
 const usageScalarKeys = ["requests", "ok", "failed", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
 const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
@@ -339,13 +389,26 @@ function usageSnapshot(value = usage) {
 }
 function loadUsageHistory() {
   try {
-    const stored = JSON.parse(readFileSync(statsPath, "utf8"))
-    const days = stored?.days && typeof stored.days === "object" ? stored.days : {}
-    for (const [date, snapshot] of Object.entries(days)) {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) usageHistory.set(date, normalizeUsageSnapshot(snapshot))
+    const count = Number(database.prepare("SELECT COUNT(*) AS count FROM usage_days").get()?.count ?? 0)
+    if (count === 0) {
+      try {
+        const stored = JSON.parse(readFileSync(legacyStatsPath, "utf8"))
+        const days = stored?.days && typeof stored.days === "object" ? stored.days : {}
+        const insert = database.prepare("INSERT OR IGNORE INTO usage_days(day, payload) VALUES(?, ?)")
+        for (const [date, snapshot] of Object.entries(days)) {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(date)) insert.run(date, JSON.stringify(normalizeUsageSnapshot(snapshot)))
+        }
+        if (Object.keys(days).length) log(`migrated usage history from ${legacyStatsPath} to ${dbPath}`)
+      } catch (err) {
+        if (err.code !== "ENOENT") throw err
+      }
+    }
+    const rows = database.prepare("SELECT day, payload FROM usage_days").all()
+    for (const row of rows) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(row.day)) usageHistory.set(row.day, normalizeUsageSnapshot(JSON.parse(row.payload)))
     }
   } catch (err) {
-    if (err.code !== "ENOENT") log(`usage: не удалось прочитать историю ${statsPath}: ${err.message}`)
+    log(`usage: не удалось прочитать историю SQLite ${dbPath}: ${err.message}`)
   }
   usageDay = localDayKey()
   usage = { ...normalizeUsageSnapshot(usageHistory.get(usageDay)), since: Date.now() }
@@ -366,10 +429,13 @@ function persistUsage() {
   usageHistory.set(usageDay, usageSnapshot())
   pruneUsageHistory()
   try {
-    mkdirSync(dirname(statsPath), { recursive: true })
-    writeFileSync(statsPath, JSON.stringify({ version: 1, retentionDays: USAGE_RETENTION_DAYS, days: Object.fromEntries(usageHistory) }, null, 2) + "\n", { mode: 0o600 })
+    const insert = database.prepare("INSERT INTO usage_days(day, payload) VALUES(?, ?) ON CONFLICT(day) DO UPDATE SET payload = excluded.payload")
+    const remove = database.prepare("DELETE FROM usage_days WHERE day = ?")
+    const keep = new Set(usageHistory.keys())
+    for (const [date, snapshot] of usageHistory) insert.run(date, JSON.stringify(snapshot))
+    for (const row of database.prepare("SELECT day FROM usage_days").all()) if (!keep.has(row.day)) remove.run(row.day)
   } catch (err) {
-    log(`usage: не удалось сохранить историю ${statsPath}: ${err.message}`)
+    log(`usage: не удалось сохранить историю SQLite ${dbPath}: ${err.message}`)
   }
 }
 function usageHistoryView() {
@@ -697,7 +763,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (AUTH && req.headers.authorization !== `Bearer ${AUTH}`) {
-      log(`401 ${req.method} ${req.url} — нет/неверный токен (authToken в config.json)`)
+      log(`401 ${req.method} ${req.url} — нет/неверный токен (authToken в SQLite)`)
       res.writeHead(401, { "content-type": "application/json" })
       return res.end(JSON.stringify({ error: { message: "bad proxy token" } }))
     }
@@ -757,7 +823,7 @@ const server = http.createServer(async (req, res) => {
       }
       const nextConfig = mergeConfigSecrets(body, config)
       applyConfig(nextConfig)
-      writeFileSync(configPath, JSON.stringify(encryptConfig(nextConfig), null, 2) + "\n")
+      saveStoredConfig(nextConfig)
       log(`config updated via GUI: ${Object.keys(nextConfig.providers ?? {}).length} providers, ${chains.size} models`)
       const opencodeSynced = syncOpencode() // карта моделей в конфиге opencode — чтобы новые модели были видны сразу
       res.writeHead(200, { "content-type": "application/json" })
@@ -1213,6 +1279,6 @@ setInterval(() => {
 server.listen(PORT, "127.0.0.1", () => {
   listenPort = PORT
   log(
-    `provider_proxy on http://127.0.0.1:${listenPort}/v1 — GUI: http://127.0.0.1:${listenPort}/ (${chains.size} models, config: ${configPath})`,
+    `provider_proxy on http://127.0.0.1:${listenPort}/v1 — GUI: http://127.0.0.1:${listenPort}/ (${chains.size} models, SQLite: ${dbPath})`,
   )
 })
