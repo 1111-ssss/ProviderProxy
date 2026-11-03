@@ -271,6 +271,7 @@
   .settings-page .setting-option span { display: grid; gap: 2px; }
   .settings-page .setting-option small { color: var(--muted); font-size: 11px; }
   .settings-page .setting-option.is-disabled { opacity: .6; }
+  .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
   .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
   .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -883,6 +884,7 @@
     <div class="settings-page-actions">
       <button type="button" id="settings-shutdown" class="danger">Выйти из приложения</button>
     </div>
+    <div class="settings-version">Версия <span id="s-version">—</span></div>
   </section>
 
   <div class="status" id="status" role="status" aria-live="polite"></div>
@@ -1523,6 +1525,7 @@ function renderSettings() {
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
+  $("s-version").textContent = cfg.appVersion ?? "—"
   $("s-theme").value = settings.theme
   $("s-auto-update").checked = settings.autoUpdate
   $("s-auto-restart").checked = settings.autoRestart

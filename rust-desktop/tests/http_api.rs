@@ -153,6 +153,7 @@ async fn protects_api_and_redacts_config_but_serves_the_gui() {
         .unwrap();
     assert_eq!(config["authToken"], "");
     assert_eq!(config["authTokenConfigured"], true);
+    assert_eq!(config["appVersion"], env!("CARGO_PKG_VERSION"));
     assert_eq!(config["providers"]["one"]["apiKey"], "");
     assert_eq!(config["providers"]["one"]["apiKeyConfigured"], true);
     assert!(config["providers"]["one"]["headers"]

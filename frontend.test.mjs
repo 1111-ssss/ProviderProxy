@@ -54,6 +54,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes("main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }"), "collapsed navigation should shrink to the arrow card")
     assert.ok(html.includes('id="s-base-url"'), "proxy base URL should live in the settings page")
     assert.ok(html.includes('id="s-check-update"'), "desktop settings should expose a manual update check")
+    assert.ok(html.includes('id="s-version"'), "settings should show the application version")
     assert.ok(html.includes("const lines = (j.lines ?? []).slice().reverse()"), "logs should show newest entries first")
     assert.ok(html.includes("const atTop = box.scrollTop <= 60"), "log refresh should preserve the newest entries at the top")
     assert.equal(run("formatContext(1000000)"), "1m")

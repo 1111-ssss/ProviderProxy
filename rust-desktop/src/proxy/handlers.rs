@@ -99,6 +99,12 @@ pub(crate) async fn get_config(State(state): State<AppState>, headers: HeaderMap
             );
         }
     }
+    if let Some(object) = exposed.as_object_mut() {
+        object.insert(
+            "appVersion".into(),
+            Value::String(env!("CARGO_PKG_VERSION").into()),
+        );
+    }
     Json(exposed).into_response()
 }
 
