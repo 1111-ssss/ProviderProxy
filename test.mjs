@@ -85,6 +85,10 @@ const upstreamB = createServer((req, res) => {
         res.write(": keepalive\r\n\r\n")
         res.write("event: message\r\ndata: null\r\n\r\n")
         if (body.messages?.[0]?.content === "no-finish") return res.end("data: {\"id\":\"chatcmpl-test\",\"choices\":[]}\n\ndata: [DONE]\r\n\r\n")
+        if (body.messages?.[0]?.content === "broken-stream") {
+          res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ delta: { content: "partial" } }] })}\n\n`)
+          return setTimeout(() => res.destroy(), 10)
+        }
         res.write(`event: message\n\ndata: ${JSON.stringify({ id: "chatcmpl-test", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "ok" }, finish_reason: null }] })}\n\n`)
         res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ delta: { tool_calls: [{ id: "call_1", function: { arguments: "{}" } }] } }], usage: null })}\n\n`)
         return res.end("data: [DONE]\r\n\r\n")
@@ -218,6 +222,12 @@ try {
   const incompleteText = await incompleteStream.text()
   assert.match(incompleteText, /"finish_reason":"stop"/, "proxy should close an SSE stream without choices")
   assert.match(incompleteText, /data: \[DONE\]/)
+
+  const brokenStream = await postStream("test", "broken-stream")
+  const brokenText = await brokenStream.text()
+  assert.match(brokenText, /proxy_stream_error/, "upstream stream errors must reach the client")
+  const brokenLogs = await (await fetch(`${base(PROXY)}/api/logs`)).json()
+  assert.ok(brokenLogs.lines.some((line) => line.includes("ошибка потока") && line.includes("unexpectedly")))
 
   // 2. A is cooling down -> skipped without a round-trip.
   const r2 = await post("test")
@@ -565,15 +575,15 @@ try {
 
   // 10. Usage dashboard: requests, failover, per-provider 429 and token tallies.
   const u = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(u.requests, 9) // r1, stream, incomplete stream, r2, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
-  assert.equal(u.ok, 9)
+  assert.equal(u.requests, 10) // r1, stream, incomplete stream, broken stream, r2, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
+  assert.equal(u.ok, 10)
   assert.equal(u.failovers, 2) // r1 (429 off A) and 2b (400 off A)
   assert.equal(u.failed, 0)
   assert.equal(u.providers.A.requests, 2)
   assert.equal(u.providers.A.limits, 1)
   assert.equal(u.providers.A.errors, 1) // 400 unsupported on the img chain
-  assert.equal(u.providers.B.ok, 9)
-  assert.equal(u.models.test.requests, 5)
+  assert.equal(u.providers.B.ok, 10)
+  assert.equal(u.models.test.requests, 6)
   assert.equal(u.models.img.requests, 1)
   assert.equal(u.models.fresh.requests, 1)
   assert.equal(u.models.paused.requests, 1)
@@ -583,7 +593,7 @@ try {
   assert.equal(u.retentionDays, 7)
   assert.equal(u.days.length, 7)
   assert.equal(u.days[0].date, dayKey(0))
-  assert.equal(u.days[0].requests, 9)
+  assert.equal(u.days[0].requests, 10)
   assert.equal(u.days.find((day) => day.date === dayKey(-1)).requests, 3, "yesterday should remain a separate persisted day")
   assert.equal(u.days.find((day) => day.date === dayKey(-8)), undefined, "history older than seven days must be pruned")
   assert.ok(u.cooldowns.length >= 1 && u.cooldowns.every((c) => c.upstream === "A")) // A cooling after 429/400
@@ -623,7 +633,7 @@ try {
   }
   assert.equal(restartedReady, true, `proxy did not restart:\n${restartedOut}`)
   const afterRestart = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 9, "today stats should survive restart")
+  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 10, "today stats should survive restart")
   assert.equal(afterRestart.days.find((day) => day.date === dayKey(-1)).requests, 3, "previous day stats should survive restart")
   const restartShutdown = await fetch(`${base(PROXY)}/api/shutdown`, { method: "POST" })
   assert.equal(restartShutdown.status, 200)

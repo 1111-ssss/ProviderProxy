@@ -672,10 +672,21 @@ async function* normalizeSse(body, exposed, upstream) {
   buffer += tail + decoder.decode()
   yield* drain(true)
   if (!doneSeen) {
-    const final = terminal()
-    if (final) yield final
-    if (choiceIndexes.size) yield "data: [DONE]\n\n"
+    const incomplete = !choiceIndexes.size || [...choiceIndexes].some((index) => !finishReasons.has(index))
+    if (incomplete) {
+      const message = "upstream SSE stream ended before [DONE]"
+      log(`${exposed} → ошибка потока ${upstream.name}/${upstream.model}: ${message}`)
+      yield streamErrorSse(message)
+    } else {
+      const final = terminal()
+      if (final) yield final
+      yield "data: [DONE]\n\n"
+    }
   }
+}
+
+function streamErrorSse(message) {
+  return `data: ${JSON.stringify({ error: { message, type: "proxy_stream_error" } })}\n\ndata: [DONE]\n\n`
 }
 
 // A few gateways ignore `stream: true` and return a regular completion. Turn
@@ -1409,9 +1420,9 @@ async function proxyChat(body, res) {
       if (!resp.body) return res.end()
 
       // Stream the body through untouched, watching for a usage report on the way (see tally()).
+      let tail = ""
       try {
         if (isSse) {
-          let tail = ""
           for await (const event of normalizeSse(resp.body, exposed, up)) {
             tail = (tail + event).slice(-8192) // usage arrives in the final chunk
             if (!res.write(event)) await once(res, "drain")
@@ -1426,8 +1437,19 @@ async function proxyChat(body, res) {
           res.end(normalized ?? text)
           tally(text, pStat, mStat)
         }
-      } catch {
-        if (!res.writableEnded) res.destroy() // client went away mid-stream
+      } catch (err) {
+        if (!res.destroyed && !res.writableEnded) {
+          const message = `upstream stream ended unexpectedly: ${err.message ?? String(err)}`
+          log(`${exposed} → ошибка потока ${up.name}/${up.model}: ${message}`)
+          if (streamRequested) {
+            res.write(streamErrorSse(message))
+            res.end()
+          } else {
+            res.destroy()
+          }
+        }
+      } finally {
+        if (isSse) tally(tail, pStat, mStat)
       }
       return
     } catch (err) {

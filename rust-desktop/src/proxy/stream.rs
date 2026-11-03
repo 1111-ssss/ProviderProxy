@@ -78,6 +78,14 @@ impl SseNormalizer {
         Some(format!("{}data: [DONE]\n\n", terminal.unwrap_or_default()))
     }
 
+    fn is_incomplete(&self) -> bool {
+        self.choice_indexes.is_empty()
+            || self
+                .choice_indexes
+                .iter()
+                .any(|index| !self.finish_reasons.contains_key(index))
+    }
+
     fn normalize_event(&mut self, raw_event: &str) -> Result<Option<String>, String> {
         let data: Vec<&str> = raw_event
             .lines()
@@ -188,6 +196,18 @@ impl SseNormalizer {
         }
         Ok(Some(format!("data: {}\n\n", parsed)))
     }
+}
+
+fn stream_error_event(message: &str) -> String {
+    format!(
+        "data: {}\n\ndata: [DONE]\n\n",
+        serde_json::json!({
+            "error": {
+                "message": message,
+                "type": "proxy_stream_error",
+            }
+        })
+    )
 }
 
 fn completion_to_sse(bytes: &[u8], upstream_model: &str) -> Option<String> {
@@ -302,6 +322,7 @@ pub(super) async fn stream_upstream_response(
         let mut tail = String::new();
         let mut buffer = String::new();
         let mut regular_body = Vec::new();
+        let mut upstream_error = None;
         let mut normalizer = SseNormalizer {
             tool_indexes: HashMap::new(),
             finish_reasons: HashMap::new(),
@@ -346,19 +367,19 @@ pub(super) async fn stream_upstream_response(
                     }
                 }
                 Err(err) => {
-                    let _ = tx.send(Err(std::io::Error::other(err.to_string()))).await;
-                    return;
+                    upstream_error = Some(err.to_string());
+                    break;
                 }
             }
         }
-        if !is_sse && stream_requested {
+        if upstream_error.is_none() && !is_sse && stream_requested {
             if let Some(normalized) = completion_to_sse(&regular_body, &upstream_model) {
                 if tx.send(Ok(bytes::Bytes::from(normalized))).await.is_err() {
                     return;
                 }
             }
         }
-        if is_sse {
+        if upstream_error.is_none() && is_sse {
             for event in take_sse_events(&mut buffer, true) {
                 match normalizer.normalize_event(&event) {
                     Ok(Some(normalized)) => {
@@ -376,7 +397,35 @@ pub(super) async fn stream_upstream_response(
                 }
             }
         }
-        if is_sse {
+        if let Some(reason) = upstream_error {
+            let message = format!("upstream stream ended unexpectedly: {reason}");
+            push_log(
+                &state,
+                format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+            );
+            if stream_requested {
+                let _ = tx
+                    .send(Ok(bytes::Bytes::from(stream_error_event(&message))))
+                    .await;
+            } else {
+                let _ = tx.send(Err(std::io::Error::other(message))).await;
+            }
+        } else if is_sse && !normalizer.done_seen {
+            if normalizer.is_incomplete() {
+                let message = "upstream SSE stream ended before [DONE]";
+                push_log(
+                    &state,
+                    format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+                );
+                if stream_requested {
+                    let _ = tx
+                        .send(Ok(bytes::Bytes::from(stream_error_event(message))))
+                        .await;
+                }
+            } else if let Some(final_event) = normalizer.finish_at_end() {
+                let _ = tx.send(Ok(bytes::Bytes::from(final_event))).await;
+            }
+        } else if is_sse {
             if let Some(final_event) = normalizer.finish_at_end() {
                 let _ = tx.send(Ok(bytes::Bytes::from(final_event))).await;
             }
@@ -435,5 +484,22 @@ mod tests {
             .unwrap();
         assert!(output.contains("\"finish_reason\":\"stop\""));
         assert!(output.ends_with("data: [DONE]\n\n"));
+    }
+
+    #[test]
+    fn detects_an_sse_stream_that_ends_before_done() {
+        let mut normalizer = SseNormalizer {
+            tool_indexes: HashMap::new(),
+            finish_reasons: HashMap::new(),
+            tool_choices: BTreeSet::new(),
+            choice_indexes: BTreeSet::new(),
+            last_meta: serde_json::Map::new(),
+            done_seen: false,
+        };
+        normalizer
+            .normalize_event("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+            .unwrap();
+        assert!(normalizer.is_incomplete());
+        assert!(!normalizer.done_seen);
     }
 }
