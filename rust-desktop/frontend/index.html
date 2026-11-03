@@ -1396,9 +1396,9 @@ function renderSettings() {
 
 async function exportConfigFile() {
   const query = new URLSearchParams({
-    keys: $("config-export-keys").checked ? "1" : "0",
-    chains: $("config-export-chains").checked ? "1" : "0",
-    models: $("config-export-models").checked ? "1" : "0",
+    keys: $("config-export-keys").checked ? "true" : "false",
+    chains: $("config-export-chains").checked ? "true" : "false",
+    models: $("config-export-models").checked ? "true" : "false",
   })
   const button = $("config-export")
   button.disabled = true
@@ -1432,6 +1432,10 @@ async function importConfigFile(file) {
     const response = await api("/api/config/import", { method: "POST", body: JSON.stringify(imported) })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
+    if (typeof imported.authToken === "string" && imported.authToken) {
+      token = imported.authToken
+      localStorage.setItem("pp_token", token)
+    }
     const current = await api("/api/config")
     if (!current.ok) throw new Error(`не удалось перечитать конфиг: HTTP ${current.status}`)
     cfg = await current.json()
@@ -1440,7 +1444,11 @@ async function importConfigFile(file) {
     cfg.opencodeModels ??= {}
     renderAll()
     applyTheme(appSettings().theme)
-    flash(true, payload.opencodeSynced === false ? "импортирован, но OpenCode не обновлён" : "конфиг импортирован ✓")
+    flash(true, payload.opencodeSynced === false ? "импортирован, но OpenCode не обновлён" : "конфиг импортирован ✓; перезапуск")
+    setTimeout(() => {
+      if (isDesktopApp()) tauriInvoke("restart_app")
+      else window.location.reload()
+    }, 350)
   } catch (error) {
     flash(false, `не удалось импортировать конфиг: ${error.message ?? error}`)
   } finally {

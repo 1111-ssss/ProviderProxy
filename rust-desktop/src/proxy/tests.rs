@@ -217,6 +217,17 @@ async fn serves_the_desktop_api_from_a_local_port() {
     assert!(exported.status().is_success());
     let exported: Value = exported.json().await.unwrap();
     assert!(exported["models"]["one"].is_object());
+    let without_optional = client
+        .get(format!(
+            "http://127.0.0.1:{}/api/config/export?keys=false&chains=false&models=false",
+            server.port
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert!(without_optional.status().is_success());
+    let without_optional: Value = without_optional.json().await.unwrap();
+    assert!(without_optional.get("models").is_none());
     let imported = client
         .post(format!("http://127.0.0.1:{}/api/config/import", server.port))
         .json(&json!({ "appSettings": { "theme": "light" } }))

@@ -50,6 +50,8 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('id="s-base-url"'), "proxy base URL should live in the settings page")
     assert.ok(html.includes('id="config-export"') && html.includes('id="config-import"'), "settings should expose config import/export")
     assert.ok(html.includes('id="config-export-keys"') && html.includes('id="config-export-chains"') && html.includes('id="config-export-models"'), "config export sections should be optional")
+    assert.ok(html.includes('checked ? "true" : "false"'), "Rust export query booleans should use true/false")
+    assert.ok(html.includes('tauriInvoke("restart_app")') && html.includes("window.location.reload()"), "config import should restart after success")
     assert.ok(!html.includes('id="settings-open"'), "duplicate header settings button should be gone")
     assert.match(html, /class="settings-nav-button" data-tab="settings"/)
     assert.ok(!html.includes('data-group="settings"'), "settings should be outside collapsible groups")
