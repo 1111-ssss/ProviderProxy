@@ -2690,14 +2690,14 @@ async function loadLogs() {
   try {
     const j = await (await api("/api/logs")).json()
     const box = $("logbox")
-    const lines = j.lines ?? []
+    const lines = (j.lines ?? []).slice().reverse()
     const key = lines.join("\n")
     if (box.dataset.k === key) return // nothing new — не перестраиваем DOM, чтобы не дёргать скролл
     box.dataset.k = key
-    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 60 // не дёргаем, если читаешь выше
+    const atTop = box.scrollTop <= 60 // новые записи появляются сверху
     box.replaceChildren(...(lines.length ? lines.map(logCard) : [document.createTextNode("—")]))
     $("log-info").textContent = `последние ${lines.length} из ${j.max ?? "?"} · чистятся сами`
-    if (atBottom) box.scrollTop = box.scrollHeight
+    if (atTop) box.scrollTop = 0
   } catch {
     /* прокси недоступен — следующий опрос повторит */
   }
