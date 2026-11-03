@@ -44,7 +44,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc-mingw-w64-x86-64 mingw-w64-tools imagemagick zip \
-            libwebkit2gtk-4.1-dev libappindicator3-dev libayatana-appindicator3-dev \
+            libwebkit2gtk-4.1-dev libappindicator3-dev \
             librsvg2-dev patchelf libfuse2 file
 
       - name: Install Rust stable
