@@ -51,6 +51,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.match(html, /\.tab-group-chevron \{[\s\S]*transform-origin: 50% 50%/, "group arrows should rotate around their center")
     assert.match(html, /main > section \{ grid-row: 1; height: 100%; min-height: 0; overflow: auto; \}/, "work cards should own the desktop scrollbar")
     assert.match(html, /\.tabs \{ grid-row: 1; height: 100%; max-height: none;/, "navigation should fill the desktop viewport")
+    assert.ok(html.includes("main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }"), "collapsed navigation should shrink to the arrow card")
     assert.ok(html.includes('id="s-base-url"'), "proxy base URL should live in the settings page")
     assert.match(html, /section\[data-tab="logs"\] \{ height: calc\(/, "logs should fill the workspace")
     assert.match(html, /\.logbox \{ flex: 1 1 auto; min-height: 0;/, "logs should scroll inside their section")

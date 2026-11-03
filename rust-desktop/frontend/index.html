@@ -393,7 +393,7 @@
     main { height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
     main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
     .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; }
-    main.nav-collapsed .tabs { height: 100%; }
+    main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
     section[data-tab="logs"] { height: 100%; overflow: auto; }
     section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
   }
