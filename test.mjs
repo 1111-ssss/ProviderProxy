@@ -542,7 +542,7 @@ try {
   assert.ok(html.includes('id="opencode-models"'), "models tab should render direct OpenCode models")
   assert.ok(html.includes("renderOpenCodePreview") && html.includes("slice(0, 10)"), "OpenCode previews should collapse after 10 entries")
   assert.ok(html.includes("Показать ещё") && html.includes("Свернуть список"), "OpenCode previews should have expand and collapse controls")
-  assert.ok(html.includes("(config)"), "direct OpenCode models should use the config label")
+  assert.ok(!html.includes("(config)"), "direct models should not expose an integration-specific config label")
   assert.ok(html.includes("cfg.opencodeModels[provider].enabled = false"), "direct provider toggle should persist disabled state")
   assert.ok(html.includes('target.closest(".chain-toggle")') && html.includes("event.preventDefault()"), "provider toggles should handle clicks on the whole pill")
   assert.ok(html.includes('target.closest("#opencode-models .card[data-provider]")') && html.includes("openOpenCodeModelDialog(provider)"), "direct model actions should have delegated click handling")

@@ -20,7 +20,7 @@ use super::{
         USAGE_RETENTION_DAYS,
     },
     opencode::{default_opencode_config_setting, sync_opencode},
-    routing::{add_model_metadata, map_headers, string_field, subst},
+    routing::{add_model_metadata, direct_model_ids, map_headers, string_field, subst},
     types::{AppState, ImageUsage, ProviderModelsRequest},
 };
 
@@ -944,15 +944,16 @@ pub(crate) async fn opencode_sync(State(state): State<AppState>, headers: Header
     let direct = config
         .get("opencodeModels")
         .and_then(Value::as_object)
-        .map(|providers| {
-            providers
-                .values()
-                .filter(|v| v.get("enabled").and_then(Value::as_bool) != Some(false))
-                .map(|v| {
-                    v.get("models")
-                        .and_then(Value::as_array)
-                        .map(Vec::len)
-                        .unwrap_or(0)
+        .map(|direct| {
+            direct
+                .iter()
+                .filter(|(_, definition)| definition.get("enabled").and_then(Value::as_bool) != Some(false))
+                .map(|(provider_name, definition)| {
+                    config
+                        .get("providers")
+                        .and_then(|providers| providers.get(provider_name))
+                        .map(|provider| direct_model_ids(provider, definition).len())
+                        .unwrap_or_else(|| definition.get("models").and_then(Value::as_array).map(Vec::len).unwrap_or(0))
                 })
                 .sum::<usize>()
         })

@@ -1,7 +1,7 @@
 use serde_json::{json, Map, Value};
 use std::fs;
 
-use super::{config::expand_home, metrics::push_log, types::AppState};
+use super::{config::expand_home, metrics::push_log, routing::direct_model_ids, types::AppState};
 
 pub(crate) fn default_opencode_config_setting() -> String {
     let dir = dirs::home_dir()
@@ -181,13 +181,13 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
             if definition.get("enabled").and_then(Value::as_bool) == Some(false) {
                 continue;
             }
-            for model in definition
-                .get("models")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-            {
+            let provider_config = config
+                .get("providers")
+                .and_then(|providers| providers.get(provider_name));
+            let Some(provider_config) = provider_config else {
+                continue;
+            };
+            for model in direct_model_ids(provider_config, definition) {
                 let name = format!("{provider_name}/{model}");
                 let mut item = previous.get(&name).cloned().unwrap_or_else(|| json!({}));
                 if let Value::Object(object) = &mut item {
@@ -195,7 +195,7 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
                 }
                 apply_model_context(
                     &mut item,
-                    model_context_length(&config, provider_name, model),
+                    model_context_length(&config, provider_name, &model),
                 );
                 models.insert(name, item);
             }

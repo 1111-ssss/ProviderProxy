@@ -329,6 +329,16 @@ function defaultOpencodeConfigSetting() {
   if (path === join(dir, "opencode.jsonc")) return "~/.config/opencode/opencode.jsonc"
   return "~/.config/opencode/opencode.json"
 }
+function providerImageModel(provider, id) {
+  const info = provider?.modelInfo?.[id] ?? {}
+  const endpoints = Array.isArray(info.endpoints) ? info.endpoints : []
+  return info.image === true || String(info.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
+}
+function directModelIds(provider, definition) {
+  const all = definition?.all === true
+  const ids = all ? provider?.models ?? [] : definition?.models ?? []
+  return [...new Set(all ? ids.filter((id) => !providerImageModel(provider, id)) : ids)]
+}
 function applyConfig(c) {
   const next = new Map()
   for (const [name, def] of Object.entries(c.models ?? {})) {
@@ -355,7 +365,7 @@ function applyConfig(c) {
   for (const [provider, def] of Object.entries(c.opencodeModels ?? {})) {
     const p = c.providers?.[provider]
     if (!p?.baseURL) continue
-    for (const model of def?.models ?? []) {
+    for (const model of directModelIds(p, def)) {
       const exposed = `${provider}/${model}`
       if (next.has(exposed)) continue // an explicitly configured chain wins
       next.set(exposed, [
@@ -795,7 +805,7 @@ function syncOpencode() {
   const directEntries = []
   for (const [provider, def] of enabled ? Object.entries(config.opencodeModels ?? {}) : []) {
     if (def?.enabled === false || !config.providers?.[provider]?.baseURL) continue
-    for (const model of def?.models ?? []) {
+    for (const model of directModelIds(config.providers?.[provider], def)) {
       const name = `${provider}/${model}`
       if (chainNames.has(name)) continue
       const old = prev[name] ?? {}
@@ -1281,7 +1291,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json" })
       const enabled = config.integrations?.opencode?.enabled !== false
       const models = enabled
-        ? Object.values(config.models ?? {}).filter((def) => def?.enabled !== false).length + Object.entries(config.opencodeModels ?? {}).reduce((n, [, def]) => n + (def?.enabled === false ? 0 : (def?.models ?? []).length), 0)
+        ? Object.values(config.models ?? {}).filter((def) => def?.enabled !== false).length + Object.entries(config.opencodeModels ?? {}).reduce((n, [provider, def]) => n + (def?.enabled === false ? 0 : directModelIds(config.providers?.[provider], def).length), 0)
         : 0
       return res.end(JSON.stringify({ ok, enabled, models }))
     }

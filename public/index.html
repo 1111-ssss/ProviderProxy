@@ -108,7 +108,7 @@
   .card:hover { border-color: #40536a; }
   .card.chain-disabled { border-color: rgba(113, 129, 149, .38); background: linear-gradient(135deg, rgba(24, 31, 40, .78), rgba(20, 26, 34, .72)); }
   .card.chain-disabled .model-title, .card.chain-disabled .step .prov { color: #9ba8b8; }
-  .chain-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; order: 3; margin-left: 0; padding: 5px 10px 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; user-select: none; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+  .chain-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; order: 3; margin-left: 0; min-height: 38px; padding: 5px 10px 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; user-select: none; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
   .chain-toggle:hover { transform: translateY(-1px); }
   .chain-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   .chain-toggle input:focus-visible + .chain-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -276,7 +276,8 @@
   .usage-day.empty { opacity: .58; }
   .search-field { position: relative; flex: 1 1 220px; min-width: 180px; }
   .search-field input { width: 100%; padding-right: 32px; }
-  .search-field::before { content: "⌕"; position: absolute; left: 11px; top: 7px; color: var(--faint); font-size: 18px; pointer-events: none; }
+  .search-field::before { content: ""; position: absolute; left: 11px; top: 9px; width: 11px; height: 11px; border: 1.6px solid var(--faint); border-radius: 50%; box-sizing: border-box; pointer-events: none; }
+  .search-field::after { content: ""; position: absolute; left: 21px; top: 19px; width: 6px; height: 1.6px; border-radius: 2px; background: var(--faint); transform: rotate(45deg); transform-origin: left center; pointer-events: none; }
   .search-field input { padding-left: 32px; }
   .search-clear { position: absolute; right: 4px; top: 4px; min-height: 30px; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); }
   .search-clear:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--text); }
@@ -342,9 +343,14 @@
   .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
   .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
   .direct-model-card .model-card-head { min-height: 38px; }
+  .direct-model-card .chain-toggle { width: 134px; justify-content: flex-start; }
+  #models .chain-toggle { width: 134px; justify-content: flex-start; }
   .direct-model-card .provider-model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-top: 14px; }
   .direct-model-card .opencode-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 10px; background: rgba(19, 27, 36, .72); }
   .direct-model-card .opencode-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chain .step { min-width: 0; }
+  .chain .chain-model { min-width: 0; }
+  .chain .chain-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
   .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .image-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
@@ -624,11 +630,11 @@
     <div class="opencode-panel integration-card">
       <div class="opencode-panel-head">
         <div>
-          <h3>OpenCode</h3>
+          <h3>Интеграция</h3>
           <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
         <div class="integration-actions">
-          <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию OpenCode">
+          <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию">
             <input id="opencode-enabled" type="checkbox" checked>
             <span class="chain-switch" aria-hidden="true"></span>
             <span class="chain-toggle-text">Включена<small>модели публикуются</small></span>
@@ -640,12 +646,12 @@
         <label>Файл конфигурации
           <input id="oc-path" placeholder="~/.config/opencode/opencode.jsonc">
         </label>
-        <label>Имя провайдера в OpenCode
+        <label>Имя провайдера
           <input id="oc-provider" placeholder="provider-proxy">
         </label>
       </div>
       <div class="opencode-preview-head">
-        <span class="muted">Будет добавлено в OpenCode</span>
+        <span class="muted">Будет добавлено в конфигурацию</span>
         <span id="oc-status" class="muted"></span>
       </div>
       <div id="oc-preview" class="opencode-preview"></div>
@@ -671,7 +677,7 @@
       <h2>4&nbsp;·&nbsp;Цепочки</h2>
       <button class="primary" id="m-add">+ Добавить цепочку</button>
     </div>
-    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации в OpenCode.</p>
+    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации.</p>
     <div id="models"></div>
   </section>
 
@@ -680,7 +686,7 @@
       <h2>5&nbsp;·&nbsp;Модели</h2>
       <button class="primary" id="om-add">+ Добавить модель</button>
     </div>
-    <p class="section-sub">Выбери провайдера и модели, которые нужно показать в OpenCode без цепочки. В OpenCode они появятся в виде <code>provider/model (config)</code>.</p>
+    <p class="section-sub">Выбери провайдера и модели, которые нужно использовать без цепочки. В подключённой интеграции они будут доступны как <code>provider/model</code>.</p>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
@@ -841,7 +847,7 @@
       </div>
       <div class="settings-block">
         <h3>Подключение</h3>
-        <p>Используй этот адрес в OpenCode или другом клиенте.</p>
+        <p>Используй этот адрес в клиенте или другом инструменте.</p>
         <label>Base URL прокси
           <code id="s-base-url" class="settings-value">—</code>
         </label>
@@ -960,10 +966,10 @@
       <p id="dm-help">Сначала задай внешний ID модели, затем добавь провайдеры в порядке приоритета.</p>
     </div>
     <div class="dialog-body">
-      <label>Имя модели в OpenCode
+      <label>Имя модели
         <input id="dm-name" required placeholder="claude-sonnet" aria-describedby="dm-name-help">
       </label>
-      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">В OpenCode модель будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
+      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">Модель будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
 
       <section class="dialog-section" aria-labelledby="dm-chain-title">
         <div class="dialog-section-head">
@@ -1012,11 +1018,11 @@
   </form>
 </dialog>
 
-<!-- Диалог: модель напрямую в OpenCode -->
+<!-- Диалог: прямая модель -->
 <dialog id="dlg-opencode-model" aria-labelledby="dom-title" aria-describedby="dom-help">
   <form method="dialog" id="dom-form" class="dialog-form">
     <div class="dialog-header">
-      <h3 id="dom-title">Добавить модель в OpenCode</h3>
+      <h3 id="dom-title">Добавить модель</h3>
       <p id="dom-help">Выбери провайдера, затем одну или несколько моделей из списка вкладки «Подключения».</p>
     </div>
     <div class="dialog-body">
@@ -1039,7 +1045,6 @@
         <div class="dialog-section-head">
           <div>
             <h4>Модели провайдера</h4>
-            <p>В OpenCode каждая модель будет записана как <code>provider/model (config)</code>.</p>
           </div>
           <span id="dom-count" class="dialog-count"></span>
         </div>
@@ -1125,6 +1130,10 @@ const isImageModel = (provider, id) => {
   const endpoints = Array.isArray(info?.endpoints) ? info.endpoints : []
   return info?.image === true || String(info?.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
 }
+const directModelIds = (provider, definition = cfg.opencodeModels?.[provider]) => {
+  const ids = definition?.all === true ? (cfg.providers[provider]?.models ?? []) : (definition?.models ?? [])
+  return [...new Set(ids.filter((id) => !isImageModel(provider, id)))]
+}
 const imageModelEndpoint = (provider, id) => (modelDetails(provider, id)?.endpoints ?? []).find((endpoint) => /images\/generations/i.test(String(endpoint))) ? "images/generations" : "images/tasks"
 const imageIcon = (label = "Модель изображений") => `<span class="model-kind-icon" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5-5 3 3 2-2 6 5"></path></svg></span>`
 function mergeProviderModelDetails(provider, details) {
@@ -1177,6 +1186,17 @@ const contextLabel = (info) => {
 const contextBadge = (provider, id) => {
   const context = contextLabel(modelDetails(provider, id))
   return context ? `<span class="model-context">контекст ${esc(context)}</span>` : ""
+}
+const modelContextSuffix = (provider, id) => {
+  const context = contextLabel(modelDetails(provider, id))
+  return context ? `<span class="model-context">(ctx ${esc(context)})</span>` : ""
+}
+const chainContextBadge = (upstreams) => {
+  const contexts = upstreams
+    .map((upstream) => contextValues(modelDetails(upstream.provider, upstream.model)).current)
+    .filter((value) => Number.isSafeInteger(value) && value > 0)
+  if (!contexts.length) return ""
+  return `<span class="pill model-context-pill">контекст ${esc(formatContext(Math.min(...contexts)))}</span>`
 }
 const availabilityBadge = (provider, id) => {
   const status = cfg.providers[provider]?.modelAvailability?.[id]
@@ -1270,6 +1290,9 @@ function cleanupModelMetadata() {
   }
 }
 function save() {
+  for (const [provider, definition] of Object.entries(cfg.opencodeModels ?? {})) {
+    if (definition?.all === true) definition.models = directModelIds(provider, definition)
+  }
   cleanupModelMetadata()
   clearTimeout(saveT)
   debugLog("save-scheduled")
@@ -1282,7 +1305,7 @@ function save() {
     }
     const j = await r.json().catch(() => ({}))
     debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
-    if (j.opencodeSynced === false) return flash(false, "сохранено, но OpenCode не обновлён — проверь путь и вкладку «Логи»")
+    if (j.opencodeSynced === false) return flash(false, "сохранено, но интеграция не обновлена — проверь путь и вкладку «Логи»")
     flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено ✓")
   }, 300)
 }
@@ -1344,11 +1367,11 @@ function renderModels() {
     div.innerHTML = `
       <div class="model-card-head">
         <b class="model-title">proxy/${esc(name)}</b>
-        <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>
-        <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из OpenCode" : "Вернуть цепочку в OpenCode"}">
+        <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
+        <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}">
           <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
           <span class="chain-switch" aria-hidden="true"></span>
-          <span class="chain-toggle-text">${enabled ? "В OpenCode" : "Скрыта"}<small>${enabled ? "цепочка активна" : "не публикуется"}</small></span>
+          <span class="chain-toggle-text">${enabled ? "Активна" : "Скрыта"}</span>
         </label>
         <div class="model-actions">
           <button type="button" data-a="edit">Изменить</button>
@@ -1361,7 +1384,7 @@ function renderModels() {
               .map(
                 (u, i) => `
                 <div class="step">
-                  <span class="n">${i + 1}.</span><span class="prov">${esc(u.provider ?? "")}</span><span>→</span><code>${esc(u.model ?? "")}</code>${contextBadge(u.provider, u.model)}${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
+                  <span class="n">${i + 1}.</span><span class="opencode-model chain-model"><strong>${esc(u.provider ?? "")}/${esc(u.model ?? "")}</strong></span>${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
         </div>`,
               )
               .join("")
@@ -1464,7 +1487,7 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
    }
    const expanded = previewExpanded.has(id)
    const visible = expanded ? entries : entries.slice(0, 10)
-   box.innerHTML = visible.map(([name, suffix]) => `<div class="opencode-model"><strong>${esc(name)}</strong><span>(${esc(suffix)})</span></div>`).join("")
+   box.innerHTML = visible.map(([name, suffix]) => `<div class="opencode-model"><strong>${esc(name)}</strong>${suffix ? `<span>(${esc(suffix)})</span>` : ""}</div>`).join("")
    if (entries.length > 15) {
      const toggle = document.createElement("button")
      toggle.type = "button"
@@ -1485,8 +1508,8 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
    $("oc-path").value = path
    $("oc-provider").value = provider
   const chains = Object.entries(cfg.models).filter(([, def]) => def.enabled !== false)
-  const direct = Object.entries(cfg.opencodeModels ?? {}).flatMap(([provider, def]) =>
-    def?.enabled === false ? [] : (def?.models ?? []).map((model) => [`${provider}/${model}`, "config"]),
+   const direct = Object.entries(cfg.opencodeModels ?? {}).flatMap(([provider, def]) =>
+      def?.enabled === false ? [] : directModelIds(provider, def).map((model) => [`${provider}/${model}`, ""]),
   )
   const entries = [...chains.map(([name, def]) => [name, `proxy, x${(def.upstreams ?? []).length}`]), ...direct]
   const status = entries.length ? `${entries.length} ${entries.length === 1 ? "модель" : "моделей"}` : "пока пусто"
@@ -1494,7 +1517,7 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
   $("oc-status").textContent = enabled ? status : "интеграция выключена"
   $("opencode-enabled").checked = enabled
   $("opencode-toggle").className = `chain-toggle ${enabled ? "is-on" : "is-off"}`
-  $("opencode-toggle").title = enabled ? "Выключить интеграцию OpenCode" : "Включить интеграцию OpenCode"
+  $("opencode-toggle").title = enabled ? "Выключить интеграцию" : "Включить интеграцию"
   $("opencode-toggle").querySelector(".chain-toggle-text").innerHTML = enabled ? "Включена<small>модели публикуются</small>" : "Выключена<small>модели не публикуются</small>"
   if (enabled) renderOpenCodePreview("oc-preview", entries)
   else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
@@ -1509,19 +1532,19 @@ function renderOpencodeModels() {
     ? entries
         .map(([provider, def]) => {
           const enabled = def?.enabled !== false
-          const ids = def?.models ?? []
+           const ids = directModelIds(provider, def)
            return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
               <span class="pill ${ids.length ? "" : "empty"}">${ids.length} моделей</span>
-              <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из OpenCode" : "Вернуть модели провайдера в OpenCode"}">
+              <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}">
                 <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
                 <span class="chain-switch" aria-hidden="true"></span>
-                <span class="chain-toggle-text">${enabled ? "В OpenCode" : "Скрыт"}<small>${enabled ? "провайдер активен" : "не публикуется"}</small></span>
+                <span class="chain-toggle-text">${enabled ? "Активен" : "Скрыт"}</span>
               </label>
                <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
             </div>
-            <div class="provider-model-list">${ids.length ? ids.map((id) => `<span class="opencode-model"><strong>${esc(provider)}/${esc(id)}</strong><span>(config)</span></span>`).join("") : `<span class="muted">модели не выбраны — нажми «Изменить»</span>`}</div>
+             <div class="provider-model-list">${ids.length ? ids.map((id) => `<span class="opencode-model"><strong>${esc(id)}</strong>${modelContextSuffix(provider, id)}</span>`).join("") : `<span class="muted">модели не выбраны — нажми «Изменить»</span>`}</div>
           </div>`
         })
         .join("")
@@ -1635,7 +1658,7 @@ async function importConfigFile(file) {
     cfg.opencodeModels ??= {}
     renderAll()
     applyTheme(appSettings().theme)
-    flash(true, payload.opencodeSynced === false ? "импортирован, но OpenCode не обновлён" : "конфиг импортирован ✓; перезапуск")
+    flash(true, payload.opencodeSynced === false ? "импортирован, но интеграция не обновлена" : "конфиг импортирован ✓; перезапуск")
     setTimeout(() => {
       if (isDesktopApp()) tauriInvoke("restart_app")
       else window.location.reload()
@@ -2145,7 +2168,7 @@ $("m-add").onclick = () => openModelDialog()
 const syncOpenCode = async () => {
   const r = await api("/api/opencode-sync", { method: "POST" })
   const j = await r.json().catch(() => ({}))
-  flash(!!j.ok, j.ok ? (j.enabled === false ? "OpenCode: интеграция выключена" : `OpenCode: провайдер и ${j.models} моделей добавлены`) : "OpenCode: не обновилось — смотри вкладку «Логи»")
+  flash(!!j.ok, j.ok ? (j.enabled === false ? "Интеграция выключена" : `Провайдер и ${j.models} моделей добавлены`) : "Интеграция не обновилась — смотри вкладку «Логи»")
 }
 $("opencode-sync").onclick = syncOpenCode
 $("dm-cancel").onclick = () => dlgModel.close()
@@ -2168,13 +2191,14 @@ dlgModel.addEventListener("close", () => {
 // ---------- прямые модели OpenCode ----------
 
 const dlgOpenCodeModel = $("dlg-opencode-model")
-let directDraft = null // { provider, models, filter, providerFilter }
+let directDraft = null // { provider, models, all, filter, providerFilter }
 
 function openOpenCodeModelDialog(provider = null) {
   const names = Object.keys(cfg.providers)
   const selectedProvider = provider ?? names[0] ?? ""
-  const current = (cfg.opencodeModels?.[selectedProvider]?.models ?? []).filter((id) => !isImageModel(selectedProvider, id))
-  directDraft = { provider: selectedProvider, models: [...current], filter: "", providerFilter: "" }
+   const definition = cfg.opencodeModels?.[selectedProvider]
+   const current = directModelIds(selectedProvider, definition)
+   directDraft = { provider: selectedProvider, models: [...current], all: definition?.all === true, filter: "", providerFilter: "" }
   dlgOpenCodeModel.returnValue = ""
   renderOpenCodeModelDialog()
   dlgOpenCodeModel.showModal()
@@ -2213,21 +2237,25 @@ function renderOpenCodeModelDialog() {
   $("dom-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
       directDraft.provider = button.dataset.provider
-      directDraft.models = [...(cfg.opencodeModels?.[directDraft.provider]?.models ?? [])]
+       const definition = cfg.opencodeModels?.[directDraft.provider]
+       directDraft.models = directModelIds(directDraft.provider, definition)
+       directDraft.all = definition?.all === true
       directDraft.filter = ""
       renderOpenCodeModelDialog()
     }
   })
   const p = cfg.providers[directDraft.provider]
-  const all = (p?.models ?? []).filter((id) => !isImageModel(directDraft.provider, id))
+   const all = directModelIds(directDraft.provider, { models: p?.models ?? [], all: true })
+   if (directDraft.all) directDraft.models = [...all]
   const filter = directDraft.filter.trim().toLowerCase()
   const ids = all.filter((id) => id.toLowerCase().includes(filter))
   $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
   const selectAll = $("dom-select-all")
-  selectAll.checked = all.length > 0 && directDraft.models.length === all.length
-  selectAll.indeterminate = directDraft.models.length > 0 && directDraft.models.length < all.length
-  selectAll.onchange = () => {
-    directDraft.models = selectAll.checked ? [...all] : []
+   selectAll.checked = all.length > 0 && directDraft.all === true
+   selectAll.indeterminate = directDraft.all !== true && directDraft.models.length > 0 && directDraft.models.length < all.length
+   selectAll.onchange = () => {
+     directDraft.all = selectAll.checked
+     directDraft.models = selectAll.checked ? [...all] : []
     renderOpenCodeModelDialog()
   }
   $("dom-model-list").innerHTML = ids.length
@@ -2239,8 +2267,9 @@ function renderOpenCodeModelDialog() {
     : `<span class="muted">${all.length ? "ничего не найдено" : "у провайдера нет выбранных моделей — добавь их на вкладке «Подключения»"}</span>`
   $("dom-model-list").querySelectorAll("input[data-id]").forEach((cb) => {
     cb.onchange = () => {
-      const id = cb.dataset.id
-      const i = directDraft.models.indexOf(id)
+       const id = cb.dataset.id
+       const i = directDraft.models.indexOf(id)
+       directDraft.all = false
       if (cb.checked && i < 0) directDraft.models.push(id)
       if (!cb.checked && i >= 0) directDraft.models.splice(i, 1)
       $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
@@ -2268,7 +2297,10 @@ dlgOpenCodeModel.addEventListener("close", () => {
   if (dlgOpenCodeModel.returnValue !== "save" || !directDraft?.provider) return
   cfg.opencodeModels ??= {}
   const prev = cfg.opencodeModels[directDraft.provider] ?? {}
-  cfg.opencodeModels[directDraft.provider] = { ...prev, models: [...new Set(directDraft.models.filter((id) => !isImageModel(directDraft.provider, id)))] }
+   const next = { ...prev, models: [...new Set(directDraft.models.filter((id) => !isImageModel(directDraft.provider, id)))] }
+   if (directDraft.all) next.all = true
+   else delete next.all
+   cfg.opencodeModels[directDraft.provider] = next
   save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
 })
 
@@ -2411,7 +2443,7 @@ function removeModelReferences(provider, id) {
   const direct = cfg.opencodeModels?.[provider]
   if (direct) {
     const models = Array.isArray(direct.models) ? direct.models : []
-    const next = models.filter((model) => model !== id)
+    const next = direct.all === true ? directModelIds(provider, direct) : models.filter((model) => model !== id)
     if (next.length !== models.length) changed = true
     if (next.length) direct.models = next
     else {

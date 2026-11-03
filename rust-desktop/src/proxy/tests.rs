@@ -58,16 +58,17 @@ fn loads_only_the_last_seven_calendar_days_of_usage() {
 fn builds_chain_and_direct_models_from_config() {
     let config = json!({
         "providers": {
-            "a": { "baseURL": "https://a.example/v1", "apiKey": "ka" }
+            "a": { "baseURL": "https://a.example/v1", "apiKey": "ka", "models": ["direct", "new"] }
         },
         "models": {
             "proxy-model": { "upstreams": [{ "provider": "a", "model": "a-model" }] }
         },
-        "opencodeModels": { "a": { "models": ["direct"] } }
+        "opencodeModels": { "a": { "all": true, "models": ["direct"] } }
     });
     let chains = build_chains(&config);
     assert_eq!(chains["proxy-model"][0].model, "a-model");
     assert_eq!(chains["a/direct"][0].base_url, "https://a.example/v1");
+    assert_eq!(chains["a/new"][0].model, "new");
 }
 
 #[test]

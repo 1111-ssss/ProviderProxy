@@ -45,6 +45,42 @@ pub(crate) fn map_headers(value: Option<&Value>) -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
+fn is_image_model(provider: &Value, id: &str) -> bool {
+    let info = provider
+        .get("modelInfo")
+        .and_then(|models| models.get(id));
+    let endpoints = info.and_then(|model| model.get("endpoints")).and_then(Value::as_array);
+    info.and_then(|model| model.get("image")).and_then(Value::as_bool) == Some(true)
+        || info
+            .and_then(|model| model.get("type"))
+            .and_then(Value::as_str)
+            .is_some_and(|kind| kind.eq_ignore_ascii_case("image"))
+        || endpoints.is_some_and(|items| {
+            items.iter().filter_map(Value::as_str).any(|endpoint| {
+                endpoint.to_ascii_lowercase().contains("images/generations")
+                    || endpoint.to_ascii_lowercase().contains("images/tasks")
+            })
+        })
+        || id.to_ascii_lowercase().contains("image")
+}
+
+pub(crate) fn direct_model_ids(provider: &Value, definition: &Value) -> Vec<String> {
+    let all = definition.get("all").and_then(Value::as_bool) == Some(true);
+    let models = if all {
+        provider.get("models")
+    } else {
+        definition.get("models")
+    };
+    models
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|id| !all || !is_image_model(provider, id))
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
 pub(crate) fn build_chains(config: &Value) -> HashMap<String, Vec<Upstream>> {
     let mut result = HashMap::new();
     let providers = config.get("providers").and_then(Value::as_object);
@@ -91,19 +127,13 @@ pub(crate) fn build_chains(config: &Value) -> HashMap<String, Vec<Upstream>> {
             let Some(base_url) = string_field(provider, "baseURL") else {
                 continue;
             };
-            for model in definition
-                .get("models")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-            {
+            for model in direct_model_ids(provider, definition) {
                 let exposed = format!("{provider_name}/{model}");
                 result.entry(exposed).or_insert_with(|| {
                     vec![Upstream {
                         name: provider_name.clone(),
                         base_url: base_url.trim_end_matches('/').to_string(),
-                        model: model.to_string(),
+                        model,
                         api_key: subst(&string_field(provider, "apiKey").unwrap_or_default()),
                         headers: map_headers(provider.get("headers")),
                     }]
