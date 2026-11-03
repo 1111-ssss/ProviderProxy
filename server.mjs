@@ -752,6 +752,7 @@ function applyModelContext(entry, context) {
 function syncOpencode() {
   const path = resolveOpencodeConfigPath()
   const id = config.opencodeProvider ?? "provider-proxy"
+  const enabled = config.integrations?.opencode?.enabled !== false
   let raw
   try {
     raw = readFileSync(path, "utf8")
@@ -780,7 +781,7 @@ function syncOpencode() {
   if (AUTH) p.settings.apiKey = AUTH
   const prev = p.models ?? {}
   p.models = {}
-  const enabledEntries = Object.entries(config.models ?? {}).filter(([, def]) => def?.enabled !== false)
+  const enabledEntries = enabled ? Object.entries(config.models ?? {}).filter(([, def]) => def?.enabled !== false) : []
   const chainNames = new Set(enabledEntries.map(([name]) => name))
   for (const [name, def] of enabledEntries) {
     const chain = chains.get(name) ?? []
@@ -792,7 +793,7 @@ function syncOpencode() {
     applyModelContext(p.models[name], chainContextLength(chain))
   }
   const directEntries = []
-  for (const [provider, def] of Object.entries(config.opencodeModels ?? {})) {
+  for (const [provider, def] of enabled ? Object.entries(config.opencodeModels ?? {}) : []) {
     if (def?.enabled === false || !config.providers?.[provider]?.baseURL) continue
     for (const model of def?.models ?? []) {
       const name = `${provider}/${model}`
@@ -808,7 +809,7 @@ function syncOpencode() {
   // rename() менял inode — opencode не подхватывал новые модели. Бэкап рядом, чтобы откатить руками.
   writeFileSync(path + ".bak", raw)
   writeFileSync(path, JSON.stringify(doc, null, 2) + "\n")
-  log(`opencode: ${enabledEntries.length + directEntries.length} моделей провайдера «${id}» записаны в ${path}`)
+  log(`opencode: ${enabled ? enabledEntries.length + directEntries.length : 0} моделей провайдера «${id}» записаны в ${path}${enabled ? "" : " (интеграция выключена)"}`)
   return true
 }
 
@@ -1278,8 +1279,11 @@ const server = http.createServer(async (req, res) => {
     if (req.url === "/api/opencode-sync" && req.method === "POST") {
       const ok = syncOpencode()
       res.writeHead(200, { "content-type": "application/json" })
-      const models = Object.values(config.models ?? {}).filter((def) => def?.enabled !== false).length + Object.entries(config.opencodeModels ?? {}).reduce((n, [, def]) => n + (def?.enabled === false ? 0 : (def?.models ?? []).length), 0)
-      return res.end(JSON.stringify({ ok, models }))
+      const enabled = config.integrations?.opencode?.enabled !== false
+      const models = enabled
+        ? Object.values(config.models ?? {}).filter((def) => def?.enabled !== false).length + Object.entries(config.opencodeModels ?? {}).reduce((n, [, def]) => n + (def?.enabled === false ? 0 : (def?.models ?? []).length), 0)
+        : 0
+      return res.end(JSON.stringify({ ok, enabled, models }))
     }
 
     if (req.url === "/api/logs" && req.method === "GET") {

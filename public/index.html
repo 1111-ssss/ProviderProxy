@@ -321,6 +321,8 @@
   .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .integration-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .integration-card .chain-toggle { margin: 0; }
   .opencode-config-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, .6fr); gap: 10px; margin-top: 14px; }
   .opencode-config-grid label { margin: 0; }
   .opencode-preview-head { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
@@ -330,6 +332,7 @@
   .opencode-model { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .65); }
   .opencode-model strong { color: #dbe7ff; font-size: 12px; }
   .opencode-model span { color: var(--muted); font-size: 11px; }
+  .opencode-panel .integration-skill-card { margin-top: 16px; }
   .model-context { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .model-warning { color: #f2c781; font-size: 11px; white-space: nowrap; cursor: help; }
   .check .model-context { margin-left: auto; }
@@ -536,26 +539,27 @@
       <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="connections"><span class="tab-index">02</span><span class="tab-label">Подключения</span></button>
+        <button data-tab="integrations"><span class="tab-index">03</span><span class="tab-label">Интеграции</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Модели">
       <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
-        <button data-tab="chains"><span class="tab-index">03</span><span class="tab-label">Цепочки</span></button>
-        <button data-tab="models"><span class="tab-index">04</span><span class="tab-label">Модели</span></button>
+        <button data-tab="chains"><span class="tab-index">04</span><span class="tab-label">Цепочки</span></button>
+        <button data-tab="models"><span class="tab-index">05</span><span class="tab-label">Модели</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Инструменты">
       <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
-        <button data-tab="images"><span class="tab-index">05</span><span class="tab-label">Изображения</span></button>
+        <button data-tab="images"><span class="tab-index">06</span><span class="tab-label">Изображения</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Статистика и логи">
       <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
-        <button data-tab="logs"><span class="tab-index">06</span><span class="tab-label">Логи</span></button>
-        <button data-tab="usage"><span class="tab-index">07</span><span class="tab-label">Статистика</span></button>
+        <button data-tab="logs"><span class="tab-index">07</span><span class="tab-label">Логи</span></button>
+        <button data-tab="usage"><span class="tab-index">08</span><span class="tab-label">Статистика</span></button>
       </div>
     </div>
         <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
@@ -612,50 +616,25 @@
     </div>
   </section>
 
-  <section data-tab="chains">
+  <section data-tab="integrations">
     <div class="section-head">
-      <h2>3&nbsp;·&nbsp;Цепочки</h2>
-      <button class="primary" id="m-add">+ Добавить цепочку</button>
+      <h2>3&nbsp;·&nbsp;Интеграции</h2>
     </div>
-    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации в OpenCode.</p>
-    <div class="opencode-panel">
+    <p class="section-sub">Подключения к внешним инструментам. Отключённая интеграция не публикует модели и цепочки в своём конфиге.</p>
+    <div class="opencode-panel integration-card">
       <div class="opencode-panel-head">
         <div>
-          <h3>Подключение к OpenCode</h3>
-          <p>Сюда записываются и прямые модели, и включённые цепочки.</p>
+          <h3>OpenCode</h3>
+          <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
-        <button id="chain-m-sync" type="button">Синхронизировать</button>
-      </div>
-      <div class="opencode-config-grid">
-        <label>Файл конфигурации
-          <input id="chain-oc-path" placeholder="~/.config/opencode/opencode.jsonc">
-        </label>
-        <label>Имя провайдера в OpenCode
-          <input id="chain-oc-provider" placeholder="provider-proxy">
-        </label>
-      </div>
-      <div class="opencode-preview-head">
-        <span class="muted">Будет добавлено в OpenCode</span>
-        <span id="chain-oc-status" class="muted"></span>
-      </div>
-      <div id="chain-oc-preview" class="opencode-preview"></div>
-    </div>
-    <div id="models"></div>
-  </section>
-
-  <section data-tab="models">
-    <div class="section-head">
-      <h2>4&nbsp;·&nbsp;Модели</h2>
-      <button class="primary" id="om-add">+ Добавить модель</button>
-    </div>
-    <p class="section-sub">Выбери провайдера и модели, которые нужно показать в OpenCode без цепочки. В OpenCode они появятся в виде <code>provider/model (config)</code>.</p>
-    <div class="opencode-panel">
-      <div class="opencode-panel-head">
-        <div>
-          <h3>Подключение к OpenCode</h3>
-          <p>Сюда записываются и прямые модели, и включённые цепочки.</p>
+        <div class="integration-actions">
+          <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию OpenCode">
+            <input id="opencode-enabled" type="checkbox" checked>
+            <span class="chain-switch" aria-hidden="true"></span>
+            <span class="chain-toggle-text">Включена<small>модели публикуются</small></span>
+          </label>
+          <button id="opencode-sync" type="button">Синхронизировать</button>
         </div>
-        <button id="m-sync" type="button">Синхронизировать</button>
       </div>
       <div class="opencode-config-grid">
         <label>Файл конфигурации
@@ -670,13 +649,44 @@
         <span id="oc-status" class="muted"></span>
       </div>
       <div id="oc-preview" class="opencode-preview"></div>
+      <div class="skill-card integration-skill-card">
+        <div class="skill-card-head">
+          <div>
+            <h3>Skill генерации изображений</h3>
+            <p>Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
+          </div>
+          <span id="image-skill-status" class="skill-status">проверяю…</span>
+        </div>
+        <div id="image-skill-path" class="skill-path">—</div>
+        <div class="row">
+          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
+          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
+        </div>
+      </div>
     </div>
+  </section>
+
+  <section data-tab="chains">
+    <div class="section-head">
+      <h2>4&nbsp;·&nbsp;Цепочки</h2>
+      <button class="primary" id="m-add">+ Добавить цепочку</button>
+    </div>
+    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации в OpenCode.</p>
+    <div id="models"></div>
+  </section>
+
+  <section data-tab="models">
+    <div class="section-head">
+      <h2>5&nbsp;·&nbsp;Модели</h2>
+      <button class="primary" id="om-add">+ Добавить модель</button>
+    </div>
+    <p class="section-sub">Выбери провайдера и модели, которые нужно показать в OpenCode без цепочки. В OpenCode они появятся в виде <code>provider/model (config)</code>.</p>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
   <section data-tab="images">
     <div class="section-head">
-      <h2>5&nbsp;·&nbsp;Генерация изображений</h2>
+      <h2>6&nbsp;·&nbsp;Генерация изображений</h2>
       <div class="image-section-actions">
         <span class="muted" id="ig-status"></span>
         <button id="ig-settings-open" class="settings-button image-settings-button" type="button" aria-label="Настройки изображений" title="Настройки изображений">
@@ -746,7 +756,7 @@
 
   <section data-tab="logs">
     <div class="section-head">
-        <h2>6&nbsp;·&nbsp;Логи</h2>
+        <h2>7&nbsp;·&nbsp;Логи</h2>
       <span class="muted" id="log-info"></span>
     </div>
     <p class="section-sub">Живой хвост вывода прокси. Держится в памяти и чистится само — старые строки вытесняются новыми.</p>
@@ -755,7 +765,7 @@
 
   <section data-tab="usage">
     <div class="section-head">
-        <h2>7&nbsp;·&nbsp;Статистика</h2>
+        <h2>8&nbsp;·&nbsp;Статистика</h2>
       <span class="muted" id="u-info"></span>
     </div>
     <p class="section-sub">История сохраняется локально за последние 7 дней и не сбрасывается при перезапуске. Токены видны, когда upstream их присылает.</p>
@@ -808,7 +818,7 @@
   <section data-tab="settings" class="settings-page">
     <div class="section-head">
       <div>
-        <h2>8&nbsp;·&nbsp;Настройки</h2>
+        <h2>9&nbsp;·&nbsp;Настройки</h2>
         <p class="section-sub" style="margin-bottom:0">Параметры прокси, внешний вид приложения и обновления разделены по группам.</p>
       </div>
     </div>
@@ -1072,23 +1082,9 @@
   <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
     <div class="dialog-header">
       <h3 id="image-settings-title">Настройки изображений</h3>
-      <p id="image-settings-help">Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
+      <p id="image-settings-help">Выбери провайдера и модель, которые будут использоваться по умолчанию.</p>
     </div>
     <div class="dialog-body">
-      <div class="skill-card">
-        <div class="skill-card-head">
-          <div>
-            <h4>Skill для harness</h4>
-            <p>Инструкции для модели: использовать генерацию изображений, ждать асинхронный результат, сохранять локальный путь и не раскрывать ключи.</p>
-          </div>
-          <span id="image-skill-status" class="skill-status">проверяю…</span>
-        </div>
-        <div id="image-skill-path" class="skill-path">—</div>
-        <div class="row">
-          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
-          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
-        </div>
-      </div>
       <div class="skill-card">
         <div class="skill-card-head">
           <div>
@@ -1486,17 +1482,22 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
  function renderOpenCode() {
   const path = cfg.opencodeConfig ?? DEFAULT_OPENCODE_CONFIG
   const provider = cfg.opencodeProvider ?? DEFAULT_OPENCODE_PROVIDER
-  for (const id of ["oc-path", "chain-oc-path"]) $(id).value = path
-  for (const id of ["oc-provider", "chain-oc-provider"]) $(id).value = provider
+   $("oc-path").value = path
+   $("oc-provider").value = provider
   const chains = Object.entries(cfg.models).filter(([, def]) => def.enabled !== false)
   const direct = Object.entries(cfg.opencodeModels ?? {}).flatMap(([provider, def]) =>
     def?.enabled === false ? [] : (def?.models ?? []).map((model) => [`${provider}/${model}`, "config"]),
   )
   const entries = [...chains.map(([name, def]) => [name, `proxy, x${(def.upstreams ?? []).length}`]), ...direct]
   const status = entries.length ? `${entries.length} ${entries.length === 1 ? "модель" : "моделей"}` : "пока пусто"
-  for (const id of ["oc-status", "chain-oc-status"]) $(id).textContent = status
-  renderOpenCodePreview("oc-preview", entries)
-  renderOpenCodePreview("chain-oc-preview", entries)
+  const enabled = cfg.integrations?.opencode?.enabled !== false
+  $("oc-status").textContent = enabled ? status : "интеграция выключена"
+  $("opencode-enabled").checked = enabled
+  $("opencode-toggle").className = `chain-toggle ${enabled ? "is-on" : "is-off"}`
+  $("opencode-toggle").title = enabled ? "Выключить интеграцию OpenCode" : "Включить интеграцию OpenCode"
+  $("opencode-toggle").querySelector(".chain-toggle-text").innerHTML = enabled ? "Включена<small>модели публикуются</small>" : "Выключена<small>модели не публикуются</small>"
+  if (enabled) renderOpenCodePreview("oc-preview", entries)
+  else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
 }
 
 function renderOpencodeModels() {
@@ -1823,7 +1824,6 @@ const imageSkillInstallButton = $("image-skill-install")
 $("ig-settings-open").onclick = () => {
   dlgImageSettings.showModal()
   renderImageSettings()
-  loadImageSkillStatus()
 }
 $("image-settings-cancel").onclick = () => dlgImageSettings.close()
 
@@ -1876,17 +1876,27 @@ async function installImageSkill(overwrite = false) {
 
 imageSkillInstallButton.onclick = () => installImageSkill()
 
-for (const id of ["oc-path", "chain-oc-path"]) $(id).onchange = (e) => {
+$("oc-path").onchange = (e) => {
   const value = e.target.value.trim()
   if (value && value !== DEFAULT_OPENCODE_CONFIG) cfg.opencodeConfig = value
   else delete cfg.opencodeConfig
   renderOpenCode(); save()
 }
-for (const id of ["oc-provider", "chain-oc-provider"]) $(id).onchange = (e) => {
+$("oc-provider").onchange = (e) => {
   const value = e.target.value.trim()
   if (value && value !== DEFAULT_OPENCODE_PROVIDER) cfg.opencodeProvider = value
   else delete cfg.opencodeProvider
   renderOpenCode(); save()
+}
+$("opencode-toggle").onclick = (event) => {
+  event.preventDefault()
+  const enabled = cfg.integrations?.opencode?.enabled !== false
+  cfg.integrations ??= {}
+  cfg.integrations.opencode ??= {}
+  if (enabled) cfg.integrations.opencode.enabled = false
+  else delete cfg.integrations.opencode.enabled
+  renderOpenCode()
+  save()
 }
 
 const num = (id, key) => ($(id).onchange = (e) => { cfg[key] = Number(e.target.value) || undefined; save() })
@@ -2135,10 +2145,9 @@ $("m-add").onclick = () => openModelDialog()
 const syncOpenCode = async () => {
   const r = await api("/api/opencode-sync", { method: "POST" })
   const j = await r.json().catch(() => ({}))
-  flash(!!j.ok, j.ok ? `OpenCode: провайдер и ${j.models} моделей добавлены` : "OpenCode: не обновилось — смотри вкладку «Логи»")
+  flash(!!j.ok, j.ok ? (j.enabled === false ? "OpenCode: интеграция выключена" : `OpenCode: провайдер и ${j.models} моделей добавлены`) : "OpenCode: не обновилось — смотри вкладку «Логи»")
 }
-$("m-sync").onclick = syncOpenCode
-$("chain-m-sync").onclick = syncOpenCode
+$("opencode-sync").onclick = syncOpenCode
 $("dm-cancel").onclick = () => dlgModel.close()
 
 $("dm-form").addEventListener("submit", (e) => {
@@ -2720,7 +2729,7 @@ $("ig-clear").onclick = () => {
 
 // ---------- вкладки ----------
 
-const TABS = ["providers", "connections", "chains", "models", "images", "logs", "usage", "settings"]
+const TABS = ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "settings"]
 let tab = localStorage.getItem("pp_tab") ?? "providers"
 
 const navigation = document.querySelector("main")
@@ -2769,6 +2778,7 @@ function showTab(name) {
   })
   document.querySelectorAll("main > section[data-tab]").forEach((s) => (s.style.display = s.dataset.tab === name ? "" : "none"))
   if (name === "settings") renderSettings()
+  if (name === "integrations") loadImageSkillStatus()
   if (name === "logs") loadLogs()
   if (name === "usage") loadUsage()
 }

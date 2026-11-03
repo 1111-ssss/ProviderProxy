@@ -72,6 +72,10 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.match(html, /class="settings-nav-button" data-tab="settings"/)
     assert.ok(!html.includes('data-group="settings"'), "settings should be outside collapsible groups")
     assert.ok(!html.includes('<h1>Provider Proxy</h1>'), "redundant page title should be removed")
+    const integrationStart = html.indexOf('<div class="opencode-panel integration-card">')
+    const chainsStart = html.indexOf('<section data-tab="chains">', integrationStart)
+    const integrationPanel = integrationStart >= 0 && chainsStart > integrationStart ? html.slice(integrationStart, chainsStart) : ""
+    assert.ok(integrationPanel?.includes('class="skill-card integration-skill-card"'), "image skill should live inside the OpenCode panel")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {

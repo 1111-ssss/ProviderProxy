@@ -288,6 +288,7 @@ rm -f "$HOME/.local/share/applications/provider-proxy.desktop" \
 | `models.<имя>.upstreams[]` | цепочка: `provider` (имя из `providers`), `model` (реальный ID модели у провайдера) |
 | `opencodeModels.<провайдер>.models` | выбранные модели провайдера, которые публикуются в OpenCode напрямую как `<провайдер>/<модель>` |
 | `opencodeModels.<провайдер>.enabled` | `false` временно скрывает прямые модели этого провайдера из OpenCode; если поле отсутствует, они включены |
+| `integrations.opencode.enabled` | `false` выключает публикацию моделей и цепочек в OpenCode; если поле отсутствует, интеграция включена |
 | `opencodeConfig` / `opencodeProvider` | куда и в какой провайдер писать карту моделей для opencode (по умолчанию `~/.config/opencode/opencode.jsonc` и `provider-proxy`) |
 | `imageSettings.defaultProvider` / `imageSettings.defaultModel` | image-провайдер и модель, которые выбираются по умолчанию в GUI и рекомендуются skill |
 | `providers.<имя>.models` (image-модели) | единый список разрешённых моделей для вкладки изображений и LLM через skill; выбирается в «Подключениях». Старое поле `imageSettings.skillModels` игнорируется |
