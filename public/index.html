@@ -27,6 +27,9 @@
     --section-background: rgba(23, 30, 39, .92);
     --control-background: var(--surface);
     --control-hover: var(--surface-hover);
+    --primary-text: #07101f;
+    --primary-hover: #84aaff;
+    --disabled-background: var(--surface);
   }
   body[data-theme="light"] {
     color-scheme: light;
@@ -47,6 +50,11 @@
     --shadow: 0 20px 60px rgba(31, 55, 80, .15);
     --body-background: radial-gradient(circle at 50% -20%, #ffffff 0, var(--bg) 58%);
     --section-background: rgba(255, 255, 255, .9);
+    --control-background: #ffffff;
+    --control-hover: #f1f5f9;
+    --primary-text: #ffffff;
+    --primary-hover: #3f73ca;
+    --disabled-background: #eef2f6;
   }
   @media (prefers-color-scheme: light) {
     body[data-theme="system"] {
@@ -58,6 +66,8 @@
       --shadow: 0 20px 60px rgba(31, 55, 80, .15);
       --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%);
       --section-background: rgba(255, 255, 255, .9);
+      --control-background: #ffffff; --control-hover: #f1f5f9;
+      --primary-text: #ffffff; --primary-hover: #3f73ca; --disabled-background: #eef2f6;
     }
   }
   * { box-sizing: border-box; }
@@ -80,10 +90,11 @@
   input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button { cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
   button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
-  button:disabled { cursor: not-allowed; opacity: .58; }
+  button:disabled { cursor: not-allowed; background: var(--disabled-background); border-color: var(--border); color: var(--faint); opacity: 1; }
   button:active:not(:disabled) { transform: translateY(1px); }
-  button.primary { background: var(--accent-strong); border-color: #88adff; color: #07101f; font-weight: 700; }
-  button.primary:hover:not(:disabled) { background: #84aaff; }
+  button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--primary-text); font-weight: 700; }
+  button.primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+  button.primary:disabled { background: var(--disabled-background); border-color: var(--border); color: var(--faint); }
   button.quiet { background: transparent; border-color: transparent; color: var(--muted); }
   button.quiet:hover:not(:disabled) { color: var(--text); background: var(--surface); border-color: var(--border); }
   button.danger { color: var(--danger); }
@@ -161,7 +172,7 @@
   .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid rgba(105, 215, 160, .25); border-radius: 9px; background: #173c2b; color: #c2f3d6; display: none; z-index: 10; box-shadow: var(--shadow); }
   .status.err { background: #4a252b; color: #ffd1d1; border-color: rgba(255, 156, 156, .3); }
   details summary { cursor: pointer; color: var(--muted); }
-  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-height: calc(100vh - 32px); padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border: 1px solid var(--border); border-radius: 12px; }
+  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; min-height: 0; padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border: 1px solid var(--border); border-radius: 12px; }
   .tabs-brand { display: flex; align-items: center; gap: 9px; padding: 3px 5px 12px; border-bottom: 1px solid var(--border); }
   .tabs-brand-mark { display: block; flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--accent-strong); border-radius: 8px; object-fit: cover; }
   .tabs-brand strong { display: block; font-size: 13px; line-height: 1.2; }
@@ -198,7 +209,9 @@
   .update-banner-message { min-width: 0; color: var(--muted); font-size: 12px; }
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
-  .logbox { max-height: 440px; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
+  section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
+  section[data-tab="logs"] .section-sub { flex: 0 0 auto; }
+  .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
   .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
   .log-card .t { display: flex; gap: 10px; align-items: baseline; }
   .log-card .tm { color: #7d8796; font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -270,7 +283,7 @@
   .filter-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
   .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .settings-form { width: 100%; }
-  .settings-page { min-height: calc(100vh - 60px); }
+  .settings-page { min-height: 0; }
   .settings-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .48); }
   .settings-block.wide { grid-column: 1 / -1; }
@@ -291,6 +304,8 @@
   .settings-grid .setting-option span { display: grid; gap: 2px; }
   .settings-grid .setting-option small { color: var(--muted); font-size: 11px; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
+  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; }
+  .settings-grid .setting-action button { flex: 0 0 auto; min-height: 32px; padding: 6px 10px; }
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
@@ -369,6 +384,8 @@
     main, main.nav-collapsed { grid-template-columns: 1fr; }
     .app-header, main > section { grid-column: 1; }
     .tabs { grid-column: 1; grid-row: auto; position: static; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    section[data-tab="logs"] { height: auto; }
+    section[data-tab="logs"] .logbox { flex: 0 1 auto; max-height: calc(100vh - 260px); min-height: 240px; }
     .tabs-brand { display: none; }
     main.nav-collapsed .tabs-brand { display: flex; }
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
@@ -392,6 +409,112 @@
     .tab-group:last-child { padding-bottom: 6px; }
     .tabs button { width: auto; }
   }
+
+  /* Keep the desktop shell inside the viewport: navigation and the active
+     work card scroll independently instead of moving the whole page. */
+  @media (min-width: 701px) {
+    body { overflow: hidden; }
+    main { height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+    main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
+    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; }
+    main.nav-collapsed .tabs { height: 100%; }
+    section[data-tab="logs"] { height: 100%; overflow: auto; }
+    section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
+  }
+
+  /* A CSS chevron has a stable box and a real rotation center. The text
+     glyph used before had a font-dependent baseline and looked off-center. */
+  .tab-group-chevron {
+    display: block;
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    margin-left: auto;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    font-size: 0;
+    line-height: 0;
+    transform: rotate(45deg);
+    transform-origin: 50% 50%;
+    transition: transform .16s ease;
+  }
+  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-45deg); }
+
+  /* Use theme surfaces instead of dark-only rgba backgrounds. */
+  .card,
+  .chart-card,
+  .settings-block,
+  .image-form,
+  .image-result {
+    background: color-mix(in srgb, var(--panel-raised) 86%, var(--panel));
+  }
+  .tab-group { border-color: color-mix(in srgb, var(--border-strong) 70%, transparent); background: color-mix(in srgb, var(--panel-raised) 56%, var(--panel)); }
+  .settings-page .setting-option,
+  .settings-grid .setting-option,
+  .provider-current,
+  .opencode-preview-toggle,
+  .skill-card { background: color-mix(in srgb, var(--surface) 72%, var(--panel)); }
+  .settings-nav-button { background: var(--surface) !important; }
+  code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+  .step .prov, .opencode-model strong, .model-kind-icon { color: var(--accent); }
+  .chain-toggle.is-on { color: var(--success); }
+  .chain-toggle.is-off { color: var(--muted); }
+  .log-card .tm, .log-card .b { color: var(--muted); }
+  .log-card.ok .b { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+  .log-card.warn .b { color: #a47718; background: color-mix(in srgb, #e5bd61 16%, transparent); }
+  .log-card.err .b { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+  .donut-track { stroke: var(--border-strong); }
+  .log-card .m b, .token-row-head span:first-child { color: var(--text); }
+  .token-track { justify-content: flex-start; background: var(--surface); }
+  .token-fill { flex: 0 0 auto; }
+  .token-row-head .problem-rate { color: var(--danger); }
+  .usage-days { background: color-mix(in srgb, var(--panel-raised) 70%, var(--panel)); }
+  .usage-day.active, .provider-option.active { color: var(--text); }
+  .image-preview { background: color-mix(in srgb, var(--bg) 72%, var(--panel)); }
+
+  /* Keep the remaining component surfaces readable when the light palette is active. */
+  body[data-theme="light"] .card.chain-disabled,
+  body[data-theme="light"] .dialog-section,
+  body[data-theme="light"] .chain-row,
+  body[data-theme="light"] .opencode-model,
+  body[data-theme="light"] .direct-model-card .opencode-model {
+    background: color-mix(in srgb, var(--surface) 70%, var(--panel));
+  }
+  body[data-theme="light"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
+  body[data-theme="light"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+  body[data-theme="light"] .opencode-panel,
+  body[data-theme="light"] .direct-model-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
+  }
+  body[data-theme="light"] .provider-model-row:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+  body[data-theme="light"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+  @media (prefers-color-scheme: light) {
+    body[data-theme="system"] .card.chain-disabled,
+    body[data-theme="system"] .dialog-section,
+    body[data-theme="system"] .chain-row,
+    body[data-theme="system"] .opencode-model,
+    body[data-theme="system"] .direct-model-card .opencode-model {
+      background: color-mix(in srgb, var(--surface) 70%, var(--panel));
+    }
+    body[data-theme="system"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
+    body[data-theme="system"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+    body[data-theme="system"] .opencode-panel,
+    body[data-theme="system"] .direct-model-card {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
+    }
+    body[data-theme="system"] .provider-model-row:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+    body[data-theme="system"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+  }
+
+  @media (max-width: 700px) {
+    body { overflow: auto; }
+    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); align-items: start; grid-template-rows: none; }
+    main > section { grid-row: auto; height: auto; max-height: none; overflow: visible; }
+    .tabs { grid-row: auto; height: auto; max-height: none; overflow: visible; align-self: start; }
+    section[data-tab="logs"] { height: auto; overflow: visible; }
+    section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: auto; }
+  }
 </style>
 </head>
 <body>
@@ -403,32 +526,32 @@
       <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"></path></svg></button>
     </div>
     <div class="tab-group" role="group" aria-label="Провайдеры">
-      <button class="tab-group-toggle" type="button" data-group="providers" aria-expanded="true"><span>Провайдеры</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <button class="tab-group-toggle" type="button" data-group="providers" aria-expanded="true"><span>Провайдеры</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="providers"><span class="tab-index">01</span><span class="tab-label">Провайдеры</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Подключения">
-      <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="connections"><span class="tab-index">02</span><span class="tab-label">Подключения</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Модели">
-      <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="chains"><span class="tab-index">03</span><span class="tab-label">Цепочки</span></button>
         <button data-tab="models"><span class="tab-index">04</span><span class="tab-label">Модели</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Инструменты">
-      <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="images"><span class="tab-index">05</span><span class="tab-label">Изображения</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Статистика и логи">
-      <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true">⌄</span></button>
+      <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
       <div class="tab-group-tabs">
         <button data-tab="logs"><span class="tab-index">06</span><span class="tab-label">Логи</span></button>
         <button data-tab="usage"><span class="tab-index">07</span><span class="tab-label">Статистика</span></button>
@@ -742,6 +865,10 @@
             <input id="s-autostart" type="checkbox">
             <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
           </label>
+          <div class="setting-option setting-action" id="s-shortcut-wrap">
+            <span>Ярлык в меню приложений<small id="s-shortcut-help">Добавляет Provider Proxy в поиск приложений Windows или Linux.</small></span>
+            <button type="button" id="s-create-shortcut">Создать ярлык</button>
+          </div>
         </div>
       </div>
       <div class="settings-block">
@@ -1422,6 +1549,9 @@ function renderSettings() {
   $("s-autostart").disabled = !desktop
   $("s-autostart-wrap").classList.toggle("is-disabled", !desktop)
   $("s-autostart-help").textContent = desktop ? "Windows и Linux" : "доступно в desktop-версии"
+  $("s-create-shortcut").disabled = !desktop
+  $("s-shortcut-wrap").classList.toggle("is-disabled", !desktop)
+  $("s-shortcut-help").textContent = desktop ? "Добавляет Provider Proxy в поиск приложений Windows или Linux." : "доступно в desktop-версии"
   $("s-base-url").textContent = `http://127.0.0.1:${cfg.port ?? 8787}/v1`
 }
 
@@ -1550,6 +1680,25 @@ async function syncAutostartSetting() {
     $("s-autostart-help").textContent = `ошибка: ${error.message ?? error}`
   }
 }
+
+async function createAppShortcut() {
+  if (!isDesktopApp()) return
+  const button = $("s-create-shortcut")
+  button.disabled = true
+  button.textContent = "Создаю…"
+  try {
+    const path = await tauriInvoke("create_app_shortcut")
+    $("s-shortcut-help").textContent = `ярлык создан: ${path}`
+    flash(true, "ярлык добавлен в меню приложений")
+  } catch (error) {
+    flash(false, `не удалось создать ярлык: ${error.message ?? error}`)
+  } finally {
+    button.disabled = false
+    button.textContent = "Создать ярлык"
+  }
+}
+
+$("s-create-shortcut").onclick = createAppShortcut
 
 $("settings-shutdown").onclick = async () => {
   if (!window.confirm("Выйти из приложения и закрыть его вкладку?")) return

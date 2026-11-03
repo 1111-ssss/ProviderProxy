@@ -565,8 +565,9 @@ async function* normalizeSse(body, exposed, upstream) {
   // strict OpenAI-compatible clients always see finish_reason.
   const terminal = () => {
     const pending = [...choiceIndexes].filter((index) => !finishReasons.has(index))
-    if (!pending.length) return ""
-    const choices = pending.map((index) => ({
+    const indexes = pending.length ? pending : choiceIndexes.size ? [] : [0]
+    if (!indexes.length) return ""
+    const choices = indexes.map((index) => ({
       index,
       delta: {},
       finish_reason: toolChoices.has(index) ? "tool_calls" : "stop",
@@ -675,6 +676,44 @@ async function* normalizeSse(body, exposed, upstream) {
     if (final) yield final
     if (choiceIndexes.size) yield "data: [DONE]\n\n"
   }
+}
+
+// A few gateways ignore `stream: true` and return a regular completion. Turn
+// that response into a minimal OpenAI-compatible stream instead of handing
+// JSON to OpenCode's SSE decoder.
+function completionToSse(text, upstream) {
+  let parsed
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.choices)) return null
+  const meta = {
+    ...(parsed.id ? { id: parsed.id } : {}),
+    object: "chat.completion.chunk",
+    ...(parsed.created ? { created: parsed.created } : {}),
+    model: parsed.model ?? upstream.model,
+  }
+  const choices = parsed.choices.length ? parsed.choices : [{ index: 0, message: {} }]
+  const content = choices.map((choice, position) => {
+    const message = choice?.message && typeof choice.message === "object" ? choice.message : {}
+    const delta = {}
+    if (message.role) delta.role = message.role
+    if (message.content !== undefined) delta.content = message.content
+    if (Array.isArray(message.tool_calls)) delta.tool_calls = message.tool_calls
+    if (message.function_call && typeof message.function_call === "object") delta.function_call = message.function_call
+    return { index: Number.isFinite(choice?.index) ? choice.index : position, delta, finish_reason: null }
+  })
+  const terminal = choices.map((choice, position) => ({
+    index: Number.isFinite(choice?.index) ? choice.index : position,
+    delta: {},
+    finish_reason: choice?.finish_reason ?? "stop",
+  }))
+  const usage = parsed.usage && typeof parsed.usage === "object" ? { usage: parsed.usage } : {}
+  return `data: ${JSON.stringify({ ...meta, choices: content })}\n\n` +
+    `data: ${JSON.stringify({ ...meta, ...usage, choices: terminal })}\n\n` +
+    "data: [DONE]\n\n"
 }
 
 // Never fail over ordinary client errors (400/401/404/etc.). A chain may
@@ -1350,12 +1389,19 @@ async function proxyChat(body, res) {
 
       // Success, or a client error that would repeat on every upstream (401, 404...): pass through untouched.
       log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
+      const isSse = (resp.headers.get("content-type") ?? "").includes("text/event-stream")
+      const streamRequested = body.stream === true
       const headers = Object.fromEntries(resp.headers)
       // undici may hand us a decoded body; stale framing headers would corrupt the passthrough
       delete headers["content-encoding"]
       delete headers["content-length"]
       delete headers["transfer-encoding"]
       delete headers["connection"]
+      if (streamRequested && !isSse) {
+        headers["content-type"] = "text/event-stream; charset=utf-8"
+        headers["cache-control"] = "no-cache"
+        log(`${exposed} → ${up.name}/${up.model}: upstream вернул обычный JSON вместо SSE, адаптирую поток`)
+      }
       res.writeHead(resp.status, headers)
       usage.ok++
       pStat.ok++
@@ -1363,7 +1409,6 @@ async function proxyChat(body, res) {
       if (!resp.body) return res.end()
 
       // Stream the body through untouched, watching for a usage report on the way (see tally()).
-      const isSse = (resp.headers.get("content-type") ?? "").includes("text/event-stream")
       try {
         if (isSse) {
           let tail = ""
@@ -1377,7 +1422,8 @@ async function proxyChat(body, res) {
           const chunks = []
           for await (const chunk of Readable.fromWeb(resp.body)) chunks.push(chunk)
           const text = Buffer.concat(chunks).toString("utf8")
-          res.end(text)
+          const normalized = streamRequested ? completionToSse(text, up) : null
+          res.end(normalized ?? text)
           tally(text, pStat, mStat)
         }
       } catch {

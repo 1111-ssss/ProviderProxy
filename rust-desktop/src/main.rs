@@ -1,13 +1,13 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use provider_proxy_desktop::proxy::{default_config_path, start_server};
 mod updater;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use std::fs;
+use std::path::{Path, PathBuf};
 #[cfg(target_os = "windows")]
 use std::process::Command;
 use std::sync::Arc;
-#[cfg(target_os = "linux")]
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -61,6 +61,42 @@ fn desktop_exec(path: &Path) -> String {
     )
 }
 
+fn autostart_config_path() -> Result<PathBuf, String> {
+    let path = default_config_path();
+    if path.is_absolute() {
+        Ok(path)
+    } else {
+        std::env::current_dir()
+            .map(|directory| directory.join(path))
+            .map_err(|error| error.to_string())
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn autostart_executable() -> Result<PathBuf, String> {
+    // When an AppImage is running, current_exe() points into its temporary
+    // mount. That path disappears as soon as the application exits, so use
+    // the original AppImage path for the desktop entry instead.
+    if let Some(appimage) = std::env::var_os("APPIMAGE") {
+        let path = PathBuf::from(appimage);
+        if path.is_file() {
+            return if path.is_absolute() {
+                Ok(path)
+            } else {
+                std::env::current_dir()
+                    .map(|directory| directory.join(path))
+                    .map_err(|error| error.to_string())
+            };
+        }
+    }
+    std::env::current_exe().map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn windows_command_arg(path: &Path) -> String {
+    format!("\"{}\"", path.display())
+}
+
 #[tauri::command]
 fn autostart_enabled() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
@@ -92,7 +128,12 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
     {
         let status = if enabled {
             let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-            let command = format!("\"{}\"", executable.display());
+            let config = autostart_config_path()?;
+            let command = format!(
+                "{} {}",
+                windows_command_arg(&executable),
+                windows_command_arg(&config)
+            );
             Command::new("reg")
                 .args([
                     "ADD",
@@ -128,13 +169,16 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
     {
         let path = autostart_file();
         if enabled {
-            let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+            let executable = autostart_executable()?;
+            let config = autostart_config_path()?;
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|error| error.to_string())?;
             }
             let desktop = format!(
-                "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
-                desktop_exec(&executable)
+                "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={} {}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+                desktop_exec(&executable),
+                desktop_exec(&config),
+                desktop_exec(executable.parent().unwrap_or_else(|| Path::new(".")))
             );
             fs::write(&path, desktop).map_err(|error| error.to_string())?;
         } else if path.exists() {
@@ -148,6 +192,94 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
         let _ = enabled;
         Err("автозапуск поддерживается только на Windows и Linux".into())
     }
+}
+
+#[cfg(target_os = "windows")]
+fn create_windows_app_shortcut() -> Result<String, String> {
+    let data_dir =
+        dirs::data_dir().ok_or_else(|| "не удалось определить каталог AppData".to_string())?;
+    let shortcut_dir = data_dir.join("Microsoft/Windows/Start Menu/Programs/Provider Proxy");
+    fs::create_dir_all(&shortcut_dir).map_err(|error| error.to_string())?;
+    let shortcut = shortcut_dir.join("Provider Proxy Rust.lnk");
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let config = autostart_config_path()?;
+    let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
+
+    // A .lnk is what the Windows Start menu indexes as an installed app.
+    // Pass paths through environment variables so PowerShell never has to
+    // re-parse user-controlled path fragments as part of its script.
+    let script = r#"
+$ErrorActionPreference = 'Stop'
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut($env:PP_SHORTCUT_PATH)
+$shortcut.TargetPath = $env:PP_SHORTCUT_TARGET
+$shortcut.Arguments = $env:PP_SHORTCUT_ARGUMENTS
+$shortcut.WorkingDirectory = $env:PP_SHORTCUT_WORKDIR
+$shortcut.Description = 'Provider Proxy'
+$shortcut.IconLocation = "$env:PP_SHORTCUT_TARGET,0"
+$shortcut.Save()
+"#;
+    let output = Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ])
+        .env("PP_SHORTCUT_PATH", &shortcut)
+        .env("PP_SHORTCUT_TARGET", &executable)
+        .env("PP_SHORTCUT_ARGUMENTS", windows_command_arg(&config))
+        .env("PP_SHORTCUT_WORKDIR", working_directory)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        let details = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if details.is_empty() {
+            "не удалось создать ярлык в меню Пуск Windows".into()
+        } else {
+            format!("не удалось создать ярлык в меню Пуск Windows: {details}")
+        });
+    }
+    Ok(shortcut.to_string_lossy().into_owned())
+}
+
+#[cfg(target_os = "linux")]
+fn create_linux_app_shortcut() -> Result<String, String> {
+    let data_dir = dirs::data_dir()
+        .ok_or_else(|| "не удалось определить каталог данных пользователя".to_string())?;
+    let applications_dir = data_dir.join("applications");
+    fs::create_dir_all(&applications_dir).map_err(|error| error.to_string())?;
+    let shortcut = applications_dir.join("provider-proxy-rust.desktop");
+    let executable = autostart_executable()?;
+    let config = autostart_config_path()?;
+    let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
+    let desktop = format!(
+        "[Desktop Entry]\nType=Application\nName=Provider Proxy Rust\nComment=Provider Proxy desktop application\nExec={} {}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+        desktop_exec(&executable),
+        desktop_exec(&config),
+        desktop_exec(working_directory)
+    );
+    fs::write(&shortcut, desktop).map_err(|error| error.to_string())?;
+    Ok(shortcut.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn create_app_shortcut() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        return create_windows_app_shortcut();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return create_linux_app_shortcut();
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    Err("создание ярлыка поддерживается только на Windows и Linux".into())
 }
 
 fn browser_url(url: &Url) -> Option<&str> {
@@ -178,7 +310,8 @@ fn main() {
             install_update,
             restart_app,
             autostart_enabled,
-            set_autostart
+            set_autostart,
+            create_app_shortcut
         ])
         .setup(move |app| {
             let url = Url::parse(&format!("http://127.0.0.1:{port}/")).expect("local proxy URL");

@@ -225,12 +225,14 @@ pub(super) async fn chat_completions(
                 upstream.model
             ),
         );
+        let stream_requested = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
         return stream_upstream_response(
             response,
             state.clone(),
             exposed,
             upstream.name,
             upstream.model,
+            stream_requested,
         )
         .await;
     }

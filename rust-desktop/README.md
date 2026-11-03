@@ -151,6 +151,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 ключ `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, на Linux —
 `$XDG_CONFIG_HOME/autostart/provider-proxy.desktop`.
 
+Там же кнопка «Создать ярлык» добавляет приложение в индекс меню приложений: пользовательский
+`.lnk` в меню «Пуск» Windows или `~/.local/share/applications/provider-proxy-rust.desktop` на Linux.
+
 Для подготовки подписи:
 
 ```powershell

@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Provider Proxy desktop commands for the local GUI.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:*", "http://localhost:*"]
+  },
+  "permissions": [
+    "core:default",
+    "allow-check-for-update",
+    "allow-install-update",
+    "allow-restart-app",
+    "allow-autostart-enabled",
+    "allow-set-autostart",
+    "allow-create-app-shortcut"
+  ]
+}

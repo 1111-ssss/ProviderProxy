@@ -84,6 +84,7 @@ const upstreamB = createServer((req, res) => {
         res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" })
         res.write(": keepalive\r\n\r\n")
         res.write("event: message\r\ndata: null\r\n\r\n")
+        if (body.messages?.[0]?.content === "no-finish") return res.end("data: {\"id\":\"chatcmpl-test\",\"choices\":[]}\n\ndata: [DONE]\r\n\r\n")
         res.write(`event: message\n\ndata: ${JSON.stringify({ id: "chatcmpl-test", object: "chat.completion.chunk", choices: [{ index: 0, delta: { content: "ok" }, finish_reason: null }] })}\n\n`)
         res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ delta: { tool_calls: [{ id: "call_1", function: { arguments: "{}" } }] } }], usage: null })}\n\n`)
         return res.end("data: [DONE]\r\n\r\n")
@@ -180,11 +181,11 @@ const post = (model) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: "hi" }] }),
   })
-const postStream = (model) =>
+const postStream = (model, content = "hi") =>
   fetch(`${base(PROXY)}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model, stream: true, messages: [{ role: "user", content: "hi" }] }),
+    body: JSON.stringify({ model, stream: true, messages: [{ role: "user", content }] }),
   })
 
 try {
@@ -212,6 +213,11 @@ try {
   assert.ok(!streamText.includes('"usage":null'), "null usage must not reach OpenCode")
   assert.ok(!streamText.includes("data: null"), "null SSE keepalives must not reach OpenCode")
   assert.ok(!streamText.includes("event: message"), "custom SSE event fields must not reach OpenCode")
+
+  const incompleteStream = await postStream("test", "no-finish")
+  const incompleteText = await incompleteStream.text()
+  assert.match(incompleteText, /"finish_reason":"stop"/, "proxy should close an SSE stream without choices")
+  assert.match(incompleteText, /data: \[DONE\]/)
 
   // 2. A is cooling down -> skipped without a round-trip.
   const r2 = await post("test")
@@ -501,7 +507,8 @@ try {
   assert.ok(!html.includes("работает локально"), "GUI should not show the local-status label")
     assert.ok(html.includes('class="settings-nav-button" data-tab="settings"'), "settings should be available from the navigation")
    assert.ok(html.includes('id="update-banner"') && html.includes("checkForDesktopUpdate"), "desktop updates should be offered in the top-right banner")
-   assert.ok(html.includes('id="s-theme"') && html.includes('id="s-autostart"'), "settings should expose theme and autostart")
+    assert.ok(html.includes('id="s-theme"') && html.includes('id="s-autostart"'), "settings should expose theme and autostart")
+    assert.ok(html.includes('id="s-create-shortcut"') && html.includes("create_app_shortcut"), "settings should expose app shortcut creation")
    assert.ok(html.includes('id="s-auto-update"') && html.includes('id="s-auto-restart"'), "settings should expose automatic update controls")
   assert.ok(html.includes('<svg viewBox="0 0 24 24"'), "settings button should use an inline vector icon")
   assert.ok(!html.includes("⚙"), "settings button should not use an emoji icon")
@@ -558,15 +565,15 @@ try {
 
   // 10. Usage dashboard: requests, failover, per-provider 429 and token tallies.
   const u = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(u.requests, 8) // r1, stream, r2, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
-  assert.equal(u.ok, 8)
+  assert.equal(u.requests, 9) // r1, stream, incomplete stream, r2, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
+  assert.equal(u.ok, 9)
   assert.equal(u.failovers, 2) // r1 (429 off A) and 2b (400 off A)
   assert.equal(u.failed, 0)
   assert.equal(u.providers.A.requests, 2)
   assert.equal(u.providers.A.limits, 1)
   assert.equal(u.providers.A.errors, 1) // 400 unsupported on the img chain
-  assert.equal(u.providers.B.ok, 8)
-  assert.equal(u.models.test.requests, 4)
+  assert.equal(u.providers.B.ok, 9)
+  assert.equal(u.models.test.requests, 5)
   assert.equal(u.models.img.requests, 1)
   assert.equal(u.models.fresh.requests, 1)
   assert.equal(u.models.paused.requests, 1)
@@ -576,7 +583,7 @@ try {
   assert.equal(u.retentionDays, 7)
   assert.equal(u.days.length, 7)
   assert.equal(u.days[0].date, dayKey(0))
-  assert.equal(u.days[0].requests, 8)
+  assert.equal(u.days[0].requests, 9)
   assert.equal(u.days.find((day) => day.date === dayKey(-1)).requests, 3, "yesterday should remain a separate persisted day")
   assert.equal(u.days.find((day) => day.date === dayKey(-8)), undefined, "history older than seven days must be pruned")
   assert.ok(u.cooldowns.length >= 1 && u.cooldowns.every((c) => c.upstream === "A")) // A cooling after 429/400
@@ -616,7 +623,7 @@ try {
   }
   assert.equal(restartedReady, true, `proxy did not restart:\n${restartedOut}`)
   const afterRestart = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 8, "today stats should survive restart")
+  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 9, "today stats should survive restart")
   assert.equal(afterRestart.days.find((day) => day.date === dayKey(-1)).requests, 3, "previous day stats should survive restart")
   const restartShutdown = await fetch(`${base(PROXY)}/api/shutdown`, { method: "POST" })
   assert.equal(restartShutdown.status, 200)

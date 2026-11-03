@@ -345,6 +345,78 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the autostart_enabled command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-autostart-enabled",
+          "markdownDescription": "Enables the autostart_enabled command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the check_for_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-check-for-update",
+          "markdownDescription": "Enables the check_for_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the create_app_shortcut command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-create-app-shortcut",
+          "markdownDescription": "Enables the create_app_shortcut command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the install_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-install-update",
+          "markdownDescription": "Enables the install_update command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the restart_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-restart-app",
+          "markdownDescription": "Enables the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_autostart command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-autostart",
+          "markdownDescription": "Enables the set_autostart command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the autostart_enabled command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-autostart-enabled",
+          "markdownDescription": "Denies the autostart_enabled command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the check_for_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-check-for-update",
+          "markdownDescription": "Denies the check_for_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the create_app_shortcut command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-create-app-shortcut",
+          "markdownDescription": "Denies the create_app_shortcut command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the install_update command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-install-update",
+          "markdownDescription": "Denies the install_update command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the restart_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-restart-app",
+          "markdownDescription": "Denies the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_autostart command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-autostart",
+          "markdownDescription": "Denies the set_autostart command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

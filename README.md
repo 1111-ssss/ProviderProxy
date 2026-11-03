@@ -126,6 +126,8 @@ GitHub API. Для текущей платформы оно ищет ZIP с им
 В настройках также доступны темы «Тёмная», «Светлая» и «Как в системе», а для desktop-версии —
 автозапуск вместе с Windows или Linux. На Windows используется пользовательский ключ Run, на
 Linux — файл `$XDG_CONFIG_HOME/autostart/provider-proxy.desktop`.
+В этом же разделе можно создать ярлык для индекса меню приложений: `.lnk` в меню «Пуск» Windows
+или `.desktop` в `~/.local/share/applications` на Linux.
 
 Workflow `.github/workflows/release.yml` собирает и публикует неподписанные ZIP с portable-
 бинарниками Linux и Windows. Для этого ключ подписи не нужен.
