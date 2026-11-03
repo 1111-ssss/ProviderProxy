@@ -312,6 +312,85 @@ pub(crate) fn merge_config_secrets(next: &Value, previous: &Value) -> Value {
     merged
 }
 
+pub(crate) fn export_config(value: &Value, keys: bool, chains: bool, models: bool) -> Value {
+    fn strip(value: &Value, parent: &str, keys: bool) -> Value {
+        match value {
+            Value::Array(items) => {
+                Value::Array(items.iter().map(|item| strip(item, parent, keys)).collect())
+            }
+            Value::Object(items) => {
+                let mut out = Map::new();
+                for (key, item) in items {
+                    if !keys
+                        && (key == "apiKey"
+                            || key == "authToken"
+                            || (parent == "headers" && super::auth::sensitive_header(key)))
+                    {
+                        continue;
+                    }
+                    out.insert(key.clone(), strip(item, key, keys));
+                }
+                Value::Object(out)
+            }
+            _ => value.clone(),
+        }
+    }
+
+    let mut exported = strip(value, "", keys);
+    if let Some(object) = exported.as_object_mut() {
+        if !chains {
+            object.remove("models");
+        }
+        if !models {
+            object.remove("opencodeModels");
+        }
+    }
+    exported
+}
+
+pub(crate) fn merge_imported_config(next: &Value, previous: &Value) -> Value {
+    let mut object = previous.as_object().cloned().unwrap_or_default();
+    if let Some(imported) = next.as_object() {
+        for (key, value) in imported {
+            object.insert(key.clone(), value.clone());
+        }
+        if let Some(providers) = imported.get("providers").and_then(Value::as_object) {
+            let mut providers = providers.clone();
+            for (name, provider) in &mut providers {
+                let Some(provider_object) = provider.as_object_mut() else {
+                    continue;
+                };
+                let previous_provider = previous
+                    .get("providers")
+                    .and_then(Value::as_object)
+                    .and_then(|all| all.get(name))
+                    .and_then(Value::as_object);
+                if !provider_object.contains_key("apiKey") {
+                    if let Some(api_key) = previous_provider.and_then(|value| value.get("apiKey")) {
+                        provider_object.insert("apiKey".into(), api_key.clone());
+                    }
+                }
+                if let (Some(headers), Some(previous_headers)) = (
+                    provider_object
+                        .get_mut("headers")
+                        .and_then(Value::as_object_mut),
+                    previous_provider
+                        .and_then(|value| value.get("headers"))
+                        .and_then(Value::as_object),
+                ) {
+                    for (header, value) in previous_headers {
+                        if super::auth::sensitive_header(header) && !headers.contains_key(header) {
+                            headers.insert(header.clone(), value.clone());
+                        }
+                    }
+                }
+            }
+            object.insert("providers".into(), Value::Object(providers));
+        }
+    }
+    merge_config_secrets(&Value::Object(object), previous)
+}
+
 pub(crate) fn expand_home(path: &str) -> PathBuf {
     if let Some(rest) = path.strip_prefix("~/") {
         dirs::home_dir()

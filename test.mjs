@@ -389,6 +389,24 @@ try {
   assert.equal(safeConfig.providers.B.apiKey, "", "GUI config must not receive the plaintext provider key")
   assert.equal(safeConfig.providers.B.apiKeyConfigured, true)
   assert.equal(safeConfig.models.paused.enabled, false, "disabled chain state should persist")
+  const fullExportResponse = await fetch(`${base(PROXY)}/api/config/export`)
+  assert.equal(fullExportResponse.status, 200)
+  assert.match(fullExportResponse.headers.get("content-disposition"), /provider-proxy-config\.json/)
+  const fullExport = await fullExportResponse.json()
+  assert.equal(fullExport.providers.B.apiKey, "key-b", "full export should include provider keys")
+  assert.ok(fullExport.models.fresh && fullExport.opencodeModels.B, "full export should include chains and direct models")
+  const publicExport = await (await fetch(`${base(PROXY)}/api/config/export?keys=0&chains=0&models=0`)).json()
+  assert.equal(publicExport.providers.B.apiKey, undefined, "keyless export must omit provider keys")
+  assert.equal(publicExport.models, undefined, "optional chain export should be omittable")
+  assert.equal(publicExport.opencodeModels, undefined, "optional direct model export should be omittable")
+  const partialImport = await fetch(`${base(PROXY)}/api/config/import`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ appSettings: { theme: "light" } }),
+  })
+  assert.equal(partialImport.status, 200)
+  const afterPartialImport = await (await fetch(`${base(PROXY)}/api/config`)).json()
+  assert.equal(afterPartialImport.models.fresh.upstreams.length, 2, "omitted chains must survive partial import")
   const database = new DatabaseSync(join(cfgDir, "config.db"))
   const storedConfig = database.prepare("SELECT value FROM settings WHERE key = 'config'").get()?.value ?? ""
   assert.ok(storedConfig.includes("enc:v1:"), "provider keys should be encrypted at rest in SQLite")

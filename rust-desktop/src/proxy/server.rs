@@ -115,6 +115,8 @@ fn router(state: AppState) -> Router {
             "/api/config",
             get(handlers::get_config).put(handlers::put_config),
         )
+        .route("/api/config/export", get(handlers::export_config_handler))
+        .route("/api/config/import", post(handlers::import_config))
         .route(
             "/api/skills/image-generation",
             get(handlers::image_skill_get).post(handlers::image_skill_install),

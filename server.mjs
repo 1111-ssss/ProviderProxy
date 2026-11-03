@@ -207,6 +207,45 @@ function mergeConfigSecrets(next, previous) {
   delete out.authTokenConfigured
   return mergeRedactedSecrets(out, previous)
 }
+function exportConfig(value, { keys = true, chains = true, models = true } = {}) {
+  const strip = (item, parentKey = "") => {
+    if (Array.isArray(item)) return item.map((child) => strip(child, parentKey))
+    if (!item || typeof item !== "object") return item
+    const out = {}
+    for (const [key, child] of Object.entries(item)) {
+      if (!keys && (key === "apiKey" || key === "authToken" || (parentKey === "headers" && sensitiveHeader(key)))) continue
+      out[key] = strip(child, key)
+    }
+    return out
+  }
+  const out = strip(value)
+  if (!chains) delete out.models
+  if (!models) delete out.opencodeModels
+  return out
+}
+function mergeImportedConfig(next, previous) {
+  const out = { ...cloneConfig(previous), ...cloneConfig(next) }
+  if (Object.prototype.hasOwnProperty.call(next, "providers")) {
+    out.providers = cloneConfig(next.providers)
+    for (const [name, provider] of Object.entries(out.providers ?? {})) {
+      const previousProvider = previous.providers?.[name]
+      if (!Object.prototype.hasOwnProperty.call(provider, "apiKey") && previousProvider?.apiKey) provider.apiKey = previousProvider.apiKey
+      if (provider.headers && previousProvider?.headers) {
+        for (const [header, value] of Object.entries(previousProvider.headers)) {
+          if (sensitiveHeader(header) && !Object.prototype.hasOwnProperty.call(provider.headers, header)) provider.headers[header] = value
+        }
+      }
+    }
+  }
+  return mergeConfigSecrets(out, previous)
+}
+function validateImportedConfig(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "config must be an object"
+  for (const key of ["providers", "models", "opencodeModels"]) {
+    if (value[key] !== undefined && (!value[key] || typeof value[key] !== "object" || Array.isArray(value[key]))) return `${key} must be an object`
+  }
+  return ""
+}
 function readStoredConfig() {
   const row = database.prepare("SELECT value FROM settings WHERE key = 'config'").get()
   return row?.value ? JSON.parse(row.value) : null
@@ -807,6 +846,41 @@ const server = http.createServer(async (req, res) => {
       if (!config.opencodeConfig) exposed.opencodeConfig = defaultOpencodeConfigSetting()
       res.writeHead(200, { "content-type": "application/json" })
       return res.end(JSON.stringify(exposed))
+    }
+
+    if (pathname === "/api/config/export" && req.method === "GET") {
+      const query = new URL(req.url, "http://127.0.0.1").searchParams
+      const included = (name) => query.has(name) ? query.get(name) !== "0" && query.get(name) !== "false" : true
+      const exported = exportConfig(config, { keys: included("keys"), chains: included("chains"), models: included("models") })
+      res.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "content-disposition": 'attachment; filename="provider-proxy-config.json"',
+      })
+      return res.end(JSON.stringify(exported, null, 2) + "\n")
+    }
+
+    if (req.url === "/api/config/import" && req.method === "POST") {
+      let body
+      try {
+        body = JSON.parse(await readBody(req))
+      } catch {
+        res.writeHead(400, { "content-type": "application/json" })
+        return res.end(JSON.stringify({ error: "invalid JSON" }))
+      }
+      const imported = body?.config && typeof body.config === "object" && !Array.isArray(body.config) ? body.config : body
+      const validationError = validateImportedConfig(imported)
+      if (validationError) {
+        res.writeHead(400, { "content-type": "application/json" })
+        return res.end(JSON.stringify({ error: validationError }))
+      }
+      const nextConfig = mergeImportedConfig(imported, config)
+      applyConfig(nextConfig)
+      saveStoredConfig(nextConfig)
+      log(`config imported: ${Object.keys(nextConfig.providers ?? {}).length} providers, ${chains.size} models`)
+      const opencodeSynced = syncOpencode()
+      res.writeHead(200, { "content-type": "application/json" })
+      return res.end(JSON.stringify({ ok: true, opencodeSynced, restartRequired: (nextConfig.port ?? 8787) !== listenPort }))
     }
 
     if (req.url === "/api/config" && req.method === "PUT") {

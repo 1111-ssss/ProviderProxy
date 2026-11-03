@@ -1,5 +1,6 @@
 use super::config::{
-    database_path, merge_config_secrets, merge_redacted, open_storage, public_config,
+    database_path, export_config, merge_config_secrets, merge_imported_config, merge_redacted,
+    open_storage, public_config,
 };
 use super::metrics::{load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
@@ -115,6 +116,26 @@ fn keeps_a_provider_key_when_the_gui_renames_the_provider() {
 }
 
 #[test]
+fn exports_optional_sections_and_preserves_secrets_on_partial_import() {
+    let previous = json!({
+        "authToken": "auth",
+        "providers": { "a": { "baseURL": "https://a.example", "apiKey": "key" } },
+        "models": { "chain": { "upstreams": [] } },
+        "opencodeModels": { "a": { "models": ["direct"] } }
+    });
+    let without_optional = export_config(&previous, false, false, false);
+    assert!(without_optional["providers"]["a"]["apiKey"].is_null());
+    assert!(without_optional.get("models").is_none());
+    assert!(without_optional.get("opencodeModels").is_none());
+
+    let imported =
+        merge_imported_config(&json!({ "appSettings": { "theme": "light" } }), &previous);
+    assert_eq!(imported["authToken"], "auth");
+    assert_eq!(imported["providers"]["a"]["apiKey"], "key");
+    assert!(imported["models"]["chain"].is_object());
+}
+
+#[test]
 fn tallies_the_last_usage_object_for_streams() {
     let mut usage = Usage::default();
     let mut provider = ProviderUsage::default();
@@ -188,6 +209,21 @@ async fn serves_the_desktop_api_from_a_local_port() {
     }
     let config = config.expect("local Rust HTTP server should start");
     assert!(config.status().is_success());
+    let exported = client
+        .get(format!("http://127.0.0.1:{}/api/config/export", server.port))
+        .send()
+        .await
+        .unwrap();
+    assert!(exported.status().is_success());
+    let exported: Value = exported.json().await.unwrap();
+    assert!(exported["models"]["one"].is_object());
+    let imported = client
+        .post(format!("http://127.0.0.1:{}/api/config/import", server.port))
+        .json(&json!({ "appSettings": { "theme": "light" } }))
+        .send()
+        .await
+        .unwrap();
+    assert!(imported.status().is_success());
     let models: Value = client
         .get(format!("http://127.0.0.1:{}/v1/models", server.port))
         .send()
