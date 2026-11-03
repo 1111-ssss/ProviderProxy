@@ -152,6 +152,11 @@ const child = spawn(process.execPath, [join(here, "server.mjs"), cfg], {
   stdio: ["ignore", "pipe", "pipe"],
 })
 let restartedChild = null
+const stopChild = async (process) => {
+  if (!process || process.exitCode !== null) return
+  process.kill()
+  await Promise.race([once(process, "exit"), new Promise((resolve) => setTimeout(resolve, 1000))])
+}
 let childOut = ""
 child.stdout.on("data", (d) => (childOut += d))
 child.stderr.on("data", (d) => (childOut += d))
@@ -202,6 +207,7 @@ try {
   const streamText = await stream.text()
   assert.match(streamText, /data: \{"id":"chatcmpl-test"/)
   assert.match(streamText, /data: \[DONE\]/)
+  assert.match(streamText, /"finish_reason":"(?:stop|tool_calls)"/, "proxy should provide a terminal finish_reason")
   assert.match(streamText, /"tool_calls":\[\{"id":"call_1","function":\{"arguments":"\{\}"\},"index":0,"type":"function"\}\]/)
   assert.ok(!streamText.includes('"usage":null'), "null usage must not reach OpenCode")
   assert.ok(!streamText.includes("data: null"), "null SSE keepalives must not reach OpenCode")
@@ -282,7 +288,7 @@ try {
           baseURL: `${base(B)}/v1`,
           apiKey: "key-b",
           models: ["model-b2", "model-b3"],
-          modelInfo: { "model-b2": { type: "image", endpoints: ["images/tasks"] }, "model-b3": { endpoints: ["images/generations"] }, "model-error": { endpoints: ["images/tasks"] }, "cached-image": { type: "image" } },
+          modelInfo: { "model-b2": { type: "image", endpoints: ["images/tasks"], contextLength: 32768 }, "model-b3": { endpoints: ["images/generations"] }, "model-error": { endpoints: ["images/tasks"] }, "cached-image": { type: "image" } },
         },
       },
       models: {
@@ -420,6 +426,7 @@ try {
   assert.equal(oc.providers["provider-proxy"].models.paused, undefined, "disabled chains must be omitted from OpenCode")
   assert.equal(oc.providers["provider-proxy"].models.fresh.name, "fresh (proxy, x2)")
   assert.equal(oc.providers["provider-proxy"].models["B/model-b2"].name, "B/model-b2 (config)")
+  assert.equal(oc.providers["provider-proxy"].models["B/model-b2"].limit.context, 32768, "model context should reach OpenCode")
   assert.equal(oc.providers["provider-proxy"].settings.baseURL, `${base(PROXY)}/v1`)
   assert.equal(oc.providers.other.name, "Other") // чужие провайдеры не тронуты
   assert.equal(statSync(ocCfg).ino, ocInode) // файл перезаписан НА МЕСТЕ: opencode перечитывает только так
@@ -492,7 +499,7 @@ try {
   assert.match(html, /\["m", 1e6\]/, "token formatter should support millions")
   assert.ok(html.includes("999,999 should become 1m"), "token formatter should promote rounded 1000k to 1m")
   assert.ok(!html.includes("работает локально"), "GUI should not show the local-status label")
-   assert.ok(html.includes('id="settings-open"'), "settings should be available from the top-right button")
+    assert.ok(html.includes('class="settings-nav-button" data-tab="settings"'), "settings should be available from the navigation")
    assert.ok(html.includes('id="update-banner"') && html.includes("checkForDesktopUpdate"), "desktop updates should be offered in the top-right banner")
    assert.ok(html.includes('id="s-theme"') && html.includes('id="s-autostart"'), "settings should expose theme and autostart")
    assert.ok(html.includes('id="s-auto-update"') && html.includes('id="s-auto-restart"'), "settings should expose automatic update controls")
@@ -617,8 +624,8 @@ try {
 
   console.log("OK: failover, cooldown skip, unsupported-400 failover, mapping, catalog, GUI page, provider models, config hot-reload, tab-close exit, privacy, logs, usage, opencode sync, full shutdown")
 } finally {
-  child.kill()
-  restartedChild?.kill()
+  await stopChild(child)
+  await stopChild(restartedChild)
   upstreamA.close()
   upstreamB.close()
   rmSync(cfgDir, { recursive: true, force: true })

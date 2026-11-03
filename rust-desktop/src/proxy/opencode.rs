@@ -34,6 +34,39 @@ fn default_opencode_config_path(config: &Value) -> std::path::PathBuf {
     }
 }
 
+fn model_context_length(config: &Value, provider: &str, model: &str) -> Option<u64> {
+    config
+        .get("providers")
+        .and_then(|providers| providers.get(provider))
+        .and_then(|provider| provider.get("modelInfo"))
+        .and_then(|models| models.get(model))
+        .and_then(|info| info.get("contextLength"))
+        .and_then(Value::as_u64)
+        .filter(|context| *context > 0)
+}
+
+fn chain_context_length(config: &Value, chain: &[super::types::Upstream]) -> Option<u64> {
+    chain
+        .iter()
+        .filter_map(|upstream| model_context_length(config, &upstream.name, &upstream.model))
+        .min()
+}
+
+fn apply_model_context(item: &mut Value, context: Option<u64>) {
+    let Some(context) = context else {
+        return;
+    };
+    let Some(object) = item.as_object_mut() else {
+        return;
+    };
+    let limit = object
+        .entry("limit")
+        .or_insert_with(|| Value::Object(Map::new()));
+    if let Some(limit) = limit.as_object_mut() {
+        limit.insert("context".into(), json!(context));
+    }
+}
+
 pub(crate) async fn sync_opencode(state: &AppState) -> bool {
     let config = state.config.read().unwrap().clone();
     let path = default_opencode_config_path(&config);
@@ -126,6 +159,12 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
                     Value::String(format!("{name} (proxy, x{chain_len})")),
                 );
             }
+            apply_model_context(
+                &mut item,
+                chains
+                    .get(name)
+                    .and_then(|chain| chain_context_length(&config, chain)),
+            );
             models.insert(name.clone(), item);
         }
     }
@@ -146,6 +185,10 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
                 if let Value::Object(object) = &mut item {
                     object.insert("name".into(), Value::String(format!("{name} (config)")));
                 }
+                apply_model_context(
+                    &mut item,
+                    model_context_length(&config, provider_name, model),
+                );
                 models.insert(name, item);
             }
         }

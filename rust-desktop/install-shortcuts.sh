@@ -7,15 +7,21 @@ ROOT="$(CDPATH= cd -- "$DIR/.." && pwd)"
 APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 
 mkdir -p "$APP_DIR"
+desktop_value() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/ /\\s/g; s/\t/\\t/g'
+}
+DESKTOP_DIR=$(desktop_value "$DIR")
+DESKTOP_ROOT=$(desktop_value "$ROOT")
+DESKTOP_ICON=$(desktop_value "$DIR/icons/icon.png")
 
 cat >"$APP_DIR/provider-proxy-rust.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Provider Proxy Rust
 Comment=Provider Proxy Rust desktop application
-Exec=$DIR/launch.sh
-Path=$DIR
-Icon=$DIR/icons/icon.png
+Exec="$DIR/launch.sh"
+Path=$DESKTOP_DIR
+Icon=$DESKTOP_ICON
 Terminal=false
 Categories=Development;Utility;
 StartupWMClass=provider-proxy-desktop
@@ -26,15 +32,16 @@ cat >"$APP_DIR/provider-proxy-npm.desktop" <<EOF
 Type=Application
 Name=Provider Proxy npm
 Comment=Provider Proxy Node.js/npm web application
-Exec=$ROOT/launch.sh
-Path=$ROOT
-Icon=$DIR/icons/icon.png
+Exec="$ROOT/launch.sh"
+Path=$DESKTOP_ROOT
+Icon=$DESKTOP_ICON
 Terminal=false
 Categories=Development;Utility;
 StartupWMClass=provider-proxy-npm
 EOF
 
 chmod 0644 "$APP_DIR/provider-proxy-rust.desktop" "$APP_DIR/provider-proxy-npm.desktop"
+chmod 0755 "$DIR/launch.sh"
 rm -f \
   "$APP_DIR/provider-proxy.desktop" \
   "$APP_DIR/Provider Proxy.desktop" \

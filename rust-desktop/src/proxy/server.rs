@@ -63,7 +63,15 @@ pub fn start_server(
         usage_history: Arc::new(Mutex::new(usage_history)),
         usage_day: Arc::new(Mutex::new(usage_day)),
         image_tasks: Arc::new(Mutex::new(HashMap::new())),
-        client: Client::builder().build()?,
+        // Streaming responses must not have a total request timeout: the
+        // upstream may spend a long time producing the first token and then
+        // continue sending a large completion. The chat handler applies the
+        // configured timeout only while waiting for response headers.
+        client: Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(32)
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .build()?,
         port,
         log_max,
     };
@@ -86,7 +94,18 @@ pub fn start_server(
     std::thread::Builder::new()
         .name("provider-proxy-http".into())
         .spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
+            // Keep HTTP handlers and upstream streams on a multi-thread Tokio
+            // runtime. They are already asynchronous, but making this
+            // explicit prevents a one-core/one-worker launch from turning
+            // unrelated requests into a serial queue.
+            let workers = std::thread::available_parallelism()
+                .map(|count| count.get().max(2))
+                .unwrap_or(2);
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(workers)
+                .enable_all()
+                .build()
+                .expect("tokio runtime");
             runtime.block_on(async move {
                 let tokio_listener = match TokioTcpListener::from_std(listener) {
                     Ok(listener) => listener,

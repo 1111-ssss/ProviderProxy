@@ -374,7 +374,10 @@ function applyConfig(c) {
   AUTH = c.authToken
   LIMIT_COOLDOWN_MS = (c.limitCooldownSec ?? 300) * 1000 // 429/403/402: block provider 5 min then try again
   ERROR_COOLDOWN_MS = (c.errorCooldownSec ?? 30) * 1000 // 5xx/network: transient
-  HEADER_TIMEOUT_MS = (c.headerTimeoutSec ?? 20) * 1000 // abort if no response headers in time
+  // This is deliberately a header-only timeout. Once fetch() resolves, the
+  // upstream body is streamed without a wall-clock/read timeout: large
+  // contexts can spend a minute or more in inference before their first byte.
+  HEADER_TIMEOUT_MS = (c.headerTimeoutSec ?? 120) * 1000 // abort only if no response headers arrive in time
   for (const [name, chain] of chains)
     for (const up of chain)
       if (!up.apiKey && !up.headers.authorization) log(`warn: upstream ${up.name} (model "${name}") has no apiKey`)
@@ -553,6 +556,30 @@ async function* normalizeSse(body, exposed, upstream) {
   let buffer = ""
   let tail = ""
   const toolIndexes = new Map()
+  const finishReasons = new Map()
+  const toolChoices = new Set()
+  const choiceIndexes = new Set()
+  let lastMeta = {}
+  let doneSeen = false
+  // Some gateways send [DONE] without a terminal choice. Supply one so
+  // strict OpenAI-compatible clients always see finish_reason.
+  const terminal = () => {
+    const pending = [...choiceIndexes].filter((index) => !finishReasons.has(index))
+    if (!pending.length) return ""
+    const choices = pending.map((index) => ({
+      index,
+      delta: {},
+      finish_reason: toolChoices.has(index) ? "tool_calls" : "stop",
+    }))
+    for (const choice of choices) finishReasons.set(choice.index, choice.finish_reason)
+    return `data: ${JSON.stringify({
+      ...(lastMeta.id ? { id: lastMeta.id } : {}),
+      object: lastMeta.object ?? "chat.completion.chunk",
+      ...(lastMeta.created ? { created: lastMeta.created } : {}),
+      model: lastMeta.model ?? upstream.model,
+      choices,
+    })}\n\n`
+  }
   const emit = (rawEvent) => {
     const data = rawEvent
       .split("\n")
@@ -560,7 +587,11 @@ async function* normalizeSse(body, exposed, upstream) {
       .map((line) => line.slice(5).replace(/^ /, ""))
     if (!data.length) return ""
     const payload = data.join("\n").trim()
-    if (!payload || payload === "[DONE]") return payload === "[DONE]" ? "data: [DONE]\n\n" : ""
+    if (!payload) return ""
+    if (payload === "[DONE]") {
+      doneSeen = true
+      return `${terminal()}data: [DONE]\n\n`
+    }
     try {
       const parsed = JSON.parse(payload)
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -576,12 +607,22 @@ async function* normalizeSse(body, exposed, upstream) {
         log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен пустой SSE кадр`)
         return ""
       }
+      lastMeta = {
+        id: parsed.id,
+        object: parsed.object,
+        created: parsed.created,
+        model: parsed.model,
+      }
       parsed.choices = parsed.choices.map((choice, choicePosition) => {
         const normalized = { ...choice, index: Number.isFinite(choice?.index) ? choice.index : choicePosition }
+        choiceIndexes.add(normalized.index)
+        if (normalized.finish_reason != null) finishReasons.set(normalized.index, normalized.finish_reason)
+        else normalized.finish_reason = null
         if (choice?.delta && typeof choice.delta === "object" && !Array.isArray(choice.delta)) {
           normalized.delta = { ...choice.delta }
           if (Array.isArray(choice.delta.tool_calls)) {
             normalized.delta.tool_calls = choice.delta.tool_calls.map((call, callPosition) => {
+              toolChoices.add(normalized.index)
               const key = `${normalized.index}:${call?.id ?? callPosition}`
               const index = Number.isFinite(call?.index) ? call.index : (toolIndexes.get(key) ?? callPosition)
               toolIndexes.set(key, index)
@@ -629,12 +670,31 @@ async function* normalizeSse(body, exposed, upstream) {
   }
   buffer += tail + decoder.decode()
   yield* drain(true)
+  if (!doneSeen) {
+    const final = terminal()
+    if (final) yield final
+    if (choiceIndexes.size) yield "data: [DONE]\n\n"
+  }
 }
 
-const FAILOVER = (status) => status === 402 || status === 403 || status === 408 || status === 429 || status >= 500
+// Never fail over ordinary client errors (400/401/404/etc.). A chain may
+// switch only for these known quota/access/timeout/server failures.
+const FAILOVER = (status) => status === 402 || status === 403 || status === 408 || status === 429 || (status >= 500 && status <= 599)
 
 // opencode не умеет сам брать список моделей у кастомного провайдера (GET /v1/models он не зовёт),
 // поэтому карта моделей должна лежать в его конфиге. Синхронизируем её отсюда: провайдер — источник истины.
+const modelContextLength = (provider, model) => {
+  const value = Number(config.providers?.[provider]?.modelInfo?.[model]?.contextLength)
+  return Number.isSafeInteger(value) && value > 0 ? value : null
+}
+const chainContextLength = (chain) => {
+  const contexts = chain.map((upstream) => modelContextLength(upstream.name, upstream.model)).filter(Boolean)
+  return contexts.length ? Math.min(...contexts) : null
+}
+function applyModelContext(entry, context) {
+  if (!context || !entry || typeof entry !== "object") return
+  entry.limit = { ...(entry.limit && typeof entry.limit === "object" ? entry.limit : {}), context }
+}
 function syncOpencode() {
   const path = resolveOpencodeConfigPath()
   const id = config.opencodeProvider ?? "provider-proxy"
@@ -675,6 +735,7 @@ function syncOpencode() {
     // entry is backed by the proxy and how many fallback models it contains.
     p.models[name] = { name: `${name} (proxy, x${chain.length})` }
     for (const [k, v] of Object.entries(old)) if (k !== "name") p.models[name][k] = v
+    applyModelContext(p.models[name], chainContextLength(chain))
   }
   const directEntries = []
   for (const [provider, def] of Object.entries(config.opencodeModels ?? {})) {
@@ -685,6 +746,7 @@ function syncOpencode() {
       const old = prev[name] ?? {}
       p.models[name] = { name: `${name} (config)` }
       for (const [k, v] of Object.entries(old)) if (k !== "name") p.models[name][k] = v
+      applyModelContext(p.models[name], modelContextLength(provider, model))
       directEntries.push(name)
     }
   }
@@ -1193,6 +1255,11 @@ const server = http.createServer(async (req, res) => {
     } else res.destroy()
   }
 })
+// Do not let Node's generic socket/request timers terminate a long inference
+// while the upstream is still producing a valid response. The upstream header
+// deadline is controlled separately by headerTimeoutSec above.
+server.requestTimeout = 0
+server.timeout = 0
 
 // "1m 30s" / "45s" / "5m" — human readable duration for log lines.
 const fmtDur = (ms) => {

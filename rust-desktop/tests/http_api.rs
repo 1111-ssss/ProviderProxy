@@ -302,7 +302,7 @@ async fn forwards_sse_body_headers_and_usage() {
     assert_eq!(response.headers()["x-request-id"], "test-request");
     assert_eq!(
         response.text().await.unwrap(),
-        "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"},\"index\":0}]}\n\ndata: {\"usage\":{\"completion_tokens\":11,\"prompt_tokens\":7}}\n\ndata: [DONE]\n\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"},\"finish_reason\":null,\"index\":0}]}\n\ndata: {\"usage\":{\"completion_tokens\":11,\"prompt_tokens\":7}}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\",\"index\":0}],\"object\":\"chat.completion.chunk\"}\n\ndata: [DONE]\n\n"
     );
     let usage = proxy.usage().await;
     assert_eq!(usage["tokensIn"], 7);

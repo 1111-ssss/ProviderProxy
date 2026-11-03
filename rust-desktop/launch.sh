@@ -25,6 +25,12 @@ if [ -z "${CARGO_BIN:-}" ]; then
     fi
   done
 fi
+if [ -z "$CARGO_BIN" ] && command -v rustup >/dev/null 2>&1; then
+  # Some desktop sessions keep an old system cargo first in PATH while the
+  # usable toolchain is managed by rustup. Resolve the selected cargo binary
+  # instead of making the shortcut fail with a misleading "cargo not found".
+  CARGO_BIN="$(rustup which cargo 2>/dev/null || true)"
+fi
 
 mkdir -p "$STATE_DIR"
 export PP_CONFIG_FILE="$CONFIG"

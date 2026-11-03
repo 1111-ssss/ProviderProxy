@@ -2,7 +2,7 @@
   "port": 8787,
   "limitCooldownSec": 300,
   "errorCooldownSec": 30,
-  "headerTimeoutSec": 20,
+  "headerTimeoutSec": 120,
   "providers": {
     "anthropic": {
       "baseURL": "https://api.anthropic.com/v1",

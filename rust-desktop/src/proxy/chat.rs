@@ -6,6 +6,7 @@ use axum::{
 };
 use serde_json::Value;
 use std::time::{Duration, Instant};
+use tokio::time::timeout;
 
 use super::{
     auth::authorized,
@@ -15,6 +16,20 @@ use super::{
     stream::stream_upstream_response,
     types::AppState,
 };
+
+async fn send_with_header_timeout(
+    request: reqwest::RequestBuilder,
+    header_timeout_sec: u64,
+) -> Result<reqwest::Response, String> {
+    let request = request.send();
+    if header_timeout_sec == 0 {
+        return request.await.map_err(|err| err.to_string());
+    }
+    timeout(Duration::from_secs(header_timeout_sec), request)
+        .await
+        .map_err(|_| "header timeout".to_string())?
+        .map_err(|err| err.to_string())
+}
 
 pub(super) async fn chat_completions(
     State(state): State<AppState>,
@@ -64,7 +79,14 @@ pub(super) async fn chat_completions(
         for (key, value) in &upstream.headers {
             request = request.header(key, value);
         }
-        let response = match request.timeout(Duration::from_secs(120)).send().await {
+        let header_timeout_sec = state
+            .config
+            .read()
+            .unwrap()
+            .get("headerTimeoutSec")
+            .and_then(Value::as_u64)
+            .unwrap_or(120);
+        let response = match send_with_header_timeout(request, header_timeout_sec).await {
             Ok(response) => response,
             Err(err) => {
                 let cooldown = Duration::from_secs(

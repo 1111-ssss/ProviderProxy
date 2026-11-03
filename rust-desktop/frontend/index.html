@@ -102,6 +102,12 @@
   .model-actions { display: flex; gap: 6px; order: 2; margin-left: auto; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
+  .provider-model-row:hover { border-color: var(--border); background: rgba(34, 45, 57, .35); }
+  .provider-model-row .check { flex: 1; min-width: 0; }
+  .provider-model-row .check code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-settings-button { flex: 0 0 auto; min-width: 30px; min-height: 28px; padding: 2px 7px; color: var(--muted); font-size: 18px; line-height: 1; }
+  .model-settings-button:hover { color: var(--text); }
   input[type="checkbox"] { accent-color: var(--accent-strong); width: 16px; height: 16px; }
   dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 16px; padding: 0; width: min(680px, calc(100vw - 28px)); max-height: calc(100vh - 28px); box-shadow: var(--shadow); }
   dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
@@ -310,6 +316,7 @@
   .image-settings-button { min-width: 38px; padding: 7px 9px; }
   .image-settings-button svg { width: 17px; height: 17px; }
   #dlg-image-settings { width: min(620px, calc(100vw - 28px)); }
+  #dlg-model-settings { width: min(440px, calc(100vw - 28px)); }
   .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid rgba(111, 153, 237, .3); border-radius: 10px; background: rgba(34, 45, 57, .48); }
   .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .skill-card h4 { margin: 0; }
@@ -408,7 +415,7 @@
         <button data-tab="usage"><span class="tab-index">07</span><span class="tab-label">Статистика</span></button>
       </div>
     </div>
-    <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
+        <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
   </nav>
 
   <section data-tab="providers">
@@ -886,6 +893,27 @@
   </form>
 </dialog>
 
+<!-- Диалог: параметры модели провайдера -->
+<dialog id="dlg-model-settings" aria-labelledby="dms-title" aria-describedby="dms-help">
+  <form method="dialog" id="dms-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="dms-title">Параметры модели</h3>
+      <p id="dms-help">Параметры сохраняются для выбранных, локально добавленных и доступных у провайдера моделей.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">—</strong></div>
+      <label>Контекст модели, токенов
+        <input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000">
+      </label>
+      <p class="muted" style="margin:0 0 10px">Оставь поле пустым, чтобы убрать ручное значение и использовать данные провайдера.</p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="dms-cancel">Отмена</button>
+      <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Диалог: настройки генерации изображений -->
 <dialog id="dlg-image-settings" aria-labelledby="image-settings-title" aria-describedby="image-settings-help">
   <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
@@ -938,6 +966,28 @@ const isImageModel = (provider, id) => {
 }
 const imageModelEndpoint = (provider, id) => (modelDetails(provider, id)?.endpoints ?? []).find((endpoint) => /images\/generations/i.test(String(endpoint))) ? "images/generations" : "images/tasks"
 const imageIcon = (label = "Модель изображений") => `<span class="model-kind-icon" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5-5 3 3 2-2 6 5"></path></svg></span>`
+function mergeProviderModelDetails(provider, details) {
+  provider.modelInfo ??= {}
+  for (const [id, detail] of Object.entries(details ?? {})) {
+    const previous = provider.modelInfo[id] ?? {}
+    const manualContext = previous.contextLengthManual === true && Number(previous.contextLength) > 0 ? Number(previous.contextLength) : null
+    const providerContext = Number(detail?.contextLength) > 0 ? Number(detail.contextLength) : null
+    const next = { ...previous, ...(detail && typeof detail === "object" ? detail : {}) }
+    if (providerContext) next.providerContextLength = providerContext
+    else delete next.providerContextLength
+    if (manualContext) {
+      next.contextLength = manualContext
+      next.contextLengthManual = true
+    } else if (providerContext) {
+      next.contextLength = providerContext
+      delete next.contextLengthManual
+    } else {
+      delete next.contextLength
+      delete next.contextLengthManual
+    }
+    provider.modelInfo[id] = next
+  }
+}
 const formatContext = (value) => {
   const n = Number(value)
   if (!Number.isFinite(n) || n <= 0) return ""
@@ -1024,7 +1074,24 @@ function flash(ok, msg) {
 }
 
 let saveT
+function modelHasLocalReference(provider, id) {
+  if (Object.values(cfg.models ?? {}).some((def) => (def?.upstreams ?? []).some((upstream) => upstream.provider === provider && upstream.model === id))) return true
+  return (cfg.opencodeModels?.[provider]?.models ?? []).includes(id)
+}
+function cleanupModelMetadata() {
+  for (const [providerName, provider] of Object.entries(cfg.providers ?? {})) {
+    const selected = new Set(provider.models ?? [])
+    const available = new Set(Object.entries(provider.modelAvailability ?? {}).filter(([, state]) => state?.available === true).map(([id]) => id))
+    for (const id of Object.keys(provider.modelInfo ?? {})) {
+      if (!selected.has(id) && !available.has(id) && !modelHasLocalReference(providerName, id)) delete provider.modelInfo[id]
+    }
+    for (const id of Object.keys(provider.modelAvailability ?? {})) {
+      if (!selected.has(id) && !available.has(id) && !modelHasLocalReference(providerName, id)) delete provider.modelAvailability[id]
+    }
+  }
+}
 function save() {
+  cleanupModelMetadata()
   clearTimeout(saveT)
   debugLog("save-scheduled")
   saveT = setTimeout(async () => {
@@ -1310,7 +1377,7 @@ function renderSettings() {
   $("s-auth").placeholder = cfg.authTokenConfigured ? "оставить текущий токен" : "не задан"
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
-  $("s-header").value = cfg.headerTimeoutSec ?? 20
+  $("s-header").value = cfg.headerTimeoutSec ?? 120
   $("s-theme").value = settings.theme
   $("s-auto-update").checked = settings.autoUpdate
   $("s-auto-restart").checked = settings.autoRestart
@@ -1469,6 +1536,44 @@ $("settings-shutdown").onclick = async () => {
     flash(false, `не удалось выйти из приложения: ${error.message}`)
   }
 }
+
+const dlgModelSettings = $("dlg-model-settings")
+let modelSettingsDraft = null
+function openModelSettings(provider, id) {
+  const info = modelDetails(provider, id) ?? {}
+  modelSettingsDraft = { provider, id }
+  dlgModelSettings.returnValue = ""
+  $("dms-model").textContent = `${provider}/${id}`
+  $("dms-context").value = Number(info.contextLength) > 0 ? String(info.contextLength) : ""
+  dlgModelSettings.showModal()
+  $("dms-context").focus()
+}
+$("dms-cancel").onclick = () => dlgModelSettings.close()
+dlgModelSettings.addEventListener("close", () => {
+  if (dlgModelSettings.returnValue !== "save" || !modelSettingsDraft) return
+  const { provider, id } = modelSettingsDraft
+  const providerConfig = cfg.providers[provider]
+  if (!providerConfig) return
+  const raw = $("dms-context").value.trim()
+  const info = { ...(providerConfig.modelInfo?.[id] ?? {}) }
+  if (raw) {
+    const context = Number(raw)
+    if (!Number.isSafeInteger(context) || context <= 0) return flash(false, "контекст должен быть положительным целым числом")
+    info.contextLength = context
+    info.contextLengthManual = true
+  } else {
+    delete info.contextLengthManual
+    if (Number(info.providerContextLength) > 0) info.contextLength = Number(info.providerContextLength)
+    else delete info.contextLength
+  }
+  providerConfig.modelInfo ??= {}
+  if (Object.keys(info).length) providerConfig.modelInfo[id] = info
+  else delete providerConfig.modelInfo[id]
+  save()
+  renderProviderModels()
+  renderModels()
+  renderOpencodeModels()
+})
 
 const dlgImageSettings = $("dlg-image-settings")
 const imageSkillStatusNode = $("image-skill-status")
@@ -1985,9 +2090,9 @@ async function loadPmModels(name) {
     const returned = new Set(res.ids)
     const availability = (provider.modelAvailability ??= {})
     for (const id of ids) availability[id] = { available: returned.has(id), checkedAt: new Date().toISOString() }
-    provider.modelInfo ??= {}
-    Object.assign(provider.modelInfo, res.details ?? {})
+    mergeProviderModelDetails(provider, res.details)
     pmState.ids = ids
+    cleanupModelMetadata()
     const chainsChanged = removeImageModelsFromChains()
     save()
     if (chainsChanged) {
@@ -2108,10 +2213,13 @@ function renderPmList() {
     ? shown
         .map(
            (id) => `
-        <label class="check">
-          <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
-            <code>${esc(id)}</code>${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}
-        </label>`,
+        <div class="provider-model-row">
+          <label class="check">
+            <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
+              <code>${esc(id)}</code>${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}
+          </label>
+          <button type="button" class="model-settings-button" data-model-settings="${esc(id)}" aria-label="Параметры модели ${esc(id)}" title="Параметры модели">⋮</button>
+        </div>`,
         )
         .join("")
     : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить с /v1/models» или добавь вручную"}</span>`
@@ -2124,6 +2232,8 @@ function renderPmList() {
       if (!cb.checked && i >= 0) {
         arr.splice(i, 1)
         removeModelReferences(pmState.provider, cb.dataset.id)
+        if (cfg.providers[pmState.provider].modelAvailability?.[cb.dataset.id]?.available !== true)
+          pmState.ids = pmState.ids.filter((id) => id !== cb.dataset.id)
       }
       save()
       renderProviders() // счётчик моделей в таблице провайдеров
@@ -2133,6 +2243,9 @@ function renderPmList() {
       renderImageGenerator()
       $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
     }
+  })
+  $("pm-list").querySelectorAll("button[data-model-settings]").forEach((button) => {
+    button.onclick = () => openModelSettings(pmState.provider, button.dataset.modelSettings)
   })
 }
 

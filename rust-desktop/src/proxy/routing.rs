@@ -166,6 +166,9 @@ pub(crate) fn with_model(body: &Value, model: &str) -> Value {
 }
 
 pub(crate) fn failover_status(status: axum::http::StatusCode) -> bool {
+    // Ordinary client errors are request/model errors and must not silently
+    // switch to another model. Only known quota/access/timeout/server errors
+    // are eligible for chain failover.
     matches!(
         status,
         axum::http::StatusCode::PAYMENT_REQUIRED

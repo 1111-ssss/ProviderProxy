@@ -27,20 +27,17 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
-      - name: Verify release version
+      - name: Set release version from tag
         shell: bash
         run: |
           version="${RELEASE_TAG#app-v}"
-          cargo_version=$(sed -n 's/^version = "\([^\"]*\)"/\1/p' rust-desktop/Cargo.toml | head -n 1)
-          tauri_version=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' rust-desktop/tauri.conf.json | head -n 1)
-          test "$version" = "$cargo_version" || {
-            echo "Tag $RELEASE_TAG does not match Cargo.toml version $cargo_version" >&2
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]] || {
+            echo "Invalid release tag: $RELEASE_TAG" >&2
             exit 1
           }
-          test "$version" = "$tauri_version" || {
-            echo "Tag $RELEASE_TAG does not match tauri.conf.json version $tauri_version" >&2
-            exit 1
-          }
+          sed -i "0,/^version = \"[^\"]*\"$/s//version = \"$version\"/" rust-desktop/Cargo.toml
+          sed -i "0,/\"version\": \"[^\"]*\"/s//\"version\": \"$version\"/" rust-desktop/tauri.conf.json
+          sed -i "/name = \"provider-proxy-desktop\"/{n;s/version = \"[^\"]*\"/version = \"$version\"/;}" rust-desktop/Cargo.lock
 
       - name: Install build dependencies
         run: |
@@ -58,6 +55,19 @@ jobs:
           mkdir -p "$RUNNER_TEMP/provider-proxy-release"
           PP_RELEASE_OUTPUT_DIR="$RUNNER_TEMP/provider-proxy-release" ./build-release.sh
 
+      - name: Package Node.js version
+        env:
+          VERSION: ${{ env.RELEASE_TAG }}
+        run: |
+          version="${VERSION#app-v}"
+          package_dir="$RUNNER_TEMP/provider-proxy-node/provider-proxy-node-v$version"
+          mkdir -p "$package_dir"
+          cp README.md server.mjs config.example.json launch.sh launch-windows.ps1 "$package_dir/"
+          cp -R public skills "$package_dir/"
+          (cd "$RUNNER_TEMP/provider-proxy-node" && zip -qr \
+            "$RUNNER_TEMP/provider-proxy-release/Provider-Proxy-Node-v$version.zip" \
+            "provider-proxy-node-v$version")
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,7 +75,7 @@ jobs:
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \
               --title "Provider Proxy $RELEASE_TAG" \
-              --notes "Unsigned portable ZIP builds for Linux and Windows."
+              --notes "Unsigned portable ZIP builds for Rust desktop (Linux and Windows) and Node.js."
           fi
           gh release upload "$RELEASE_TAG" \
             "$RUNNER_TEMP/provider-proxy-release/Provider-Proxy-v"*.zip \
