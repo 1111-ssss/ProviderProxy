@@ -107,28 +107,25 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ### Релизы и автоматическое обновление
 
-Desktop-приложение проверяет GitHub Releases через Tauri Updater через несколько секунд после
-запуска. Если найдена новая подписанная версия, в правом верхнем углу появляется предложение
-обновить приложение и перезапустить его. В настройках можно включить автоматическую загрузку и
-отдельно автоматический перезапуск после установки. Для аварийного отключения проверки задайте
+Desktop-приложение через несколько секунд после запуска проверяет последний GitHub Release через
+GitHub API. Для текущей платформы оно ищет ZIP с именем
+`Provider-Proxy-vX.Y.Z-windows-x64.zip` или `Provider-Proxy-vX.Y.Z-linux-x64.zip`.
+Если найдена новая версия, в правом верхнем углу появляется предложение обновить приложение и
+перезапустить его. В настройках можно включить автоматическую загрузку и отдельно автоматический
+перезапуск после установки. ZIP распаковывается, бинарник заменяется после завершения текущего
+процесса, затем приложение запускается снова. Для аварийного отключения проверки задайте
 `PP_DISABLE_UPDATES=1`.
+
+Обновления ZIP не подписываются. Это проще для локального релиза, но менее безопасно: приложение
+доверяет HTTPS GitHub и правам владельца репозитория, поэтому не публикуйте релизы в репозитории,
+доступ к которому могут получить посторонние.
 
 В настройках также доступны темы «Тёмная», «Светлая» и «Как в системе», а для desktop-версии —
 автозапуск вместе с Windows или Linux. На Windows используется пользовательский ключ Run, на
 Linux — файл `$XDG_CONFIG_HOME/autostart/provider-proxy.desktop`.
 
-Workflow `.github/workflows/release.yml` собирает Windows installer `.exe`, portable `.exe` и
-Linux AppImage и публикует `latest.json`, который использует updater. Перед первым релизом один
-раз создайте ключ:
-
-```bash
-cargo tauri signer generate -- -w ~/.tauri/provider-proxy.key
-```
-
-Содержимое приватного ключа добавьте в GitHub Actions Secret `TAURI_SIGNING_PRIVATE_KEY`, пароль —
-в `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (если задавали). Содержимое файла `.pub` должно быть в
-поле `plugins.updater.pubkey` в `rust-desktop/tauri.conf.json`; публичный ключ можно коммитить,
-приватный нельзя.
+Workflow `.github/workflows/release.yml` собирает и публикует неподписанные ZIP с portable-
+бинарниками Linux и Windows. Для этого ключ подписи не нужен.
 
 Релиз создаётся пушем тега версии, например:
 
@@ -138,7 +135,7 @@ git push origin app-v0.1.1
 ```
 
 Версия в `rust-desktop/Cargo.toml` и `rust-desktop/tauri.conf.json` должна совпадать с тегом.
-После публикации пользователи уже установленной версии получат обновление автоматически.
+После публикации пользователи уже установленной версии увидят обновление при следующем запуске.
 
 ### Сборка `.exe`
 
@@ -148,30 +145,30 @@ git push origin app-v0.1.1
 cd rust-desktop
 Set-ExecutionPolicy -Scope Process Bypass
 .\build-windows.ps1                 # target\release\provider-proxy-desktop.exe
-.\build-windows.ps1 -Installer      # installer и updater-артефакты
+.\build-windows.ps1 -Installer      # установщики Tauri без updater-подписи
 ```
 
-Для `-Installer` нужен `TAURI_SIGNING_PRIVATE_KEY`. Обычная команда собирает exe и удобна для
-локальной проверки; чтобы отключить проверку обновлений при таком запуске, задайте
+Обычная команда собирает exe и удобна для локальной проверки; чтобы отключить проверку обновлений
+при таком запуске, задайте
 `$env:PP_DISABLE_UPDATES=1`. Linux можно собрать аналогично:
-`./build-linux.sh` создаёт бинарник, а `./build-linux.sh --bundle` — AppImage.
+`./build-linux.sh` создаёт бинарник, а `./build-linux.sh --bundle` — AppImage без updater-подписи.
 
 Есть единые команды из корня проекта:
 
 ```bash
 ./release.sh              # Linux: target/release/provider-proxy-desktop
-./release.sh --bundle     # Linux: AppImage и остальные пакеты Tauri
+./release.sh --bundle     # Linux: AppImage и остальные пакеты Tauri без updater-подписи
 ```
 
 На Windows используйте PowerShell:
 
 ```powershell
 .\release.ps1             # Windows: provider-proxy-desktop.exe
-.\release.ps1 -Bundle     # Windows: установщик и updater-артефакты
+.\release.ps1 -Bundle     # Windows: установщики Tauri без updater-подписи
 ```
 
-Для сборки обоих вариантов на чистых окружениях используется GitHub Actions: пуш тега
-`app-vX.Y.Z` запускает матрицу Windows/Linux и публикует артефакты релиза.
+Для сборки обоих ZIP-вариантов на чистом Linux-окружении используется GitHub Actions: пуш тега
+`app-vX.Y.Z` запускает кросс-сборку и публикует ZIP-артефакты релиза.
 
 После смены названия desktop-приложения старый ярлык `Provider Proxy` может остаться
 от ранее установленного `.deb`/`.rpm`. Два актуальных ярлыка устанавливаются так:

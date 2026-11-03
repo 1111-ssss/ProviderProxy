@@ -1,5 +1,5 @@
 use provider_proxy_desktop::proxy::{default_config_path, start_server};
-use serde::Serialize;
+mod updater;
 #[cfg(target_os = "windows")]
 use std::process::Command;
 use std::sync::Arc;
@@ -15,76 +15,31 @@ use tauri::{
     Manager, Url, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_updater::UpdaterExt;
-
-#[derive(Debug, Serialize)]
-struct UpdateInfo {
-    version: String,
-    current_version: String,
-}
 
 #[tauri::command]
-async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
-    // Do not make a locally compiled/debug binary unexpectedly replace itself.
-    if cfg!(debug_assertions) || std::env::var_os("PP_DISABLE_UPDATES").is_some() {
-        return Ok(None);
-    }
-
-    let update = app
-        .updater()
-        .map_err(|error| error.to_string())?
-        .check()
-        .await
-        .map_err(|error| error.to_string())?;
-    Ok(update.map(|update| UpdateInfo {
-        version: update.version,
-        current_version: update.current_version,
-    }))
+async fn check_for_update() -> Result<Option<updater::UpdateInfo>, String> {
+    updater::check_for_update().await
 }
 
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle, restart: bool) -> Result<bool, String> {
-    if cfg!(debug_assertions) || std::env::var_os("PP_DISABLE_UPDATES").is_some() {
-        return Ok(false);
-    }
-
-    let Some(update) = app
-        .updater()
-        .map_err(|error| error.to_string())?
-        .check()
-        .await
-        .map_err(|error| error.to_string())?
-    else {
-        return Ok(false);
-    };
-
-    eprintln!(
-        "[updater] installing version {} (current {}, restart: {restart})",
-        update.version, update.current_version
-    );
-    let mut downloaded = 0_usize;
-    update
-        .restart_after_install(restart)
-        .download_and_install(
-            |chunk_length, content_length| {
-                downloaded += chunk_length;
-                eprintln!("[updater] downloaded {downloaded} bytes of {content_length:?}");
-            },
-            || eprintln!("[updater] download finished"),
-        )
-        .await
-        .map_err(|error| error.to_string())?;
-
-    eprintln!("[updater] update installed");
+    let installed = updater::install_update(restart).await?;
     if restart {
-        app.restart();
+        if installed {
+            app.exit(0);
+        }
     }
-    Ok(true)
+    Ok(installed)
 }
 
 #[tauri::command]
 fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
-    app.restart();
+    if updater::restart_pending()? {
+        app.exit(0);
+    } else {
+        app.restart();
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
@@ -210,7 +165,6 @@ fn main() {
     let server = Arc::new(start_server(config_path).expect("provider_proxy server must start"));
     let port = server.port;
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
         // Handle new windows natively; the GUI is served over the local HTTP
         // API and must not need remote IPC permissions to open a web link.
         .plugin(

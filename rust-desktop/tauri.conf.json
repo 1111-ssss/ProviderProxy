@@ -16,21 +16,10 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
     "icon": [
       "icons/icon.png"
     ]
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5M0E5QzI5NTEyQ0E5QTkKUldTcHFTeFJLWnc2dVhxTnVGeXlPcHF1cTlORlQxSWZtNjJHd3RMeWFDdDdjbmR2UXNnMlRzWFQK",
-      "endpoints": [
-        "https://github.com/1111-ssss/ProviderProxy/releases/latest/download/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
   }
 }

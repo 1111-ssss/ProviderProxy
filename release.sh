@@ -20,7 +20,7 @@ usage() {
   ./release.sh --bundle     собрать бинарник и пакеты Tauri (AppImage и другие доступные)
   ./release.sh --help       показать эту справку
 
-Для пакетной сборки с updater-артефактами задайте TAURI_SIGNING_PRIVATE_KEY.
+Подпись updater-артефактов не используется; для ZIP-релиза используйте ./build-release.sh.
 EOF
 }
 

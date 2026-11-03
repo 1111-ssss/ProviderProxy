@@ -8,13 +8,9 @@ $RustDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $RustDir
 
 if ($Installer) {
-    if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
-        throw "Для установщика и автообновлений задайте TAURI_SIGNING_PRIVATE_KEY."
-    }
     & cargo tauri build --ci -- --locked
 } else {
-    # This produces target\release\provider-proxy-desktop.exe without requiring
-    # a signing key. Signed installers are built with -Installer or in CI.
+    # This produces target\release\provider-proxy-desktop.exe.
     & cargo build --release --locked
 }
 
