@@ -441,6 +441,7 @@ try {
   assert.deepEqual(Object.keys(oc.providers["provider-proxy"].models), ["fresh", "B/model-b2"])
   assert.equal(oc.providers["provider-proxy"].models.paused, undefined, "disabled chains must be omitted from OpenCode")
   assert.equal(oc.providers["provider-proxy"].models.fresh.name, "fresh (proxy, x2)")
+  assert.equal(oc.providers["provider-proxy"].models.fresh.limit.context, 32768, "chain context should use the smallest upstream context")
   assert.equal(oc.providers["provider-proxy"].models["B/model-b2"].name, "B/model-b2 (config)")
   assert.equal(oc.providers["provider-proxy"].models["B/model-b2"].limit.context, 32768, "model context should reach OpenCode")
   assert.equal(oc.providers["provider-proxy"].settings.baseURL, `${base(PROXY)}/v1`)

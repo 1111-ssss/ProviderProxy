@@ -883,6 +883,10 @@
             <input id="s-auto-restart" type="checkbox">
             <span>Перезапускать после обновления автоматически<small>Без перезапуска обновлённая версия не активируется.</small></span>
           </label>
+          <div class="setting-option setting-action" id="s-check-update-wrap">
+            <span>Проверить обновления<small id="s-check-update-help">Проверяет последний GitHub Release.</small></span>
+            <button type="button" id="s-check-update">Проверить</button>
+          </div>
         </div>
       </div>
       <div class="settings-block wide">
@@ -1051,6 +1055,7 @@
       <label>Контекст модели, токенов
         <input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000">
       </label>
+      <button type="button" id="dms-context-max">Максимальный</button>
       <p class="muted" style="margin:0 0 10px">Оставь поле пустым, чтобы убрать ручное значение и использовать данные провайдера.</p>
     </div>
     <div class="dialog-actions">
@@ -1134,7 +1139,7 @@ function mergeProviderModelDetails(provider, details) {
     if (providerContext) next.providerContextLength = providerContext
     else delete next.providerContextLength
     if (manualContext) {
-      next.contextLength = manualContext
+      next.contextLength = providerContext ? Math.min(manualContext, providerContext) : manualContext
       next.contextLengthManual = true
     } else if (providerContext) {
       next.contextLength = providerContext
@@ -1149,12 +1154,30 @@ function mergeProviderModelDetails(provider, details) {
 const formatContext = (value) => {
   const n = Number(value)
   if (!Number.isFinite(n) || n <= 0) return ""
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 ? 1 : 0)}M`
+  if (n >= 1_000_000) {
+    const value = Math.round((n / 1_000_000) * 10) / 10
+    return `${Number.isInteger(value) ? value : value.toFixed(1)}m`
+  }
   if (n >= 1000) return `${Math.round(n / 1000)}k`
   return String(Math.round(n))
 }
+const contextValues = (info) => {
+  const provider = Number(info?.providerContextLength)
+  const hasProvider = Number.isSafeInteger(provider) && provider > 0
+  const raw = Number(info?.contextLength)
+  const hasRaw = Number.isSafeInteger(raw) && raw > 0
+  const manual = info?.contextLengthManual === true && hasRaw ? Math.min(raw, hasProvider ? provider : raw) : null
+  const current = manual ?? (hasRaw ? Math.min(raw, hasProvider ? provider : raw) : hasProvider ? provider : null)
+  return { current, manual, provider: hasProvider ? provider : null }
+}
+const contextLabel = (info) => {
+  const values = contextValues(info)
+  return values.manual && values.provider
+    ? `${formatContext(values.manual)} / ${formatContext(values.provider)}`
+    : formatContext(values.current)
+}
 const contextBadge = (provider, id) => {
-  const context = formatContext(modelDetails(provider, id)?.contextLength)
+  const context = contextLabel(modelDetails(provider, id))
   return context ? `<span class="model-context">контекст ${esc(context)}</span>` : ""
 }
 const availabilityBadge = (provider, id) => {
@@ -1545,6 +1568,9 @@ function renderSettings() {
   $("s-auto-update").disabled = !desktop
   $("s-auto-update-wrap").classList.toggle("is-disabled", !desktop)
   $("s-auto-update-help").textContent = desktop ? "Проверка выполняется после запуска приложения." : "доступно в desktop-версии"
+  $("s-check-update").disabled = !desktop
+  $("s-check-update-wrap").classList.toggle("is-disabled", !desktop)
+  $("s-check-update-help").textContent = desktop ? "Проверяет последний GitHub Release." : "доступно в desktop-версии"
   $("s-autostart").checked = settings.autostart
   $("s-autostart").disabled = !desktop
   $("s-autostart-wrap").classList.toggle("is-disabled", !desktop)
@@ -1654,20 +1680,33 @@ async function installDesktopUpdate(restart = true) {
     updateBusy = false
   }
 }
-async function checkForDesktopUpdate() {
+async function checkForDesktopUpdate(manual = false) {
   if (!isDesktopApp() || updateBusy) return
+  const checkButton = $("s-check-update")
+  if (manual) {
+    checkButton.disabled = true
+    checkButton.textContent = "Проверяю…"
+  }
   try {
     const info = await tauriInvoke("check_for_update")
     if (!info) {
       updateInfo = null
-      setUpdateBanner("")
+      if (manual) setUpdateBanner("<strong>Обновлений нет.</strong>", "Проверить снова", () => checkForDesktopUpdate(true))
+      else setUpdateBanner("")
       return
     }
     updateInfo = info
     if (appSettings().autoUpdate) return installDesktopUpdate(appSettings().autoRestart)
     setUpdateBanner(`<strong>Доступна новая версия ${esc(info.version)}.</strong>`, "Обновить", () => installDesktopUpdate(true))
   } catch (error) {
-    debugLog("update-check-failed", { message: error.message ?? String(error) })
+    const message = error.message ?? String(error)
+    debugLog("update-check-failed", { message })
+    setUpdateBanner(`Не удалось проверить обновления: ${esc(message)}`, "Повторить", checkForDesktopUpdate)
+  } finally {
+    if (manual) {
+      checkButton.disabled = false
+      checkButton.textContent = "Проверить"
+    }
   }
 }
 async function syncAutostartSetting() {
@@ -1729,14 +1768,23 @@ const dlgModelSettings = $("dlg-model-settings")
 let modelSettingsDraft = null
 function openModelSettings(provider, id) {
   const info = modelDetails(provider, id) ?? {}
+  const values = contextValues(info)
   modelSettingsDraft = { provider, id }
   dlgModelSettings.returnValue = ""
   $("dms-model").textContent = `${provider}/${id}`
-  $("dms-context").value = Number(info.contextLength) > 0 ? String(info.contextLength) : ""
+  $("dms-context").value = values.current ? String(values.current) : ""
+  $("dms-context").max = values.provider ? String(values.provider) : ""
+  $("dms-context-max").disabled = !values.provider
+  $("dms-context-max").textContent = values.provider ? `Максимальный (${formatContext(values.provider)})` : "Максимальный"
   dlgModelSettings.showModal()
   $("dms-context").focus()
 }
 $("dms-cancel").onclick = () => dlgModelSettings.close()
+$("dms-context-max").onclick = () => {
+  const { provider, id } = modelSettingsDraft ?? {}
+  const values = contextValues(modelDetails(provider, id))
+  if (values.provider) $("dms-context").value = String(values.provider)
+}
 dlgModelSettings.addEventListener("close", () => {
   if (dlgModelSettings.returnValue !== "save" || !modelSettingsDraft) return
   const { provider, id } = modelSettingsDraft
@@ -1744,9 +1792,11 @@ dlgModelSettings.addEventListener("close", () => {
   if (!providerConfig) return
   const raw = $("dms-context").value.trim()
   const info = { ...(providerConfig.modelInfo?.[id] ?? {}) }
+  const maxContext = Number(info.providerContextLength)
   if (raw) {
     const context = Number(raw)
     if (!Number.isSafeInteger(context) || context <= 0) return flash(false, "контекст должен быть положительным целым числом")
+    if (Number.isSafeInteger(maxContext) && maxContext > 0 && context > maxContext) return flash(false, `контекст не может быть больше ${formatContext(maxContext)}`)
     info.contextLength = context
     info.contextLengthManual = true
   } else {
@@ -1852,6 +1902,7 @@ $("s-auto-update").onchange = (e) => {
   save()
   if (e.target.checked) checkForDesktopUpdate()
 }
+$("s-check-update").onclick = () => checkForDesktopUpdate(true)
 $("s-auto-restart").onchange = (e) => {
   appSettings().autoRestart = e.target.checked
   save()
@@ -2452,7 +2503,7 @@ function renderChips(containerId, provider, ids, onAdd, details = {}) {
     </div>
     <div class="fetched" style="margin-top:6px">
        ${shown.length
-         ? shown.map((id) => `<span class="chip"><code>${esc(id)}</code>${isImageModel(provider, id) ? imageIcon() : ""}${formatContext(details[id]?.contextLength) ? `<span class="model-context">ctx ${esc(formatContext(details[id]?.contextLength))}</span>` : ""}<button type="button" data-id="${esc(id)}" aria-label="Добавить модель ${esc(id)}" title="Добавить в цепочку">＋</button></span>`).join("")
+          ? shown.map((id) => { const context = contextLabel({ ...(details[id] ?? {}), ...(modelDetails(provider, id) ?? {}) }); return `<span class="chip"><code>${esc(id)}</code>${isImageModel(provider, id) ? imageIcon() : ""}${context ? `<span class="model-context">ctx ${esc(context)}</span>` : ""}<button type="button" data-id="${esc(id)}" aria-label="Добавить модель ${esc(id)}" title="Добавить в цепочку">＋</button></span>` }).join("")
         : `<span class="muted">ничего не найдено</span>`}
     </div>`
   const f = box.querySelector('[data-role="filter"]')

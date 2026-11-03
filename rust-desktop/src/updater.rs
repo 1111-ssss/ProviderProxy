@@ -90,7 +90,7 @@ fn parse_release_version(tag: &str) -> Result<Version, String> {
 }
 
 async fn latest_update() -> Result<Option<RemoteUpdate>, String> {
-    if cfg!(debug_assertions) || std::env::var_os("PP_DISABLE_UPDATES").is_some() {
+    if std::env::var_os("PP_DISABLE_UPDATES").is_some() {
         return Ok(None);
     }
 
@@ -261,7 +261,7 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
             )
         };
         let script = format!(
-            "$targetPid = {pid}\nwhile (Get-Process -Id $targetPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}\nMove-Item -LiteralPath {} -Destination {} -Force\n{}\nRemove-Item -LiteralPath {} -Recurse -Force -ErrorAction SilentlyContinue",
+            "$ErrorActionPreference = 'Stop'\n$targetPid = {pid}\nwhile (Get-Process -Id $targetPid -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}\n$moved = $false\nfor ($attempt = 0; $attempt -lt 50; $attempt++) {{\n    try {{\n        Move-Item -LiteralPath {} -Destination {} -Force\n        $moved = $true\n        break\n    }} catch {{\n        Start-Sleep -Milliseconds 200\n    }}\n}}\nif (-not $moved) {{ exit 1 }}\n{}\nRemove-Item -LiteralPath {} -Recurse -Force -ErrorAction SilentlyContinue",
             ps_quote(&binary),
             ps_quote(&current),
             start,
@@ -276,6 +276,8 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
         Command::new("powershell.exe")
             .args([
                 "-NoProfile",
+                "-WindowStyle",
+                "Hidden",
                 "-ExecutionPolicy",
                 "Bypass",
                 "-EncodedCommand",
@@ -299,7 +301,7 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
             format!("exec {} {}", sh_quote(&current), arguments.join(" "))
         };
         let script = format!(
-            "while kill -0 {pid} 2>/dev/null; do sleep 0.2; done; mv -f -- {} {}; chmod 755 {}; rm -rf -- {}; {}",
+            "while kill -0 {pid} 2>/dev/null; do sleep 0.2; done; moved=0; for attempt in $(seq 1 50); do if mv -f -- {} {}; then moved=1; break; fi; sleep 0.2; done; [ \"$moved\" -eq 1 ] || exit 1; chmod 755 {}; rm -rf -- {}; {}",
             sh_quote(&binary),
             sh_quote(&current),
             sh_quote(&current),
@@ -318,6 +320,9 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
 }
 
 pub(crate) async fn install_update(restart: bool) -> Result<bool, String> {
+    if cfg!(debug_assertions) {
+        return Err("автообновление доступно только в release-сборке приложения".into());
+    }
     let Some(update) = latest_update().await? else {
         return Ok(false);
     };

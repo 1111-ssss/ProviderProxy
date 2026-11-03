@@ -734,8 +734,11 @@ const FAILOVER = (status) => status === 402 || status === 403 || status === 408 
 // opencode не умеет сам брать список моделей у кастомного провайдера (GET /v1/models он не зовёт),
 // поэтому карта моделей должна лежать в его конфиге. Синхронизируем её отсюда: провайдер — источник истины.
 const modelContextLength = (provider, model) => {
-  const value = Number(config.providers?.[provider]?.modelInfo?.[model]?.contextLength)
-  return Number.isSafeInteger(value) && value > 0 ? value : null
+  const info = config.providers?.[provider]?.modelInfo?.[model] ?? {}
+  const value = Number(info.contextLength)
+  const providerValue = Number(info.providerContextLength)
+  if (!Number.isSafeInteger(value) || value <= 0) return Number.isSafeInteger(providerValue) && providerValue > 0 ? providerValue : null
+  return Number.isSafeInteger(providerValue) && providerValue > 0 ? Math.min(value, providerValue) : value
 }
 const chainContextLength = (chain) => {
   const contexts = chain.map((upstream) => modelContextLength(upstream.name, upstream.model)).filter(Boolean)

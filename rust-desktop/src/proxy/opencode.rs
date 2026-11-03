@@ -35,14 +35,22 @@ fn default_opencode_config_path(config: &Value) -> std::path::PathBuf {
 }
 
 fn model_context_length(config: &Value, provider: &str, model: &str) -> Option<u64> {
-    config
+    let info = config
         .get("providers")
         .and_then(|providers| providers.get(provider))
         .and_then(|provider| provider.get("modelInfo"))
-        .and_then(|models| models.get(model))
-        .and_then(|info| info.get("contextLength"))
-        .and_then(Value::as_u64)
-        .filter(|context| *context > 0)
+        .and_then(|models| models.get(model))?;
+    let context = info.get("contextLength").and_then(Value::as_u64);
+    let provider_context = info.get("providerContextLength").and_then(Value::as_u64);
+    match (
+        context.filter(|value| *value > 0),
+        provider_context.filter(|value| *value > 0),
+    ) {
+        (Some(context), Some(provider_context)) => Some(context.min(provider_context)),
+        (Some(context), None) => Some(context),
+        (None, Some(provider_context)) => Some(provider_context),
+        (None, None) => None,
+    }
 }
 
 fn chain_context_length(config: &Value, chain: &[super::types::Upstream]) -> Option<u64> {
