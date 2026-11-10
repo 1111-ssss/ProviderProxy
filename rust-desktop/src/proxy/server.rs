@@ -16,7 +16,7 @@ use super::{
     chat,
     config::{load_config, open_storage, LOG_MAX_DEFAULT},
     handlers,
-    metrics::{load_usage, push_log},
+    metrics::{load_lifetime, load_usage, push_log},
     routing::build_chains,
     types::{AppState, ServerHandle},
 };
@@ -50,6 +50,7 @@ pub fn start_server(
                 .join("usage-stats.json")
         });
     let (usage, usage_history, usage_day) = load_usage(&storage, &legacy_stats_path);
+    let lifetime = load_lifetime(&storage);
     let state = AppState {
         config_path: Arc::new(config_path),
         storage,
@@ -62,6 +63,7 @@ pub fn start_server(
         usage: Arc::new(Mutex::new(usage)),
         usage_history: Arc::new(Mutex::new(usage_history)),
         usage_day: Arc::new(Mutex::new(usage_day)),
+        lifetime: Arc::new(Mutex::new(lifetime)),
         image_tasks: Arc::new(Mutex::new(HashMap::new())),
         // Streaming responses must not have a total request timeout: the
         // upstream may spend a long time producing the first token and then
@@ -85,6 +87,7 @@ pub fn start_server(
         .spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
             super::metrics::persist_usage(&persistence_state);
+            super::metrics::persist_lifetime(&persistence_state);
         })?;
 
     let listener = TcpListener::bind(("127.0.0.1", port))?;

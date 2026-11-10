@@ -750,6 +750,7 @@
         <h2>8&nbsp;·&nbsp;Статистика</h2>
       <span class="muted" id="u-info"></span>
     </div>
+    <p class="muted" id="u-lifetime" style="margin:8px 0 0"></p>
     <p class="section-sub">История сохраняется локально за последние 7 дней и не сбрасывается при перезапуске. Токены видны, когда upstream их присылает.</p>
     <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div class="tiles" id="u-tiles"></div>
@@ -2956,6 +2957,12 @@ function renderUsageReport(report) {
     tile("ошибок", u.failed ?? 0) +
     tile("токенов вход", fmtTok(u.tokensIn)) +
     tile("токенов выход", fmtTok(u.tokensOut))
+  const lifetime = report.lifetimeTokens ?? {}
+  if (lifetime.tokensIn || lifetime.tokensOut) {
+    $("u-lifetime").textContent = `за всё время: ${fmtTok(lifetime.tokensIn)} вход · ${fmtTok(lifetime.tokensOut)} выход · ${fmtNum(lifetime.requests)} запросов`
+  } else {
+    $("u-lifetime").textContent = "за всё время: пока нет данных"
+  }
   renderUsageCharts(u)
   $("u-providers").innerHTML = usageTable(u.providers, [
     { h: "запросов", f: (s) => s.requests ?? 0 },

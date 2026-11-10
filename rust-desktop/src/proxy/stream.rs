@@ -305,6 +305,7 @@ pub(super) async fn stream_upstream_response(
     let mut headers = response.headers().clone();
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
     let usage_state = state.usage.clone();
+    let lifetime_state = state.lifetime.clone();
     let is_sse = headers
         .get("content-type")
         .and_then(|value| value.to_str().ok())
@@ -433,9 +434,14 @@ pub(super) async fn stream_upstream_response(
         let mut usage = usage_state.lock().unwrap();
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
         let mut model_stat = usage.models.remove(&exposed).unwrap_or_default();
-        tally_usage(&tail, &mut usage, &mut provider_stat, &mut model_stat);
+        let (tokens_in, tokens_out) = tally_usage(&tail, &mut usage, &mut provider_stat, &mut model_stat);
         usage.providers.insert(provider, provider_stat);
         usage.models.insert(exposed, model_stat);
+        drop(usage);
+        let mut lifetime = lifetime_state.lock().unwrap();
+        lifetime.tokens_in += tokens_in;
+        lifetime.tokens_out += tokens_out;
+        lifetime.requests += 1;
     });
     if stream_requested && !is_sse {
         headers.insert(
