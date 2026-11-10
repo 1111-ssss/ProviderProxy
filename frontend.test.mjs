@@ -97,6 +97,14 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('class="chain-toggle-text">${enabled ? "Активна" : "Скрыта"}</span>'), "chain status should use compact labels")
     assert.ok(!html.includes("провайдер активен"), "direct model status should not have a provider subtitle")
     assert.ok(html.includes(".direct-model-card .chain-toggle { width: 134px;") && html.includes("#models .chain-toggle { width: 134px;"), "model and chain status buttons should have the same width")
+    // Layout regressions: a settings card must never be able to push its
+    // controls or neighbour cards outside the column.
+    assert.match(html, /\.settings-grid label \{ margin: 0; min-width: 0; \}/, "settings labels should shrink with their column")
+    assert.ok(html.includes('input:not([type="checkbox"])'), "only text fields should stretch; a stretched checkbox squeezed its label to zero width")
+    assert.match(html, /\.settings-grid \.setting-option span \{ display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax\(0, 1fr\); \}/, "option text needs a shrinkable single-column track")
+    assert.match(html, /\.settings-grid \.setting-action \{ display: flex;[\s\S]*?flex-wrap: wrap; \}/, "long shortcut paths should drop the button under the text")
+    assert.ok(html.includes(".token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }"), "provider names should ellipsize instead of overflowing")
+    assert.ok(html.includes("min-height: 100dvh"), "the shell should follow the visible viewport on mobile browsers")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {
