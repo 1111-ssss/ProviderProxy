@@ -127,16 +127,18 @@
   .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
   .step .prov { color: #a9d6ff; font-weight: 650; }
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
-  /* Between ~700px and ~1000px the head did not fit: the toggle and the
-     action buttons spilled out of the card. Let it wrap at any width. */
-  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+  /* Name and badge stay together on the left; the toggle and the buttons form
+     one right-hand group. Wrapping the whole row used to strand the toggle on
+     its own line and leave a large empty area under the title. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 12px; }
+  .model-card-head > .model-title { flex: 0 1 auto; min-width: 0; }
   .model-title { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-card-head .head-controls { display: flex; align-items: center; gap: 9px; margin-left: auto; min-width: 0; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  /* Toggle and buttons travel together, so a wrapped card keeps the same
-     order as a wide one. */
-  .model-card-head .chain-toggle { order: 2; }
-  .model-actions { display: flex; gap: 6px; order: 3; margin-left: auto; }
+  /* The toggle and the buttons are grouped in .head-controls; inside that group
+     the toggle comes first and the buttons stay right-aligned. */
+  .model-actions { display: flex; gap: 6px; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
@@ -361,12 +363,16 @@
   .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .settings-form { width: 100%; }
   .settings-page { min-height: 0; }
-  .settings-page-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  /* Two fixed columns squeezed every settings card to ~200px while the sidebar
+     was still visible. Stack the cards whenever a column would be unusable. */
+  .settings-page-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
   .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .48); }
   .settings-block.wide { grid-column: 1 / -1; }
   .settings-block h3 { margin: 0; font-size: 14px; }
   .settings-block > p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; }
   .settings-page label { display: grid; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; }
+  /* One-line explanation under a settings field. */
+  .settings-page label .field-hint, .settings-grid label .field-hint { display: block; color: var(--faint); font-size: 11px; line-height: 1.35; }
   .settings-page .setting-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
   .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
   .settings-page .setting-option span { display: grid; gap: 2px; }
@@ -375,7 +381,9 @@
   .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
   .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
   .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-  .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  /* Inside a card the two field columns must collapse too, or a numeric input
+     ends up ~70px wide. */
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 12px; }
   .settings-grid label { margin: 0; min-width: 0; }
   /* A field must shrink with its column, but checkboxes keep their own size. */
   .settings-grid label input:not([type="checkbox"]), .settings-grid label select { width: 100%; min-width: 0; }
@@ -387,10 +395,20 @@
   .settings-grid .setting-option span { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr); }
   .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
-  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+  .settings-grid .setting-action { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
   .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
-  .settings-grid .setting-action button { flex: 0 0 auto; min-height: 32px; padding: 6px 10px; }
+  /* Two shortcut buttons sized to their own labels, so they looked uneven.
+     Equal columns fix that; the labels wrap instead of being cut off when a
+     narrow card cannot fit them side by side. */
+  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  /* Matches the two grid columns to a readable label width so the pair never
+     collapses into wrapped stubs. */
+  .settings-grid .setting-action .row { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  .settings-grid .setting-action button { min-width: 0; min-height: 32px; padding: 6px 10px; justify-content: center; white-space: normal; text-align: center; }
+  @media (max-width: 620px) {
+    .settings-grid .setting-action .row { grid-template-columns: minmax(0, 1fr); }
+  }
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
@@ -928,9 +946,11 @@
         <div class="settings-grid">
           <label>Порт
             <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
+            <span class="field-hint">Локальный порт прокси. Смена применится после перезапуска приложения.</span>
           </label>
           <label>Токен доступа
             <input id="s-auth" placeholder="не задан" autocomplete="off">
+            <span class="field-hint">Необязательный Bearer-токен. Если задан, клиент должен присылать его в заголовке Authorization.</span>
           </label>
         </div>
       </div>
@@ -939,6 +959,7 @@
         <p>Используй этот адрес в клиенте или другом инструменте.</p>
         <label>Base URL прокси
           <code id="s-base-url" class="settings-value">—</code>
+          <span class="field-hint">Этот адрес вписывается в клиент как OpenAI-совместимый endpoint.</span>
         </label>
       </div>
       <div class="settings-block wide">
@@ -947,12 +968,15 @@
         <div class="settings-grid">
           <label>Блокировка после лимита, сек
             <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
+            <span class="field-hint">Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты.</span>
           </label>
           <label>Блокировка после ошибки, сек
             <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
+            <span class="field-hint">Сколько не отправлять запросы после сетевой ошибки или ответа 5xx.</span>
           </label>
           <label>Таймаут ответа, сек
             <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
+            <span class="field-hint">Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается.</span>
           </label>
         </div>
       </div>
@@ -966,6 +990,7 @@
               <option value="light">Светлая</option>
               <option value="system">Как в системе</option>
             </select>
+            <span class="field-hint">«Как в системе» следует текущей теме рабочего стола.</span>
           </label>
           <label class="setting-option" id="s-autostart-wrap">
             <input id="s-autostart" type="checkbox">
@@ -1465,14 +1490,16 @@ function renderModels() {
       <div class="model-card-head">
         <b class="model-title">proxy/${esc(name)}</b>
         <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
-        <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}">
-          <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
-          <span class="chain-switch" aria-hidden="true"></span>
-          <span class="chain-toggle-text">${enabled ? "Активна" : "Скрыта"}</span>
-        </label>
-        <div class="model-actions">
-          <button type="button" data-a="edit">Изменить</button>
-          <button type="button" class="quiet danger" data-a="del">Удалить</button>
+        <div class="head-controls">
+          <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}">
+            <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
+            <span class="chain-switch" aria-hidden="true"></span>
+            <span class="chain-toggle-text">${enabled ? "Активна" : "Скрыта"}</span>
+          </label>
+          <div class="model-actions">
+            <button type="button" data-a="edit">Изменить</button>
+            <button type="button" class="quiet danger" data-a="del">Удалить</button>
+          </div>
         </div>
       </div>
       <div class="chain">
@@ -1861,8 +1888,9 @@ async function createAppShortcut(desktop) {
   button.disabled = true
   button.textContent = "Создаю…"
   try {
-    const path = await tauriInvoke("create_app_shortcut", { desktop })
-    $("s-shortcut-help").textContent = `ярлык создан: ${path}`
+    await tauriInvoke("create_app_shortcut", { desktop })
+    // The saved path is long and unbreakable; the toast already confirms it,
+    // so the helper text keeps its short description.
     flash(true, desktop ? "ярлык добавлен на рабочий стол" : "ярлык добавлен в меню приложений")
   } catch (error) {
     flash(false, `не удалось создать ярлык: ${error.message ?? error}`)
