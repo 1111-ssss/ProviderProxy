@@ -105,6 +105,9 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.match(html, /\.settings-grid \.setting-action \{ display: flex;[\s\S]*?flex-wrap: wrap; \}/, "long shortcut paths should drop the button under the text")
     assert.ok(html.includes(".token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }"), "provider names should ellipsize instead of overflowing")
     assert.ok(html.includes("min-height: 100dvh"), "the shell should follow the visible viewport on mobile browsers")
+    assert.ok(html.includes('id="s-autostart-tray"'), "autostart should offer a tray-only start")
+    assert.ok(html.includes('tauriInvoke("set_autostart", { enabled, tray })'), "the tray choice must reach the command")
+    assert.ok(html.includes('tauriInvoke("autostart_tray_enabled")'), "the tray choice must be read back from the OS")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {

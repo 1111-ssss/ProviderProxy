@@ -97,6 +97,89 @@ fn windows_command_arg(path: &Path) -> String {
     format!("\"{}\"", path.display())
 }
 
+/// Set when the app is started by the autostart entry. The window stays hidden
+/// and only the tray icon appears, so logging in does not open a GUI window.
+const TRAY_FLAG: &str = "--tray";
+
+fn started_in_tray() -> bool {
+    std::env::args().skip(1).any(|arg| arg == TRAY_FLAG)
+}
+
+fn autostart_command(executable: &Path, config: &Path, tray: bool) -> String {
+    let mut command = format!(
+        "\"{}\" \"{}\"",
+        executable.display(),
+        config.display()
+    );
+    if tray {
+        command.push(' ');
+        command.push_str(TRAY_FLAG);
+    }
+    command
+}
+
+/// Sidecar that remembers the tray choice while autostart is switched off.
+fn autostart_tray_preference_file() -> PathBuf {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(dirs::config_dir)
+        .unwrap_or_else(|| PathBuf::from("."));
+    config.join("provider-proxy/autostart-tray")
+}
+
+fn write_autostart_preference(tray: bool) -> Result<(), String> {
+    let path = autostart_tray_preference_file();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    fs::write(&path, if tray { "1" } else { "0" }).map_err(|error| error.to_string())
+}
+
+fn read_autostart_preference() -> bool {
+    fs::read_to_string(autostart_tray_preference_file())
+        .map(|value| value.trim() == "1")
+        .unwrap_or(false)
+}
+
+/// Reads whether the stored autostart entry starts the app in the tray.
+#[tauri::command]
+fn autostart_tray_enabled() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("reg")
+            .args([
+                "QUERY",
+                r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+                "/v",
+                "ProviderProxy",
+            ])
+            .output()
+            .map_err(|error| error.to_string())?;
+        return if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).contains(TRAY_FLAG))
+        } else {
+            Ok(read_autostart_preference())
+        };
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // The entry is deleted when autostart is off, so the sidecar file keeps
+        // the choice until it is turned back on.
+        return Ok(autostart_file()
+            .is_file()
+            .then(|| {
+                fs::read_to_string(autostart_file())
+                    .map(|entry| entry.contains(TRAY_FLAG))
+                    .unwrap_or(false)
+            })
+            .unwrap_or_else(read_autostart_preference));
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    Err("автозапуск поддерживается только на Windows и Linux".into())
+}
+
 #[tauri::command]
 fn autostart_enabled() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
@@ -123,17 +206,13 @@ fn autostart_enabled() -> Result<bool, String> {
 }
 
 #[tauri::command]
-fn set_autostart(enabled: bool) -> Result<bool, String> {
+fn set_autostart(enabled: bool, tray: bool) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         let status = if enabled {
             let executable = std::env::current_exe().map_err(|error| error.to_string())?;
             let config = autostart_config_path()?;
-            let command = format!(
-                "{} {}",
-                windows_command_arg(&executable),
-                windows_command_arg(&config)
-            );
+            let command = autostart_command(&executable, &config, tray);
             Command::new("reg")
                 .args([
                     "ADD",
@@ -159,14 +238,22 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
                 .status()
         }
         .map_err(|error| error.to_string())?;
-        if !status.success() {
+        if !status.success() && enabled {
             return Err("не удалось изменить автозапуск Windows".into());
         }
+        // The frontend always sends the current tray choice, including when
+        // autostart is being turned off, so the setting survives toggling.
+        let _ = write_autostart_preference(tray);
         return autostart_enabled();
     }
 
     #[cfg(target_os = "linux")]
     {
+        // Remember the tray choice while the entry is disabled: enabling it
+        // later must not lose the setting.
+        if !enabled {
+            let _ = write_autostart_preference(tray);
+        }
         let path = autostart_file();
         if enabled {
             let executable = autostart_executable()?;
@@ -175,12 +262,12 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
                 fs::create_dir_all(parent).map_err(|error| error.to_string())?;
             }
             let desktop = format!(
-                "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={} {}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
-                desktop_exec(&executable),
-                desktop_exec(&config),
+                "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+                autostart_command(&executable, &config, tray),
                 desktop_exec(executable.parent().unwrap_or_else(|| Path::new(".")))
             );
             fs::write(&path, desktop).map_err(|error| error.to_string())?;
+            let _ = write_autostart_preference(tray);
         } else if path.exists() {
             fs::remove_file(&path).map_err(|error| error.to_string())?;
         }
@@ -189,7 +276,7 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
 
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
-        let _ = enabled;
+        let _ = (enabled, tray);
         Err("автозапуск поддерживается только на Windows и Linux".into())
     }
 }
@@ -333,15 +420,20 @@ fn main() {
             restart_app,
             autostart_enabled,
             set_autostart,
+            autostart_tray_enabled,
             create_app_shortcut
         ])
         .setup(move |app| {
             let url = Url::parse(&format!("http://127.0.0.1:{port}/")).expect("local proxy URL");
+            // Autostart passes --tray: start quietly with only the tray icon and
+            // leave the window hidden until the user asks for it.
+            let in_tray = started_in_tray();
             let browser = app.handle().clone();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("Provider Proxy")
                 .inner_size(1240.0, 900.0)
                 .min_inner_size(900.0, 620.0)
+                .visible(!in_tray)
                 .on_new_window(move |url, _features| {
                     if let Some(url) = browser_url(&url) {
                         if let Err(error) = browser.opener().open_url(url, None::<&str>) {
@@ -379,6 +471,12 @@ fn main() {
                 _ => {}
             })
             .build(app)?;
+
+            // A hidden window still needs to exist for the tray menu to show it,
+            // but WebKit should not keep a hidden view alive on first paint.
+            if in_tray {
+                let _ = window.hide();
+            }
 
             Ok(())
         })

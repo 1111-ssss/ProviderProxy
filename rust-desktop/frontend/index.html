@@ -881,6 +881,10 @@
             <input id="s-autostart" type="checkbox">
             <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
           </label>
+          <label class="setting-option is-disabled" id="s-autostart-tray-wrap">
+            <input id="s-autostart-tray" type="checkbox">
+            <span>Стартовать свёрнутым в трей<small id="s-autostart-tray-help">Без окна — только значок в трее. Работает вместе с автозапуском.</small></span>
+          </label>
           <div class="setting-option setting-action" id="s-shortcut-wrap">
             <span>Ярлыки приложения<small id="s-shortcut-help">Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе.</small></span>
             <div class="row" style="margin-left:auto">
@@ -1201,6 +1205,7 @@ const appSettings = () => {
   settings.autoUpdate ??= false
   settings.autoRestart ??= false
   settings.autostart ??= false
+  settings.autostartTray ??= false
   return settings
 }
 const tauriInvoke = (command, args) => {
@@ -1594,6 +1599,14 @@ function renderSettings() {
   $("s-autostart-help").textContent = desktop ? "Windows и Linux" : "доступно в desktop-версии"
   $("s-create-shortcut-menu").disabled = !desktop
   $("s-create-shortcut-desktop").disabled = !desktop
+  $("s-autostart-tray").checked = settings.autostartTray
+  $("s-autostart-tray").disabled = !desktop || !settings.autostart
+  $("s-autostart-tray-wrap").classList.toggle("is-disabled", !desktop || !settings.autostart)
+  $("s-autostart-tray-help").textContent = !desktop
+    ? "доступно в desktop-версии"
+    : settings.autostart
+      ? "Без окна — только значок в трее."
+      : "сначала включи автозапуск"
   $("s-shortcut-wrap").classList.toggle("is-disabled", !desktop)
   $("s-shortcut-help").textContent = desktop ? "Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе." : "доступно в desktop-версии"
   $("s-base-url").textContent = `http://127.0.0.1:${cfg.port ?? 8787}/v1`
@@ -1731,6 +1744,7 @@ async function syncAutostartSetting() {
   if (!isDesktopApp()) return
   try {
     appSettings().autostart = Boolean(await tauriInvoke("autostart_enabled"))
+    appSettings().autostartTray = Boolean(await tauriInvoke("autostart_tray_enabled"))
     renderSettings()
   } catch (error) {
     $("s-autostart").disabled = true
@@ -1936,18 +1950,27 @@ $("s-auto-restart").onchange = (e) => {
   appSettings().autoRestart = e.target.checked
   save()
 }
-$("s-autostart").onchange = async (e) => {
-  const enabled = e.target.checked
-  e.target.disabled = true
+async function applyAutostart(enabled, tray, onError) {
   try {
-    appSettings().autostart = Boolean(await tauriInvoke("set_autostart", { enabled }))
+    appSettings().autostart = Boolean(await tauriInvoke("set_autostart", { enabled, tray }))
     save()
   } catch (error) {
-    e.target.checked = !enabled
+    onError()
     flash(false, `автозапуск: ${error.message ?? error}`)
   } finally {
     renderSettings()
   }
+}
+$("s-autostart").onchange = async (e) => {
+  const enabled = e.target.checked
+  e.target.disabled = true
+  // Turning autostart off keeps the tray choice for next time.
+  await applyAutostart(enabled, appSettings().autostartTray, () => (e.target.checked = !enabled))
+}
+$("s-autostart-tray").onchange = async (e) => {
+  const tray = e.target.checked
+  e.target.disabled = true
+  await applyAutostart(true, tray, () => (e.target.checked = !tray))
 }
 $("s-auth").onchange = (e) => {
   const v = e.target.value.trim()

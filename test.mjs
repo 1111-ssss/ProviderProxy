@@ -520,7 +520,7 @@ try {
     assert.ok(html.includes('class="settings-nav-button" data-tab="settings"'), "settings should be available from the navigation")
    assert.ok(html.includes('id="update-banner"') && html.includes("checkForDesktopUpdate"), "desktop updates should be offered in the top-right banner")
     assert.ok(html.includes('id="s-theme"') && html.includes('id="s-autostart"'), "settings should expose theme and autostart")
-    assert.ok(html.includes('id="s-create-shortcut"') && html.includes("create_app_shortcut"), "settings should expose app shortcut creation")
+    assert.ok(html.includes('id="s-create-shortcut-menu"') && html.includes('id="s-create-shortcut-desktop"') && html.includes("create_app_shortcut"), "settings should expose app shortcut creation for both targets")
    assert.ok(html.includes('id="s-auto-update"') && html.includes('id="s-auto-restart"'), "settings should expose automatic update controls")
   assert.ok(html.includes('<svg viewBox="0 0 24 24"'), "settings button should use an inline vector icon")
   assert.ok(!html.includes("⚙"), "settings button should not use an emoji icon")
