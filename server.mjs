@@ -636,8 +636,16 @@ async function* normalizeSse(body, exposed, upstream) {
             normalized.delta.tool_calls = choice.delta.tool_calls.map((call, callPosition) => {
               toolChoices.add(normalized.index)
               const key = `${normalized.index}:${call?.id ?? callPosition}`
-              const index = Number.isFinite(call?.index) ? call.index : (toolIndexes.get(key) ?? callPosition)
+              let index
+              if (Number.isFinite(call?.index)) index = call.index
+              // A first fragment opens a call by id; argument fragments carry
+              // neither id nor index and continue the call that is still open.
+              // Using the array position for either merged separate calls into
+              // slot 0, so clients saw duplicated tool calls.
+              else if (call?.id) index = toolIndexes.get(key) ?? (toolIndexes.get(`${normalized.index}:@open`) ?? -1) + 1
+              else index = toolIndexes.get(`${normalized.index}:@open`) ?? callPosition
               toolIndexes.set(key, index)
+              toolIndexes.set(`${normalized.index}:@open`, index)
               const next = { ...call, index }
               if (!next.type && next.function) next.type = "function"
               return next

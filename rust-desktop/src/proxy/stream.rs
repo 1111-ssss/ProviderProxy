@@ -13,6 +13,7 @@ use super::{
 
 struct SseNormalizer {
     tool_indexes: HashMap<String, usize>,
+    open_tool_index: HashMap<usize, usize>,
     finish_reasons: HashMap<usize, String>,
     tool_choices: BTreeSet<usize>,
     choice_indexes: BTreeSet<usize>,
@@ -21,6 +22,12 @@ struct SseNormalizer {
 }
 
 impl SseNormalizer {
+    fn next_tool_index(&self, choice_index: usize) -> usize {
+        self.open_tool_index
+            .get(&choice_index)
+            .map_or(0, |index| index + 1)
+    }
+
     // A few OpenAI-compatible gateways terminate with [DONE] but omit the
     // final choice object. Emit the missing terminal chunk so strict clients
     // do not try to read finish_reason from an absent choice.
@@ -173,16 +180,27 @@ impl SseNormalizer {
                 let call = call
                     .as_object_mut()
                     .ok_or_else(|| "SSE tool call is not an object".to_string())?;
-                let call_key = format!(
-                    "{}:{}",
-                    choice_index,
-                    call.get("id").and_then(Value::as_str).unwrap_or_default()
-                );
-                let call_index = call
-                    .get("index")
-                    .and_then(Value::as_u64)
-                    .map(|index| index as usize)
-                    .unwrap_or_else(|| *self.tool_indexes.entry(call_key).or_insert(call_position));
+                let call_id = call.get("id").and_then(Value::as_str).unwrap_or_default();
+                let call_key = format!("{choice_index}:{call_id}");
+                let declared = call.get("index").and_then(Value::as_u64).map(|i| i as usize);
+                let call_index = match (declared, call_id.is_empty()) {
+                    (Some(index), _) => index,
+                    // A well-formed first fragment opens a call by id.
+                    (None, false) => {
+                        let next = self.next_tool_index(choice_index);
+                        *self.tool_indexes.entry(call_key).or_insert(next)
+                    }
+                    // Argument fragments repeat neither id nor index. They belong
+                    // to the call that is still open, not to slot 0: mapping them
+                    // by array position merged the arguments of the second tool
+                    // call into the first one, so the client saw duplicated calls.
+                    (None, true) => self
+                        .open_tool_index
+                        .get(&choice_index)
+                        .copied()
+                        .unwrap_or(call_position),
+                };
+                self.open_tool_index.insert(choice_index, call_index);
                 call.insert("index".into(), serde_json::json!(call_index));
                 if !call.get("type").is_some_and(Value::is_string)
                     && call.get("function").is_some_and(Value::is_object)
@@ -196,6 +214,23 @@ impl SseNormalizer {
         }
         Ok(Some(format!("data: {}\n\n", parsed)))
     }
+}
+
+/// Trims `tail` to at most `limit` bytes without cutting a UTF-8 character.
+///
+/// The naive `tail[keep_from..]` panics when the cut lands inside a multi-byte
+/// character (any Russian, CJK or emoji content). That panic killed the
+/// streaming task, so the client got a clean end of body mid-answer: no error,
+/// no `[DONE]`, and the agent stopped half-way.
+fn keep_tail(tail: &mut String, limit: usize) {
+    if tail.len() <= limit {
+        return;
+    }
+    let mut cut = tail.len() - limit;
+    while cut < tail.len() && !tail.is_char_boundary(cut) {
+        cut += 1;
+    }
+    tail.drain(..cut);
 }
 
 fn stream_error_event(message: &str) -> String {
@@ -325,21 +360,24 @@ pub(super) async fn stream_upstream_response(
         let mut upstream_error = None;
         let mut normalizer = SseNormalizer {
             tool_indexes: HashMap::new(),
+            open_tool_index: HashMap::new(),
             finish_reasons: HashMap::new(),
             tool_choices: BTreeSet::new(),
             choice_indexes: BTreeSet::new(),
             last_meta: serde_json::Map::new(),
             done_seen: false,
         };
+        // A panic anywhere below used to kill this task silently: the response
+        // body just ended mid-answer, the client saw a clean end of stream and
+        // the agent stopped without any error. Catch it and report a stream
+        // error instead.
+        let pump = async {
         while let Some(item) = upstream_stream.next().await {
             match item {
                 Ok(chunk) => {
                     let text = String::from_utf8_lossy(&chunk);
                     tail.push_str(&text);
-                    if tail.len() > 8192 {
-                        let keep_from = tail.len() - 8192;
-                        tail = tail[keep_from..].to_string();
-                    }
+                    keep_tail(&mut tail, 8192);
                     if !is_sse {
                         if stream_requested {
                             regular_body.extend_from_slice(&chunk);
@@ -430,6 +468,26 @@ pub(super) async fn stream_upstream_response(
                 let _ = tx.send(Ok(bytes::Bytes::from(final_event))).await;
             }
         }
+        };
+        if futures_util::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(pump))
+            .await
+            .is_err()
+        {
+            let message = "proxy stream task panicked; the answer was cut off";
+            push_log(
+                &state,
+                format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+            );
+            // The task that owned `tx` is gone, so report through the sender we
+            // kept. Without this the client simply sees the body end.
+            if stream_requested {
+                let _ = tx
+                    .send(Ok(bytes::Bytes::from(stream_error_event(message))))
+                    .await;
+            } else {
+                let _ = tx.send(Err(std::io::Error::other(message))).await;
+            }
+        }
         let mut usage = usage_state.lock().unwrap();
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
         let mut model_stat = usage.models.remove(&exposed).unwrap_or_default();
@@ -468,6 +526,7 @@ mod tests {
     fn emits_finish_reason_when_done_has_no_choices() {
         let mut normalizer = SseNormalizer {
             tool_indexes: HashMap::new(),
+            open_tool_index: HashMap::new(),
             finish_reasons: HashMap::new(),
             tool_choices: BTreeSet::new(),
             choice_indexes: BTreeSet::new(),
@@ -490,6 +549,7 @@ mod tests {
     fn detects_an_sse_stream_that_ends_before_done() {
         let mut normalizer = SseNormalizer {
             tool_indexes: HashMap::new(),
+            open_tool_index: HashMap::new(),
             finish_reasons: HashMap::new(),
             tool_choices: BTreeSet::new(),
             choice_indexes: BTreeSet::new(),
@@ -501,5 +561,59 @@ mod tests {
             .unwrap();
         assert!(normalizer.is_incomplete());
         assert!(!normalizer.done_seen);
+    }
+
+    #[test]
+    fn keeps_argument_fragments_on_the_open_tool_call() {
+        let mut normalizer = SseNormalizer {
+            tool_indexes: HashMap::new(),
+            open_tool_index: HashMap::new(),
+            finish_reasons: HashMap::new(),
+            tool_choices: BTreeSet::new(),
+            choice_indexes: BTreeSet::new(),
+            last_meta: serde_json::Map::new(),
+            done_seen: false,
+        };
+        let open_first = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"id\":\"call_a\",\"function\":{\"name\":\"read\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(open_first.contains("\"index\":0"), "{open_first}");
+        // No id, no index: this is the argument stream of call_a.
+        let args = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"function\":{\"arguments\":\"{\\\"path\\\":\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(args.contains("\"index\":0"), "{args}");
+        // A second call must open the next slot, not reuse slot 0.
+        let open_second = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"id\":\"call_b\",\"function\":{\"name\":\"write\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(open_second.contains("\"index\":1"), "{open_second}");
+        let second_args = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"function\":{\"arguments\":\"{}\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(second_args.contains("\"index\":1"), "{second_args}");
+    }
+
+    #[test]
+    fn trims_the_usage_tail_without_splitting_a_character() {
+        let mut tail = String::new();
+        for _ in 0..4000 {
+            tail.push('€'); // three bytes each: the cut can land mid-character
+        }
+        keep_tail(&mut tail, 8192);
+        assert!(tail.len() <= 8192);
+        assert!(tail.chars().all(|c| c == '€'), "tail must stay valid UTF-8");
     }
 }
