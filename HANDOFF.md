@@ -58,12 +58,34 @@ start byte index 269 is not a char boundary; it is inside 'о'
 
 на каждом длинном русском ответе: поток умирает, клиент видит конец ответа,
 нейросеть останавливается на середине. Именно это чинит `fix/stream-tool-calls`.
-Чтобы правка заработала, бинарник нужно пересобрать из `integration/all-fixes`.
+
+Пересобранный бинарник лежит в
+`rust-desktop/target/release/provider-proxy-desktop` (ветка
+`integration/all-fixes`) и проверен запуском на отдельном порту:
+
+- 400 чанков кириллицы (105 КБ) пришли целиком, с `[DONE]`, без `proxy_stream_error`;
+- два tool call получили индексы 0 и 1, аргументы не склеились;
+- `skipped` отделён от `failed` (2 провала, из них 1 — кулдаун);
+- `lifetimeTokens` считается и отдаётся в `/api/usage`;
+- живые `8787` и новый `8799` работали одновременно, твой процесс не задет.
+
+Бинарник **не подменял**. Замена — одна команда, когда решишь:
+
+```bash
+cp rust-desktop/target/release/provider-proxy-desktop \
+   ~/workspace/projects/pet/provider_proxy_binary/provider-proxy-desktop
+```
+
+## Что было сломано в тестах и починено
+
+`serves_the_desktop_api_from_a_local_port` вызывал `/api/config/import`, а тот
+делает `sync_opencode` и при отсутствии `opencodeConfig` пишет в **настоящий**
+`~/.config/opencode/opencode.jsonc`. Прогон тестов подменял список моделей
+тестовой моделью `one`. Теперь тест указывает временный файл, а неизменность
+настоящего конфига проверена замером mtime и размера до/после.
 
 ## Ограничение окружения
 
-Полная GUI-сборка (`cargo build`, `cargo check` с фичей `desktop`) здесь не
-проходит: нет `webkit2gtk4.1-devel` (нужен sudo). Поэтому `main.rs` проверен
-изолированными тестами логики (команда автозапуска, генерация `.desktop` с
-`--tray`, sidecar-файл выбора трея) для обеих ОС. Библиотечная часть
-(`cargo test --no-default-features --lib`, 14 тестов) собирается и проходит.
+Полная GUI-сборка теперь проходит: `webkit2gtk4.1-devel` установлен, `cargo check`
+и `cargo build --release --locked` собираются за ~4 минуты. `cargo test
+--no-default-features --lib` — 15 тестов, все зелёные.
