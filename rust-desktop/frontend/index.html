@@ -351,8 +351,54 @@
   .settings-block h3 { margin: 0; font-size: 14px; }
   .settings-block > p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; }
   .settings-page label { display: grid; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; }
-  /* One-line explanation under a settings field. */
-  .settings-page label .field-hint, .settings-grid label .field-hint { display: block; color: var(--faint); font-size: 11px; line-height: 1.35; }
+  /* A field label with a small "?" that opens the explanation on hover/focus.
+     The hint stays in the DOM as the accessible description. */
+  .field-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .field-label > span:first-child { min-width: 0; }
+  .field-help {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    font: 700 10px/1 ui-monospace, monospace;
+    cursor: help;
+  }
+  .field-help:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: transparent; }
+  /* The settings section scrolls (overflow:auto), so a tooltip centred above
+     the button was clipped at the card edge. Anchor it under the button and
+     open it to the right, where the field has room. */
+  .field-help::after {
+    content: attr(data-hint);
+    position: absolute;
+    left: -4px;
+    top: calc(100% + 7px);
+    width: max-content;
+    max-width: min(260px, calc(100vw - 48px));
+    padding: 7px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    font: 400 11px/1.4 system-ui, sans-serif;
+    text-align: left;
+    white-space: normal;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-3px);
+    transition: opacity .13s ease, transform .13s ease, visibility .13s;
+    z-index: 20;
+  }
+  .field-help:hover::after, .field-help:focus-visible::after { opacity: 1; visibility: visible; transform: translateY(0); }
   .settings-page .setting-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
   .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
   .settings-page .setting-option span { display: grid; gap: 2px; }
@@ -378,7 +424,7 @@
   .settings-grid .setting-option span { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr); }
   .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
-  .settings-grid .setting-action { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
   /* A saved shortcut path is one long unbreakable string on Windows; let it
      wrap inside the card instead of pushing the button out of view. Below
      roughly 300px of column the button drops under the text instead of
@@ -389,7 +435,9 @@
      the longer one was clipped. Equal columns fix that; labels wrap when a
      narrow card cannot fit them side by side, and below 620px they stack. */
   .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
-  .settings-grid .setting-action button { min-width: 0; min-height: 32px; padding: 6px 10px; justify-content: center; white-space: normal; text-align: center; }
+  /* Same height as every other button (38px from the base control rule); the
+     override to 32px made this row look stunted. */
+  .settings-grid .setting-action button { min-width: 0; min-height: 38px; padding: 8px 10px; justify-content: center; white-space: normal; text-align: center; }
   @media (max-width: 620px) {
     .settings-grid .setting-action .row { grid-template-columns: minmax(0, 1fr); }
   }
@@ -928,39 +976,51 @@
         <h3>Сервер</h3>
         <p>Основные параметры локального прокси.</p>
         <div class="settings-grid">
-          <label>Порт
+          <label>
+            <span class="field-label">Порт
+              <button type="button" class="field-help" data-hint="Локальный порт прокси. Смена применится после перезапуска приложения." aria-label="Что делает настройка «Порт»">?</button>
+            </span>
             <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
-            <span class="field-hint">Локальный порт прокси. Смена применится после перезапуска приложения.</span>
           </label>
-          <label>Токен доступа
+          <label>
+            <span class="field-label">Токен доступа
+              <button type="button" class="field-help" data-hint="Необязательный Bearer-токен. Если задан, клиент должен присылать его в заголовке Authorization." aria-label="Что делает настройка «Токен доступа»">?</button>
+            </span>
             <input id="s-auth" placeholder="не задан" autocomplete="off">
-            <span class="field-hint">Необязательный Bearer-токен. Если задан, клиент должен присылать его в заголовке Authorization.</span>
           </label>
         </div>
       </div>
       <div class="settings-block">
         <h3>Подключение</h3>
         <p>Используй этот адрес в клиенте или другом инструменте.</p>
-        <label>Base URL прокси
+        <label>
+          <span class="field-label">Base URL прокси
+            <button type="button" class="field-help" data-hint="Этот адрес вписывается в клиент как OpenAI-совместимый endpoint." aria-label="Что такое Base URL прокси">?</button>
+          </span>
           <code id="s-base-url" class="settings-value">—</code>
-          <span class="field-hint">Этот адрес вписывается в клиент как OpenAI-совместимый endpoint.</span>
         </label>
       </div>
       <div class="settings-block wide">
         <h3>Защита от сбоев</h3>
         <p>Время блокировки upstream после лимита или временной ошибки.</p>
         <div class="settings-grid">
-          <label>Блокировка после лимита, сек
+          <label>
+            <span class="field-label">Блокировка после лимита, сек
+              <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты." aria-label="Что значит «Блокировка после лимита»">?</button>
+            </span>
             <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
-            <span class="field-hint">Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты.</span>
           </label>
-          <label>Блокировка после ошибки, сек
+          <label>
+            <span class="field-label">Блокировка после ошибки, сек
+              <button type="button" class="field-help" data-hint="Сколько не отправлять запросы после сетевой ошибки или ответа 5xx." aria-label="Что значит «Блокировка после ошибки»">?</button>
+            </span>
             <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
-            <span class="field-hint">Сколько не отправлять запросы после сетевой ошибки или ответа 5xx.</span>
           </label>
-          <label>Таймаут ответа, сек
+          <label>
+            <span class="field-label">Таймаут ответа, сек
+              <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
+            </span>
             <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
-            <span class="field-hint">Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается.</span>
           </label>
         </div>
       </div>
@@ -968,13 +1028,15 @@
         <h3>Внешний вид и запуск</h3>
         <p>Настрой интерфейс и запуск приложения.</p>
         <div class="settings-grid">
-          <label>Тема интерфейса
+          <label>
+            <span class="field-label">Тема интерфейса
+              <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола." aria-label="Что значит «Тема интерфейса»">?</button>
+            </span>
             <select id="s-theme">
               <option value="dark">Тёмная</option>
               <option value="light">Светлая</option>
               <option value="system">Как в системе</option>
             </select>
-            <span class="field-hint">«Как в системе» следует текущей теме рабочего стола.</span>
           </label>
           <label class="setting-option" id="s-autostart-wrap">
             <input id="s-autostart" type="checkbox">
@@ -1633,12 +1695,14 @@ function renderOpencodeModels() {
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
               <span class="pill ${ids.length ? "" : "empty"}">${ids.length} моделей</span>
-              <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}">
-                <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
-                <span class="chain-switch" aria-hidden="true"></span>
-                <span class="chain-toggle-text">${enabled ? "Активен" : "Скрыт"}</span>
-              </label>
-               <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
+              <div class="head-controls">
+                <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}">
+                  <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
+                  <span class="chain-switch" aria-hidden="true"></span>
+                  <span class="chain-toggle-text">${enabled ? "Активен" : "Скрыт"}</span>
+                </label>
+                <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
+              </div>
             </div>
              <div class="provider-model-list">${ids.length ? ids.map((id) => `<span class="opencode-model"><strong>${esc(id)}</strong>${modelContextSuffix(provider, id)}</span>`).join("") : `<span class="muted">модели не выбраны — нажми «Изменить»</span>`}</div>
           </div>`
