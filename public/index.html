@@ -398,13 +398,10 @@
   .settings-grid .setting-action { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
   .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
-  /* Two shortcut buttons sized to their own labels, so they looked uneven.
-     Equal columns fix that; the labels wrap instead of being cut off when a
-     narrow card cannot fit them side by side. */
-  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
-  /* Matches the two grid columns to a readable label width so the pair never
-     collapses into wrapped stubs. */
-  .settings-grid .setting-action .row { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  /* Two shortcut buttons sized to their own labels, so they looked uneven and
+     the longer one was clipped. Equal columns fix that; labels wrap when a
+     narrow card cannot fit them side by side, and below 620px they stack. */
+  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
   .settings-grid .setting-action button { min-width: 0; min-height: 32px; padding: 6px 10px; justify-content: center; white-space: normal; text-align: center; }
   @media (max-width: 620px) {
     .settings-grid .setting-action .row { grid-template-columns: minmax(0, 1fr); }
