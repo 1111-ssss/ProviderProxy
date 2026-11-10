@@ -195,12 +195,20 @@ fn set_autostart(enabled: bool) -> Result<bool, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn create_windows_app_shortcut() -> Result<String, String> {
+fn create_windows_shortcut(desktop: bool) -> Result<String, String> {
     let data_dir =
         dirs::data_dir().ok_or_else(|| "не удалось определить каталог AppData".to_string())?;
-    let shortcut_dir = data_dir.join("Microsoft/Windows/Start Menu/Programs/Provider Proxy");
+    let (shortcut_dir, shortcut) = if desktop {
+        let desktop_dir =
+            dirs::desktop_dir().ok_or_else(|| "не удалось определить рабочий стол".to_string())?;
+        let shortcut = desktop_dir.join("Provider Proxy Rust.lnk");
+        (desktop_dir, shortcut)
+    } else {
+        let shortcut_dir = data_dir.join("Microsoft/Windows/Start Menu/Programs/Provider Proxy");
+        let shortcut = shortcut_dir.join("Provider Proxy Rust.lnk");
+        (shortcut_dir, shortcut)
+    };
     fs::create_dir_all(&shortcut_dir).map_err(|error| error.to_string())?;
-    let shortcut = shortcut_dir.join("Provider Proxy Rust.lnk");
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let config = autostart_config_path()?;
     let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
@@ -238,48 +246,62 @@ $shortcut.Save()
     if !output.status.success() {
         let details = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if details.is_empty() {
-            "не удалось создать ярлык в меню Пуск Windows".into()
+            "не удалось создать ярлык Windows".into()
         } else {
-            format!("не удалось создать ярлык в меню Пуск Windows: {details}")
+            format!("не удалось создать ярлык Windows: {details}")
         });
     }
     Ok(shortcut.to_string_lossy().into_owned())
 }
 
 #[cfg(target_os = "linux")]
-fn create_linux_app_shortcut() -> Result<String, String> {
+fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
     let data_dir = dirs::data_dir()
         .ok_or_else(|| "не удалось определить каталог данных пользователя".to_string())?;
-    let applications_dir = data_dir.join("applications");
-    fs::create_dir_all(&applications_dir).map_err(|error| error.to_string())?;
-    let shortcut = applications_dir.join("provider-proxy-rust.desktop");
+    // XDG desktop folders are localised, so ask the platform instead of assuming a name.
+    let shortcut_dir = if desktop {
+        dirs::desktop_dir().ok_or_else(|| "не удалось определить рабочий стол".to_string())?
+    } else {
+        data_dir.join("applications")
+    };
+    fs::create_dir_all(&shortcut_dir).map_err(|error| error.to_string())?;
+    let shortcut = shortcut_dir.join("provider-proxy-rust.desktop");
     let executable = autostart_executable()?;
     let config = autostart_config_path()?;
     let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
-    let desktop = format!(
+    let entry = format!(
         "[Desktop Entry]\nType=Application\nName=Provider Proxy Rust\nComment=Provider Proxy desktop application\nExec={} {}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
         desktop_exec(&executable),
         desktop_exec(&config),
         desktop_exec(working_directory)
     );
-    fs::write(&shortcut, desktop).map_err(|error| error.to_string())?;
+    fs::write(&shortcut, entry).map_err(|error| error.to_string())?;
+    // GNOME/KDE only treat a desktop file as launchable when it is executable.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&shortcut, fs::Permissions::from_mode(0o755));
+    }
     Ok(shortcut.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
-fn create_app_shortcut() -> Result<String, String> {
+fn create_app_shortcut(desktop: bool) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        return create_windows_app_shortcut();
+        return create_windows_shortcut(desktop);
     }
 
     #[cfg(target_os = "linux")]
     {
-        return create_linux_app_shortcut();
+        return create_linux_shortcut(desktop);
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    Err("создание ярлыка поддерживается только на Windows и Linux".into())
+    {
+        let _ = desktop;
+        Err("создание ярлыка поддерживается только на Windows и Linux".into())
+    }
 }
 
 fn browser_url(url: &Url) -> Option<&str> {
