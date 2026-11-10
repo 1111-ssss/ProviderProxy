@@ -223,6 +223,94 @@ fn starts_server_without_a_caller_tokio_runtime() {
     let _ = fs::remove_file(database);
 }
 
+/// Reproduces the field crash: a long Russian answer split into many SSE
+/// chunks used to panic when the 8 KiB usage tail was trimmed mid-character.
+/// The client then saw a clean end of body with no error and the agent stopped
+/// half-way. The response here must arrive complete, with [DONE].
+#[tokio::test]
+async fn streams_a_long_russian_answer_without_cutting_it_off() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|| async {
+                let chunk = |text: &str| {
+                    format!(
+                        "data: {}\n\n",
+                        json!({
+                            "id": "chatcmpl-test",
+                            "object": "chat.completion.chunk",
+                            "model": "upstream-model",
+                            "choices": [{ "index": 0, "delta": { "content": text }, "finish_reason": null }]
+                        })
+                    )
+                };
+                // Multi-byte characters, well past the 8 KiB tail limit.
+                let mut body = String::new();
+                for _ in 0..600 {
+                    body.push_str(&chunk("Проверка кириллицы и длинного ответа — "));
+                }
+                body.push_str(&format!(
+                    "data: {}\n\n",
+                    json!({
+                        "id": "chatcmpl-test",
+                        "usage": { "prompt_tokens": 7, "completion_tokens": 11 }
+                    })
+                ));
+                body.push_str("data: [DONE]\n\n");
+                (
+                    [("content-type", "text/event-stream")],
+                    body,
+                )
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-cyrillic-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [{ "provider": "p", "model": "m" }] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let response = Client::new()
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({
+            "model": "chain",
+            "stream": true,
+            "messages": [{ "role": "user", "content": "тест" }]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let body = response.text().await.unwrap();
+
+    assert!(body.ends_with("data: [DONE]\n\n"), "the stream must end with [DONE]");
+    assert!(!body.contains("proxy_stream_error"), "the answer must not be cut off: {body:.200}");
+    assert!(body.contains("Проверка кириллицы"), "the text must survive the rewrite");
+    assert!(
+        body.contains("\"prompt_tokens\":7"),
+        "the usage chunk still reaches the client, which some clients rely on"
+    );
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
 #[tokio::test]
 async fn serves_the_desktop_api_from_a_local_port() {
     let path = std::env::temp_dir().join(format!("provider-proxy-rust-test-{}.json", now_ms()));
