@@ -105,10 +105,10 @@
   .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
   .step .prov { color: #a9d6ff; font-weight: 650; }
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
-  /* Name and badge stay together on the left; the toggle and the buttons form
-     one right-hand group. Wrapping the whole row used to strand the toggle on
-     its own line and leave a large empty area under the title. */
-  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 12px; }
+  /* Name and its badges read as one block: a tight gap inside, a wide gap
+     before the controls. With one uniform gap they looked like unrelated chips. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  .model-head-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; }
   .model-card-head > .model-title { flex: 0 1 auto; min-width: 0; }
   .model-title { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-card-head .head-controls { display: flex; align-items: center; gap: 9px; margin-left: auto; min-width: 0; }
@@ -455,10 +455,16 @@
   .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-  .integration-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  .integration-card .chain-toggle { margin: 0; }
-  .opencode-config-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, .6fr); gap: 10px; margin-top: 14px; }
-  .opencode-config-grid label { margin: 0; }
+  .integration-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  /* The integration toggle toggles between "Активен" and "Отключен"; reserving
+     the wider label's width stops the switch from shifting on every click. */
+  .integration-card .chain-toggle { min-width: 132px; justify-content: flex-start; margin: 0; }
+  /* Two labelled fields under the panel title. Both labels sit above their
+     input, with the same gap, so they read as one group instead of a label
+     floating beside a box. */
+  .opencode-config-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, .6fr); gap: 12px 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .opencode-config-grid label { display: grid; gap: 6px; margin: 0; min-width: 0; font-size: 12px; color: var(--muted); }
+  .opencode-config-grid input { width: 100%; min-width: 0; }
   .opencode-preview-head { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
   .opencode-preview { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
   .opencode-preview-toggle { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; margin-top: 2px; color: var(--muted); background: rgba(34, 45, 57, .55); border-style: dashed; }
@@ -771,12 +777,12 @@
           <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
         <div class="integration-actions">
+          <button id="opencode-sync" type="button">Синхронизировать</button>
           <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию">
             <input id="opencode-enabled" type="checkbox" checked>
             <span class="chain-switch" aria-hidden="true"></span>
-            <span class="chain-toggle-text">Включена<small>модели публикуются</small></span>
+            <span class="chain-toggle-text">Активен</span>
           </label>
-          <button id="opencode-sync" type="button">Синхронизировать</button>
         </div>
       </div>
       <div class="opencode-config-grid">
@@ -1493,9 +1499,11 @@ function renderProviders() {
     tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
     tr.querySelector('[data-a="del"]').onclick = () => {
       if (!confirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`)) return
+      const chainsBefore = chainFillSnapshot()
       delete cfg.providers[name]
       removeProviderReferences(name)
       save(); renderAll()
+      reportEmptiedChains(chainsBefore)
     }
   }
   $("p-checkins").style.display = anyCheckin ? "" : "none"
@@ -1522,8 +1530,10 @@ function renderModels() {
      div.dataset.model = name
     div.innerHTML = `
       <div class="model-card-head">
-        <b class="model-title">proxy/${esc(name)}</b>
-        <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
+        <span class="model-head-title">
+          <b class="model-title">${esc(name)}</b>
+          <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
+        </span>
         <div class="head-controls">
           <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}">
             <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
@@ -1676,7 +1686,9 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
   $("opencode-enabled").checked = enabled
   $("opencode-toggle").className = `chain-toggle ${enabled ? "is-on" : "is-off"}`
   $("opencode-toggle").title = enabled ? "Выключить интеграцию" : "Включить интеграцию"
-  $("opencode-toggle").querySelector(".chain-toggle-text").innerHTML = enabled ? "Включена<small>модели публикуются</small>" : "Выключена<small>модели не публикуются</small>"
+  // Same label pair as the model/chain toggles, and the toggle keeps a fixed
+  // width so it does not jump when the word changes.
+  $("opencode-toggle").querySelector(".chain-toggle-text").textContent = enabled ? "Активен" : "Отключен"
   if (enabled) renderOpenCodePreview("oc-preview", entries)
   else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
 }
@@ -2623,6 +2635,30 @@ function removeModelFromChains(provider, id) {
   return changed
 }
 
+/// Chains that just lost their last upstream. Reported once per edit so the
+/// user hears about an emptied chain, not on every model toggle.
+function emptiedChainNames(chainStates) {
+  const names = []
+  for (const [name, wasFilled] of chainStates) {
+    if (wasFilled && (cfg.models?.[name]?.upstreams?.length ?? 0) === 0) names.push(name)
+  }
+  return names
+}
+
+function chainFillSnapshot() {
+  const snapshot = new Map()
+  for (const [name, def] of Object.entries(cfg.models ?? {})) snapshot.set(name, (def.upstreams?.length ?? 0) > 0)
+  return snapshot
+}
+
+/// Shows one toast naming the chains that became empty because of this edit.
+function reportEmptiedChains(snapshot) {
+  const names = emptiedChainNames(snapshot)
+  if (!names.length) return
+  const label = names.map((name) => `«${name}»`).join(", ")
+  flash(false, names.length === 1 ? `цепочка ${label} теперь пуста` : `цепочки ${label} теперь пусты`)
+}
+
 function removeModelReferences(provider, id) {
   let changed = removeModelFromChains(provider, id)
   const direct = cfg.opencodeModels?.[provider]
@@ -2697,6 +2733,7 @@ function renderPmList() {
       const arr = (cfg.providers[pmState.provider].models ??= [])
       const i = arr.indexOf(cb.dataset.id)
       if (cb.checked && i < 0) arr.push(cb.dataset.id)
+      const chainsBefore = chainFillSnapshot()
       if (!cb.checked && i >= 0) {
         arr.splice(i, 1)
         removeModelReferences(pmState.provider, cb.dataset.id)
@@ -2710,6 +2747,7 @@ function renderPmList() {
       renderOpenCode()
       renderImageGenerator()
       $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
+      reportEmptiedChains(chainsBefore)
     }
   })
   $("pm-list").querySelectorAll("button[data-model-settings]").forEach((button) => {
