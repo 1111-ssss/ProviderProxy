@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use provider_proxy_desktop::proxy::{default_config_path, start_server};
+use provider_proxy_desktop::proxy::{
+    default_config_path, shutdown_running_instance, start_server,
+};
 mod updater;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::fs;
@@ -61,8 +63,25 @@ fn desktop_exec(path: &Path) -> String {
     )
 }
 
+/// The database this process was told to use: argv[1], then PP_CONFIG_FILE,
+/// then the default lookup. main() uses the same order to start the server.
+fn requested_config_path() -> PathBuf {
+    pick_config_path(std::env::args_os().nth(1), std::env::var_os("PP_CONFIG_FILE"))
+}
+
+/// argv wins over PP_CONFIG_FILE, which wins over the default lookup.
+fn pick_config_path(argument: Option<std::ffi::OsString>, env: Option<std::ffi::OsString>) -> PathBuf {
+    argument
+        .map(PathBuf::from)
+        .or_else(|| env.map(PathBuf::from))
+        .unwrap_or_else(default_config_path)
+}
+
 fn autostart_config_path() -> Result<PathBuf, String> {
-    let path = default_config_path();
+    // Must match the database the running process opened. Reading only
+    // default_config_path() ignored an explicit path argument, so the autostart
+    // entry pointed at ./config.db instead of the user's real database.
+    let path = requested_config_path();
     if path.is_absolute() {
         Ok(path)
     } else {
@@ -397,12 +416,10 @@ fn browser_url(url: &Url) -> Option<&str> {
 }
 
 fn main() {
-    let config_path = std::env::args()
-        .nth(1)
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("PP_CONFIG_FILE").map(std::path::PathBuf::from))
-        .unwrap_or_else(default_config_path);
-
+    let config_path = requested_config_path();
+    // A second launch replaces the running window instead of failing on a busy
+    // port and leaving the old copy (and its stale config) on screen.
+    shutdown_running_instance(&config_path);
     let server = Arc::new(start_server(config_path).expect("provider_proxy server must start"));
     let port = server.port;
     tauri::Builder::default()
@@ -495,6 +512,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The autostart entry must point at the database the app actually opened.
+    /// It used to ignore argv and fall back to ./config.db, so a login launched
+    /// an empty copy that filled itself from config.example.json.
+    #[test]
+    fn autostart_follows_the_database_this_process_opened() {
+        use std::ffi::OsString;
+        let from_arg = pick_config_path(Some(OsString::from("/real/config.db")), None);
+        assert_eq!(from_arg, PathBuf::from("/real/config.db"));
+        let from_env = pick_config_path(None, Some(OsString::from("/env/config.db")));
+        assert_eq!(from_env, PathBuf::from("/env/config.db"));
+    }
 
     #[test]
     fn checkin_links_allow_web_pages_only() {

@@ -21,6 +21,74 @@ use super::{
     types::{AppState, ServerHandle},
 };
 
+/// A second launch must take over from the copy that already holds the port,
+/// otherwise it dies on `AddrInUse` and the old window keeps showing.
+///
+/// Asks that instance to exit through its own `/api/shutdown` (the only way to
+/// stop it without guessing a PID) and waits briefly for the port to come free.
+/// Returns false when nothing was listening, so a normal cold start is cheap.
+pub fn shutdown_running_instance(config_path: &PathBuf) -> bool {
+    use std::io::{Read, Write};
+    use std::time::{Duration, Instant};
+
+    fn exchange(port: u16, request: &str) -> Option<String> {
+        let mut stream = std::net::TcpStream::connect(("127.0.0.1", port)).ok()?;
+        stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
+        stream.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
+        stream.write_all(request.as_bytes()).ok()?;
+        let mut response = String::new();
+        stream.read_to_string(&mut response).ok()?;
+        Some(response)
+    }
+
+    let Ok(storage) = open_storage(config_path) else {
+        return false;
+    };
+    let Ok(config) = load_config(&storage, &config_path.with_extension("json")) else {
+        return false;
+    };
+    let port = config
+        .get("port")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(8787) as u16;
+    let token = config
+        .get("authToken")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .to_string();
+    // Release the database before waiting: the outgoing process still writes
+    // its usage counters while it shuts down.
+    drop(storage);
+    // Never shut down something that is not us: another program on port 8787
+    // would answer ping differently (or not at all).
+    let ping = exchange(
+        port,
+        "GET /api/ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    if !ping.as_deref().is_some_and(|r| r.contains("apiVersion")) {
+        return false;
+    }
+    let auth = if token.is_empty() {
+        String::new()
+    } else {
+        format!("Authorization: Bearer {token}\r\n")
+    };
+    let _ = exchange(
+        port,
+        &format!(
+            "POST /api/shutdown HTTP/1.1\r\nHost: localhost\r\n{auth}Connection: close\r\nContent-Length: 0\r\n\r\n"
+        ),
+    );
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        if std::net::TcpStream::connect(("127.0.0.1", port)).is_err() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    true
+}
+
 pub fn start_server(
     config_path: PathBuf,
 ) -> Result<ServerHandle, Box<dyn std::error::Error + Send + Sync>> {

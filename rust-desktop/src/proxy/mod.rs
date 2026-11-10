@@ -15,8 +15,7 @@ mod stream;
 mod types;
 
 pub use config::default_config_path;
-pub use server::start_server;
+pub use server::{shutdown_running_instance, start_server};
 pub use types::ServerHandle;
-
 #[cfg(test)]
 mod tests;

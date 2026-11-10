@@ -12,6 +12,7 @@
     "allow-install-update",
     "allow-restart-app",
     "allow-autostart-enabled",
+    "allow-autostart-tray-enabled",
     "allow-set-autostart",
     "allow-create-app-shortcut"
   ]

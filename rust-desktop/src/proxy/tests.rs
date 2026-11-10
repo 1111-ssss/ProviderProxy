@@ -4,7 +4,7 @@ use super::config::{
 };
 use super::metrics::{load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
-use super::server::start_server;
+use super::server::{shutdown_running_instance, start_server};
 use super::types::{AppState, ModelUsage, ProviderUsage, Usage};
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -221,6 +221,51 @@ fn starts_server_without_a_caller_tokio_runtime() {
     let database = database_path(&path);
     let _ = fs::remove_file(&path);
     let _ = fs::remove_file(database);
+}
+
+/// A second launch must not kill an unrelated program that happens to hold the
+/// configured port. The takeover is gated on our own /api/ping signature.
+#[tokio::test]
+async fn does_not_shut_down_a_stranger_on_the_configured_port() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let stranger_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/api/ping",
+            axum::routing::get(|| async { axum::Json(json!({ "service": "something-else" })) }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-takeover-{}.json", now_ms()));
+    fs::write(
+        &path,
+        json!({
+            "port": stranger_port,
+            "opencodeConfig": path.with_extension("opencode.json").display().to_string(),
+            "providers": {},
+            "models": {}
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    assert!(
+        !shutdown_running_instance(&path),
+        "a service without our apiVersion must be left alone"
+    );
+    // Still alive: the stranger answers after the takeover attempt.
+    let response = Client::new()
+        .get(format!("http://127.0.0.1:{stranger_port}/api/ping"))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(path.with_extension("opencode.json"));
 }
 
 /// Reproduces the field crash: a long Russian answer split into many SSE

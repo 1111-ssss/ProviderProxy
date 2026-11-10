@@ -1987,6 +1987,9 @@ $("s-auto-restart").onchange = (e) => {
 async function applyAutostart(enabled, tray, onError) {
   try {
     appSettings().autostart = Boolean(await tauriInvoke("set_autostart", { enabled, tray }))
+    // The command reports only whether autostart is on; keep the tray choice
+    // the user just made so the second checkbox does not snap back.
+    appSettings().autostartTray = tray
     save()
   } catch (error) {
     onError()
