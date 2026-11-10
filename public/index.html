@@ -71,7 +71,7 @@
     }
   }
   * { box-sizing: border-box; }
-  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--body-background); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; }
+  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--body-background); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; min-height: 100dvh; }
   main { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: minmax(210px, 224px) minmax(0, 1fr); align-items: start; gap: 18px; transition: grid-template-columns .2s ease; }
   main.nav-collapsed { grid-template-columns: 44px minmax(0, 1fr); }
   h1 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.03em; margin: 0; }
@@ -209,7 +209,7 @@
   .update-banner-message { min-width: 0; color: var(--muted); font-size: 12px; }
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
-  section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
+  section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
   section[data-tab="logs"] .section-sub { flex: 0 0 auto; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
   .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
@@ -227,7 +227,8 @@
   .tile .k { color: var(--muted); font-size: 12px; }
   .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
   .chart-card { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .chart-head > div { min-width: 0; }
   .chart-head h3 { margin: 0; font-size: 14px; }
   .chart-head p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
   .chart-head .muted { white-space: nowrap; }
@@ -244,12 +245,12 @@
   .donut-center strong { font-size: 26px; line-height: 1; letter-spacing: -.04em; }
   .donut-center span { color: var(--muted); font-size: 11px; margin-top: 5px; }
   .chart-legend { display: grid; gap: 10px; }
-  .legend-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
   .legend-dot.ok { background: var(--success); }
   .legend-dot.failed { background: var(--danger); }
   .legend-dot.other { background: var(--accent); }
-  .legend-name { color: var(--muted); }
+  .legend-name { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
   .token-bars { display: grid; gap: 13px; }
   .token-legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; }
@@ -258,9 +259,9 @@
   .token-key.success::before { background: #69d7a0; }
   .token-key.error::before { background: #ff9c9c; }
   .token-row { display: grid; gap: 5px; }
-  .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
-  .token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .token-row-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; min-width: 0; }
+  .token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .token-row-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto; }
   .token-row-head .problem-rate { color: #ffb0b0; }
   .token-track { display: flex; justify-content: space-between; height: 7px; overflow: hidden; border-radius: 999px; background: #2a3746; }
   .token-fill { display: block; height: 100%; min-width: 0; border-radius: inherit; transition: width .25s ease; }
@@ -300,13 +301,20 @@
   .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
   .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .settings-grid label { margin: 0; }
-  .settings-grid .setting-option { display: flex; align-items: flex-start; gap: 9px; grid-column: 1 / -1; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-grid label { margin: 0; min-width: 0; }
+  /* A field must shrink with its column, but checkboxes keep their own size. */
+  .settings-grid label input:not([type="checkbox"]), .settings-grid label select { width: 100%; min-width: 0; }
+  .settings-grid .setting-option { display: flex; align-items: flex-start; gap: 9px; grid-column: 1 / -1; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
   .settings-grid .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
-  .settings-grid .setting-option span { display: grid; gap: 2px; }
-  .settings-grid .setting-option small { color: var(--muted); font-size: 11px; }
+  /* The text column must be a shrinkable flex item with a minmax(0,1fr) track.
+     A plain `display: grid` sizes the track to the longest line's max-content,
+     so a long help text spilled out of the card and collapsed its own width. */
+  .settings-grid .setting-option span { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
-  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; }
+  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+  .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
+  .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action button { flex: 0 0 auto; min-height: 32px; padding: 6px 10px; }
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
@@ -424,7 +432,7 @@
      work card scroll independently instead of moving the whole page. */
   @media (min-width: 701px) {
     body { overflow: hidden; }
-    main { height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+    main { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
     main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
     .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; }
     main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
@@ -519,7 +527,7 @@
 
   @media (max-width: 700px) {
     body { overflow: auto; }
-    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); align-items: start; grid-template-rows: none; }
+    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: calc(100dvh - clamp(32px, 6vw, 64px)); align-items: start; grid-template-rows: none; }
     main > section { grid-row: auto; height: auto; max-height: none; overflow: visible; }
     .tabs { grid-row: auto; height: auto; max-height: none; overflow: visible; align-self: start; }
     section[data-tab="logs"] { height: auto; overflow: visible; }
