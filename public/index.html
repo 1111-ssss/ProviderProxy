@@ -125,11 +125,16 @@
   .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
   .step .prov { color: #a9d6ff; font-weight: 650; }
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
-  .model-card-head { display: flex; align-items: center; gap: 9px; }
-  .model-title { font-size: 15px; }
+  /* Between ~700px and ~1000px the head did not fit: the toggle and the
+     action buttons spilled out of the card. Let it wrap at any width. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+  .model-title { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  .model-actions { display: flex; gap: 6px; order: 2; margin-left: auto; }
+  /* Toggle and buttons travel together, so a wrapped card keeps the same
+     order as a wide one. */
+  .model-card-head .chain-toggle { order: 2; }
+  .model-actions { display: flex; gap: 6px; order: 3; margin-left: auto; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
@@ -370,7 +375,9 @@
   .chain .chain-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
   .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .image-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  /* Two fixed columns squeezed the form to ~190px between 760 and 1000px.
+     Stack them whenever a column would be narrower than a usable form. */
+  .image-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; align-items: start; }
   .settings-button { display: inline-grid; place-items: center; min-width: 42px; padding: 8px 11px; line-height: 1; }
   .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .image-section-actions { display: flex; align-items: center; gap: 8px; }
@@ -387,13 +394,15 @@
   .skill-status.is-ok { color: var(--success); }
   .skill-status.is-warn { color: #f2c781; }
   .image-form, .image-result { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  .image-form { display: grid; gap: 12px; }
+  /* An auto grid column grows to the browser's default control width, so
+     the form used to spill out of its card at mid widths. */
+  .image-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .image-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .image-form label input, .image-form label select { width: 100%; min-width: 0; height: 42px; }
   .image-form .row { align-items: end; }
   .image-form .row > label { flex: 1 1 150px; min-width: 0; }
   .image-field-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
-  .image-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .image-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .image-file-row { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
   .image-file-row input[type="file"] { width: 100%; padding: 7px; }
   .image-reference-name { color: var(--faint); font-size: 11px; min-height: 16px; }
