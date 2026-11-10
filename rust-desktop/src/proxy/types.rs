@@ -68,6 +68,11 @@ pub(crate) struct Usage {
     pub(crate) requests: u64,
     pub(crate) ok: u64,
     pub(crate) failed: u64,
+    /// Client requests that never reached an upstream because every link in the
+    /// chain was cooling down. They count as failures globally but belong to no
+    /// provider, which made the global error rate look far worse than any single
+    /// provider's rate.
+    pub(crate) skipped: u64,
     pub(crate) failovers: u64,
     #[serde(rename = "tokensIn")]
     pub(crate) tokens_in: u64,
@@ -93,6 +98,7 @@ impl Default for Usage {
             requests: 0,
             ok: 0,
             failed: 0,
+            skipped: 0,
             failovers: 0,
             tokens_in: 0,
             tokens_out: 0,

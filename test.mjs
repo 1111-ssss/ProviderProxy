@@ -584,6 +584,7 @@ try {
   assert.equal(u.ok, 10)
   assert.equal(u.failovers, 2) // r1 (429 off A) and 2b (400 off A)
   assert.equal(u.failed, 0)
+  assert.equal(u.skipped, 0, "a request that reached an upstream is never counted as skipped")
   assert.equal(u.providers.A.requests, 2)
   assert.equal(u.providers.A.limits, 1)
   assert.equal(u.providers.A.errors, 1) // 400 unsupported on the img chain

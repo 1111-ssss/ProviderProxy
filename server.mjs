@@ -404,8 +404,8 @@ const cool = (key, ms) => cooldowns.set(key, Date.now() + ms)
 // Usage counters for the GUI dashboard. Daily snapshots are kept locally for seven calendar days
 // in SQLite, separately from the config row so usage history never contains provider credentials.
 const USAGE_RETENTION_DAYS = 7
-const usageScalarKeys = ["requests", "ok", "failed", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
-const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
+const usageScalarKeys = ["requests", "ok", "failed", "skipped", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
+const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
 const cloneData = (value) => JSON.parse(JSON.stringify(value))
 const localDayKey = (date = new Date()) => {
   const p = (n) => String(n).padStart(2, "0")
@@ -1358,11 +1358,12 @@ async function proxyChat(body, res) {
   })
 
   let lastError = "all upstreams are cooling down"
+  let attempted = false
   for (let i = 0; i < chain.length; i++) {
     const up = chain[i]
     const key = `${exposed}|${up.name}|${up.model}` // stable under chain edits from the GUI
     if (cooling(key)) continue
-
+    attempted = true
     const ctrl = new AbortController()
     current = ctrl
     const pStat = statP(up.name)
@@ -1486,6 +1487,7 @@ async function proxyChat(body, res) {
   }
 
   usage.failed++
+  if (!attempted) usage.skipped++
   res.writeHead(502, { "content-type": "application/json" })
   res.end(JSON.stringify({ error: { message: `all upstreams failed for ${exposed}: ${lastError}` } }))
 }
