@@ -596,6 +596,9 @@ try {
   assert.equal(u.models["B/model-b2"].requests, 1)
   assert.equal(u.tokensIn, 77) // 7 successful chats x 11 prompt tokens from B
   assert.equal(u.tokensOut, 154)
+  assert.equal(u.tokensIn, 77)
+  assert.equal(u.lifetimeTokens?.tokensIn, 77, "lifetime totals must be exposed to the GUI")
+  assert.equal(u.lifetimeTokens?.tokensOut, 154)
   assert.equal(u.retentionDays, 7)
   assert.equal(u.days.length, 7)
   assert.equal(u.days[0].date, dayKey(0))

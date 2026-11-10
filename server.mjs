@@ -490,11 +490,35 @@ function persistUsage() {
   } catch (err) {
     log(`usage: не удалось сохранить историю SQLite ${dbPath}: ${err.message}`)
   }
+  persistLifetime()
 }
 function usageHistoryView() {
   rollUsageDay()
   const today = usageDay
   return usageDayKeys(today).map((date) => ({ date, ...usageSnapshot(date === today ? usage : usageHistory.get(date) ?? emptyUsage()) }))
+}
+// Totals that outlive the seven-day window. The history is pruned, so summing
+// it cannot answer "how much have I spent in total".
+let lifetimeTokens = { tokensIn: 0, tokensOut: 0, requests: 0 }
+try {
+  const row = database.prepare("SELECT value FROM settings WHERE key = 'lifetimeTokens'").get()
+  if (row?.value) lifetimeTokens = { ...lifetimeTokens, ...JSON.parse(row.value) }
+} catch (err) {
+  log(`usage: не удалось прочитать lifetime-токены: ${err.message}`)
+}
+function persistLifetime() {
+  try {
+    database
+      .prepare("INSERT INTO settings(key, value) VALUES('lifetimeTokens', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(JSON.stringify(lifetimeTokens))
+  } catch (err) {
+    log(`usage: не удалось сохранить lifetime-токены: ${err.message}`)
+  }
+}
+function addLifetime(tokensIn = 0, tokensOut = 0) {
+  lifetimeTokens.tokensIn += tokensIn
+  lifetimeTokens.tokensOut += tokensOut
+  lifetimeTokens.requests += 1
 }
 loadUsageHistory()
 const statP = (name) => (usage.providers[name] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0 })
@@ -555,6 +579,7 @@ const tally = (text, ...stats) => {
     s.tokensIn += tin
     s.tokensOut += tout
   }
+  addLifetime(tin, tout)
 }
 
 // Normalize upstream SSE before handing it to OpenCode. Some OpenAI-compatible
@@ -1319,7 +1344,7 @@ const server = http.createServer(async (req, res) => {
           return { model, upstream, until }
         })
       res.writeHead(200, { "content-type": "application/json" })
-      return res.end(JSON.stringify({ ...usage, cooldowns: coolingNow, uptimeMs: now - usage.since, today: usageDay, retentionDays: USAGE_RETENTION_DAYS, days: usageHistoryView() }))
+      return res.end(JSON.stringify({ ...usage, cooldowns: coolingNow, uptimeMs: now - usage.since, today: usageDay, retentionDays: USAGE_RETENTION_DAYS, days: usageHistoryView(), lifetimeTokens }))
     }
 
     res.writeHead(404, { "content-type": "application/json" })

@@ -5,7 +5,7 @@ use super::config::{
 use super::metrics::{load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
 use super::server::start_server;
-use super::types::{ModelUsage, ProviderUsage, Usage};
+use super::types::{AppState, ModelUsage, ProviderUsage, Usage};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::{
@@ -151,6 +151,43 @@ fn tallies_the_last_usage_object_for_streams() {
     assert_eq!(usage.tokens_out, 13);
     assert_eq!(provider.tokens_in, 7);
     assert_eq!(model.tokens_out, 13);
+}
+
+#[test]
+fn lifetime_totals_outlive_the_seven_day_window() {
+    let path = std::env::temp_dir().join(format!(
+        "provider-proxy-lifetime-test-{}.db",
+        now_ms()
+    ));
+    let storage = super::config::open_storage(&path).unwrap();
+    let state = AppState {
+        config_path: std::sync::Arc::new(path.clone()),
+        storage: std::sync::Arc::new(storage),
+        config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
+        chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
+        cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
+        usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
+        lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        client: reqwest::Client::new(),
+        port: 0,
+        log_max: 10,
+    };
+    {
+        let mut lifetime = state.lifetime.lock().unwrap();
+        lifetime.tokens_in = 1234;
+        lifetime.tokens_out = 5678;
+        lifetime.requests = 9;
+    }
+    super::metrics::persist_lifetime(&state);
+    let reloaded = super::metrics::load_lifetime(&state.storage);
+    assert_eq!(reloaded.tokens_in, 1234);
+    assert_eq!(reloaded.tokens_out, 5678);
+    assert_eq!(reloaded.requests, 9);
+    let _ = std::fs::remove_file(&path);
 }
 
 #[test]

@@ -113,6 +113,14 @@ impl Default for Usage {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LifetimeTokens {
+    pub(crate) tokens_in: u64,
+    pub(crate) tokens_out: u64,
+    pub(crate) requests: u64,
+}
+
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) config_path: Arc<PathBuf>,
@@ -124,6 +132,9 @@ pub(crate) struct AppState {
     pub(crate) usage: Arc<Mutex<Usage>>,
     pub(crate) usage_history: Arc<Mutex<HashMap<String, Usage>>>,
     pub(crate) usage_day: Arc<Mutex<String>>,
+    /// Totals that never reset: the seven-day history is pruned, so summing it
+    /// cannot answer "how much have I spent in total".
+    pub(crate) lifetime: Arc<Mutex<LifetimeTokens>>,
     pub(crate) image_tasks: Arc<Mutex<HashMap<String, String>>>,
     pub(crate) client: reqwest::Client,
     pub(crate) port: u16,

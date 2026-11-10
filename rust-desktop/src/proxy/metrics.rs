@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     config::Storage,
-    types::{AppState, ModelUsage, ProviderUsage, Usage},
+    types::{AppState, LifetimeTokens, ModelUsage, ProviderUsage, Usage},
 };
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
@@ -189,6 +189,39 @@ pub(crate) fn usage_history_view(state: &AppState) -> Vec<Value> {
         .collect()
 }
 
+/// Totals that outlive the seven-day window. Stored as one small JSON blob in
+/// `settings`, written with the same absolute value every time, so a crash
+/// between ticks cannot double-count.
+pub(crate) fn load_lifetime(storage: &Storage) -> LifetimeTokens {
+    let Ok(connection) = storage.connection.lock() else {
+        return LifetimeTokens::default();
+    };
+    connection
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'lifetimeTokens'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+pub(crate) fn persist_lifetime(state: &AppState) {
+    let totals = *state.lifetime.lock().unwrap();
+    let Ok(serialized) = serde_json::to_string(&totals) else {
+        return;
+    };
+    let Ok(connection) = state.storage.connection.lock() else {
+        return;
+    };
+    let _ = connection.execute(
+        "INSERT INTO settings(key, value) VALUES('lifetimeTokens', ?1) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![serialized],
+    );
+}
+
 pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
     let line = format!(
         "[{}] {}",
@@ -216,9 +249,9 @@ pub(crate) fn tally_usage(
     usage: &mut Usage,
     provider: &mut ProviderUsage,
     model: &mut ModelUsage,
-) {
+) -> (u64, u64) {
     let Some(start) = text.rfind("\"usage\"") else {
-        return;
+        return (0, 0);
     };
     let tail = &text[start..];
     let number = |key: &str| {
@@ -240,8 +273,8 @@ pub(crate) fn tally_usage(
     provider.tokens_out += output;
     model.tokens_in += input;
     model.tokens_out += output;
+    (input, output)
 }
-
 pub(crate) fn cooldown_snapshot(state: &AppState) -> Vec<Value> {
     let now = std::time::Instant::now();
     state

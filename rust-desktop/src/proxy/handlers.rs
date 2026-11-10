@@ -921,6 +921,10 @@ pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap)
         );
         object.insert("retentionDays".into(), json!(USAGE_RETENTION_DAYS));
         object.insert("days".into(), Value::Array(usage_history_view(&state)));
+        object.insert(
+            "lifetimeTokens".into(),
+            serde_json::to_value(*state.lifetime.lock().unwrap()).unwrap_or_else(|_| json!({})),
+        );
     }
     Json(value).into_response()
 }
