@@ -226,9 +226,16 @@ fn starts_server_without_a_caller_tokio_runtime() {
 #[tokio::test]
 async fn serves_the_desktop_api_from_a_local_port() {
     let path = std::env::temp_dir().join(format!("provider-proxy-rust-test-{}.json", now_ms()));
+    // Without an explicit opencodeConfig the config import below would rewrite
+    // the developer's real ~/.config/opencode/opencode.jsonc.
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
     fs::write(
         &path,
-        r#"{"port":0,"providers":{},"models":{"one":{"upstreams":[]}}}"#,
+        format!(
+            r#"{{"port":0,"providers":{{}},"models":{{"one":{{"upstreams":[]}}}},"opencodeConfig":"{}"}}"#,
+            opencode.display()
+        ),
     )
     .unwrap();
     let server = start_server(path.clone()).unwrap();
@@ -285,4 +292,5 @@ async fn serves_the_desktop_api_from_a_local_port() {
     let database = database_path(&path);
     let _ = fs::remove_file(&path);
     let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
 }
