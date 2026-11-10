@@ -126,10 +126,15 @@ impl SseNormalizer {
         }
         let has_usage_object = object.get("usage").is_some_and(|usage| usage.is_object());
         let Some(choices) = object.get_mut("choices") else {
+            // Frames without choices are keep-alives or metadata pings some
+            // gateways send mid-stream. They used to abort normalization with
+            // an error, which could cut an otherwise healthy answer short.
+            // Usage-only frames are forwarded because clients tally them;
+            // everything else is dropped silently.
             if has_usage_object {
                 return Ok(Some(format!("data: {}\n\n", parsed)));
             }
-            return Err("SSE object has neither choices nor usage".into());
+            return Ok(None);
         };
         let choices = choices
             .as_array_mut()
@@ -527,6 +532,39 @@ pub(super) async fn stream_upstream_response(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Keep-alive frames (id/object metadata, pings, comments) must not abort
+    /// the stream: a gateway that sends them mid-answer used to make the proxy
+    /// log "neither choices nor usage" and drop the whole stream with an error.
+    #[test]
+    fn keeps_the_stream_alive_when_a_frame_has_no_choices() {
+        let mut normalizer = SseNormalizer {
+            tool_indexes: HashMap::new(),
+            open_tool_index: HashMap::new(),
+            finish_reasons: HashMap::new(),
+            tool_choices: BTreeSet::new(),
+            choice_indexes: BTreeSet::new(),
+            last_meta: serde_json::Map::new(),
+            done_seen: false,
+        };
+        // Metadata ping without choices or usage: skipped, stream continues.
+        assert!(normalizer
+            .normalize_event("data: {\"id\":\"x\",\"object\":\"chat.completion.chunk\"}\n\n")
+            .unwrap()
+            .is_none());
+        // The answer still flows after the ping.
+        let out = normalizer
+            .normalize_event("data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ок\"}}]}\n\n")
+            .unwrap()
+            .unwrap();
+        assert!(out.contains("ок"));
+        // Usage-only frames keep reaching the client.
+        let usage = normalizer
+            .normalize_event("data: {\"usage\":{\"prompt_tokens\":1}}\n\n")
+            .unwrap()
+            .unwrap();
+        assert!(usage.contains("prompt_tokens"));
+    }
 
     #[test]
     fn emits_finish_reason_when_done_has_no_choices() {

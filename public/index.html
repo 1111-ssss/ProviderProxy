@@ -134,20 +134,20 @@
   .chain-empty { color: var(--muted); font-size: 12px; padding: 6px 0 2px; }
   .step .prov { color: #a9d6ff; font-weight: 650; }
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
-  /* Badges hug each other more than they hug the name, so the name reads as a
-     heading and the badges as its metadata. */
-  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-  .model-head-title { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+  /* The name is a heading on its own line; the badges form a sub-line under
+     it, so a long name cannot squeeze the badges. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 18px; }
+  .model-head-title { display: grid; gap: 6px; min-width: 0; flex: 1 1 auto; }
   .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
-  .model-card-head > .model-title { flex: 0 1 auto; min-width: 0; }
-  .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .model-card-head .head-controls { display: flex; align-items: center; gap: 9px; margin-left: auto; min-width: 0; }
+  .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-card-head .head-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; margin-left: auto; min-width: 0; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  /* The toggle and the buttons are grouped in .head-controls. The two buttons
-     stack so the group never needs a second header line. */
+  /* The toggle and the two buttons stack in one column on the right, so the
+     header never needs a second line and the buttons are always visible. */
   .model-actions { display: flex; flex-direction: column; gap: 6px; }
   .model-actions button { min-height: 32px; padding: 5px 10px; }
+  .head-controls .chain-toggle { min-height: 32px; padding: 5px 10px 5px 6px; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
@@ -501,12 +501,22 @@
   .chip .model-context { padding-right: 4px; }
   .provider-models { display: grid; gap: 8px; }
   .provider-models .card { margin-bottom: 0; }
-  .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
+  /* Controls sit right of the header block; the model chips flow under the
+     header at full width, so a one-model card has no tall empty head. */
+  .direct-model-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head controls" "list controls"; gap: 8px 18px; padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
+  .direct-model-card .model-card-head { grid-area: head; }
+  .direct-model-card .head-controls { grid-area: controls; align-self: start; }
+  .direct-model-card .provider-model-list { grid-area: list; margin-top: 0; align-self: start; }
   .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
   .direct-model-card .model-card-head { min-height: 38px; }
   .direct-model-card .chain-toggle { width: 134px; justify-content: flex-start; }
   #models .chain-toggle { width: 134px; justify-content: flex-start; }
-  .direct-model-card .provider-model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-top: 14px; }
+  /* The header column with its three stacked controls is narrow, so the model
+     chips sit beside it instead of under it. That keeps a single-model card
+     from growing a tall empty head. */
+  /* The stacked controls are narrow, so they sit to the right of the model
+     chips instead of above them. That removes the tall empty head a card with
+     one model used to have. */
   .direct-model-card .opencode-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 10px; background: rgba(19, 27, 36, .72); }
   .direct-model-card .opencode-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chain .step { min-width: 0; }
@@ -1742,15 +1752,15 @@ function renderOpencodeModels() {
            return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
-              <span class="pill ${ids.length ? "" : "empty"}">${ids.length} моделей</span>
-              <div class="head-controls">
-                <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}">
-                  <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
-                  <span class="chain-switch" aria-hidden="true"></span>
-                  <span class="chain-toggle-text">${enabled ? "Активен" : "Скрыт"}</span>
-                </label>
-                <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
-              </div>
+              <span class="model-badges"><span class="pill ${ids.length ? "" : "empty"}">${ids.length} моделей</span></span>
+            </div>
+            <div class="head-controls">
+              <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}">
+                <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
+                <span class="chain-switch" aria-hidden="true"></span>
+                <span class="chain-toggle-text">${enabled ? "Активен" : "Скрыт"}</span>
+              </label>
+              <div class="model-actions"><button type="button" data-a="edit">Изменить</button><button type="button" class="quiet danger" data-a="del">Удалить</button></div>
             </div>
              <div class="provider-model-list">${ids.length ? ids.map((id) => `<span class="opencode-model"><strong>${esc(id)}</strong>${modelContextSuffix(provider, id)}</span>`).join("") : `<span class="muted">модели не выбраны — нажми «Изменить»</span>`}</div>
           </div>`

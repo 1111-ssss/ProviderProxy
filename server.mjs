@@ -637,7 +637,7 @@ async function* normalizeSse(body, exposed, upstream) {
       }
       if (!Array.isArray(parsed.choices)) {
         if (parsed.usage && typeof parsed.usage === "object") return `data: ${JSON.stringify(parsed)}\n\n`
-        log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен SSE кадр без choices`)
+        // Keep-alive or metadata ping: normal, not worth a log line per frame.
         return ""
       }
       if (!parsed.choices.length && !parsed.usage) {
