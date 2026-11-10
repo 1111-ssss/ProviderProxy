@@ -859,8 +859,11 @@
             <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
           </label>
           <div class="setting-option setting-action" id="s-shortcut-wrap">
-            <span>Ярлык в меню приложений<small id="s-shortcut-help">Добавляет Provider Proxy в поиск приложений Windows или Linux.</small></span>
-            <button type="button" id="s-create-shortcut">Создать ярлык</button>
+            <span>Ярлыки приложения<small id="s-shortcut-help">Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе.</small></span>
+            <div class="row" style="margin-left:auto">
+              <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
+              <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1566,9 +1569,10 @@ function renderSettings() {
   $("s-autostart").disabled = !desktop
   $("s-autostart-wrap").classList.toggle("is-disabled", !desktop)
   $("s-autostart-help").textContent = desktop ? "Windows и Linux" : "доступно в desktop-версии"
-  $("s-create-shortcut").disabled = !desktop
+  $("s-create-shortcut-menu").disabled = !desktop
+  $("s-create-shortcut-desktop").disabled = !desktop
   $("s-shortcut-wrap").classList.toggle("is-disabled", !desktop)
-  $("s-shortcut-help").textContent = desktop ? "Добавляет Provider Proxy в поиск приложений Windows или Linux." : "доступно в desktop-версии"
+  $("s-shortcut-help").textContent = desktop ? "Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе." : "доступно в desktop-версии"
   $("s-base-url").textContent = `http://127.0.0.1:${cfg.port ?? 8787}/v1`
 }
 
@@ -1711,24 +1715,26 @@ async function syncAutostartSetting() {
   }
 }
 
-async function createAppShortcut() {
+async function createAppShortcut(desktop) {
   if (!isDesktopApp()) return
-  const button = $("s-create-shortcut")
+  const button = $(desktop ? "s-create-shortcut-desktop" : "s-create-shortcut-menu")
+  const label = button.textContent
   button.disabled = true
   button.textContent = "Создаю…"
   try {
-    const path = await tauriInvoke("create_app_shortcut")
+    const path = await tauriInvoke("create_app_shortcut", { desktop })
     $("s-shortcut-help").textContent = `ярлык создан: ${path}`
-    flash(true, "ярлык добавлен в меню приложений")
+    flash(true, desktop ? "ярлык добавлен на рабочий стол" : "ярлык добавлен в меню приложений")
   } catch (error) {
     flash(false, `не удалось создать ярлык: ${error.message ?? error}`)
   } finally {
     button.disabled = false
-    button.textContent = "Создать ярлык"
+    button.textContent = label
   }
 }
 
-$("s-create-shortcut").onclick = createAppShortcut
+$("s-create-shortcut-menu").onclick = () => createAppShortcut(false)
+$("s-create-shortcut-desktop").onclick = () => createAppShortcut(true)
 
 $("settings-shutdown").onclick = async () => {
   if (!window.confirm("Выйти из приложения и закрыть его вкладку?")) return
