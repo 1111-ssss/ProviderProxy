@@ -240,6 +240,7 @@
   .donut-segment.ok { stroke: var(--success); }
   .donut-segment.failed { stroke: var(--danger); }
   .donut-segment.other { stroke: var(--accent); }
+  .donut-segment.skipped { stroke: var(--faint); }
   .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
   .donut-center strong { font-size: 26px; line-height: 1; letter-spacing: -.04em; }
   .donut-center span { color: var(--muted); font-size: 11px; margin-top: 5px; }
@@ -249,6 +250,7 @@
   .legend-dot.ok { background: var(--success); }
   .legend-dot.failed { background: var(--danger); }
   .legend-dot.other { background: var(--accent); }
+  .legend-dot.skipped { background: var(--faint); }
   .legend-name { color: var(--muted); }
   .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
   .token-bars { display: grid; gap: 13px; }
@@ -792,6 +794,7 @@
               <circle class="donut-track" cx="60" cy="60" r="43"></circle>
               <circle id="u-donut-ok" class="donut-segment ok" cx="60" cy="60" r="43"></circle>
               <circle id="u-donut-failed" class="donut-segment failed" cx="60" cy="60" r="43"></circle>
+              <circle id="u-donut-skipped" class="donut-segment skipped" cx="60" cy="60" r="43"></circle>
               <circle id="u-donut-other" class="donut-segment other" cx="60" cy="60" r="43"></circle>
             </svg>
             <div class="donut-center"><strong id="u-donut-total">0</strong><span>запросов</span></div>
@@ -803,7 +806,7 @@
         <div class="chart-head">
           <div>
             <h3>Результаты по провайдерам</h3>
-            <p>Успешные ответы и ошибки upstream</p>
+            <p>Успешные ответы и ошибки upstream. Пропуски из-за кулдауна в эти проценты не входят.</p>
           </div>
           <div class="token-legend"><span class="token-key success">успешно</span><span class="token-key error">ошибки</span></div>
         </div>
@@ -2891,13 +2894,20 @@ function renderUsageCharts(u) {
   const requests = Math.max(0, Number(u.requests) || 0)
   const ok = Math.max(0, Number(u.ok) || 0)
   const failed = Math.max(0, Number(u.failed) || 0)
+  // Requests that never reached an upstream (whole chain cooling down). They
+  // are failures globally but belong to no provider, so showing them as
+  // "ошибки" made the overall error rate look far worse than the per-provider
+  // rates below it.
+  const skipped = Math.min(Math.max(0, Number(u.skipped) || 0), failed)
+  const errors = failed - skipped
   const other = Math.max(0, requests - ok - failed)
-  const chartTotal = Math.max(1, ok + failed + other)
+  const chartTotal = Math.max(1, ok + errors + skipped + other)
   const circumference = 2 * Math.PI * 43
   let offset = 0
   const segments = [
     ["u-donut-ok", ok],
-    ["u-donut-failed", failed],
+    ["u-donut-failed", errors],
+    ["u-donut-skipped", skipped],
     ["u-donut-other", other],
   ]
   for (const [id, value] of segments) {
@@ -2912,7 +2922,8 @@ function renderUsageCharts(u) {
   $("u-outcome-note").textContent = `${fmtNum(u.failovers)} failover`
   const outcomeRows = [
     ["ok", "Успешные", ok],
-    ["failed", "Ошибки", failed],
+    ["failed", "Ошибки", errors],
+    ["skipped", "Пропущено (кулдаун)", skipped],
     ["other", "Другие", other],
   ]
   $("u-outcome-legend").innerHTML = outcomeRows

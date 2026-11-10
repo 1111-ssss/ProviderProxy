@@ -54,6 +54,7 @@ pub(super) async fn chat_completions(
         model_stat(&mut usage, &exposed).requests += 1;
     }
     let mut last_error = "all upstreams are cooling down".to_string();
+    let mut attempted = false;
     for upstream in chain {
         let key = format!("{exposed}|{}|{}", upstream.name, upstream.model);
         if state
@@ -65,6 +66,7 @@ pub(super) async fn chat_completions(
         {
             continue;
         }
+        attempted = true;
         {
             let mut usage = state.usage.lock().unwrap();
             provider_stat(&mut usage, &upstream.name).requests += 1;
@@ -236,7 +238,12 @@ pub(super) async fn chat_completions(
         )
         .await;
     }
-    state.usage.lock().unwrap().failed += 1;
+    let mut usage = state.usage.lock().unwrap();
+    usage.failed += 1;
+    if !attempted {
+        usage.skipped += 1;
+    }
+    drop(usage);
     json_error(
         StatusCode::BAD_GATEWAY,
         format!("all upstreams failed for {exposed}: {last_error}"),
