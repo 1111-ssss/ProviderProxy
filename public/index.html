@@ -97,8 +97,11 @@
   button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--primary-text); font-weight: 700; }
   button.primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
   button.primary:disabled { background: var(--disabled-background); border-color: var(--border); color: var(--faint); }
-  button.quiet { background: transparent; border-color: transparent; color: var(--muted); }
-  button.quiet:hover:not(:disabled) { color: var(--text); background: var(--surface); border-color: var(--border); }
+  /* "Удалить" sits next to "Изменить" and needs the same outline: a fully
+     transparent border made the pair look mismatched and clipped. */
+  button.quiet { background: var(--control-background); border-color: var(--border-strong); color: var(--muted); }
+  button.quiet:hover:not(:disabled) { color: var(--text); background: var(--control-hover); border-color: var(--accent-strong); }
+  button.quiet.danger { color: var(--danger); }
   button.danger { color: var(--danger); }
   button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
   table { width: 100%; border-collapse: collapse; }
@@ -122,23 +125,29 @@
   .chain-toggle.is-on .chain-switch::after { transform: translateX(13px); background: #f2fff7; }
   .chain-toggle-text { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
   .chain-toggle-text small { display: block; margin-top: 1px; color: inherit; font-size: 10px; font-weight: 500; opacity: .72; }
-  .card .chain { margin: 13px 0 0; display: grid; gap: 7px; }
-  .step { display: flex; gap: 9px; align-items: center; font-size: 13px; }
-  .step .n { color: var(--faint); width: 20px; font-variant-numeric: tabular-nums; }
+  /* Tighter list: the 7px gap plus a 32px row made the chain feel airy and
+     pushed the header away from its steps. */
+  .card .chain { margin: 10px 0 0; display: grid; gap: 5px; }
+  .step { display: flex; gap: 7px; align-items: center; font-size: 13px; min-height: 0; }
+  .step .n { color: var(--faint); width: 16px; font-variant-numeric: tabular-nums; text-align: right; }
+  .step .opencode-model { padding: 4px 8px; }
+  .chain-empty { color: var(--muted); font-size: 12px; padding: 6px 0 2px; }
   .step .prov { color: #a9d6ff; font-weight: 650; }
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
-  /* Name and its badges read as one block: a tight gap inside, a wide gap
-     before the controls. With one uniform gap they looked like unrelated chips. */
+  /* Badges hug each other more than they hug the name, so the name reads as a
+     heading and the badges as its metadata. */
   .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-  .model-head-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; }
+  .model-head-title { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+  .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
   .model-card-head > .model-title { flex: 0 1 auto; min-width: 0; }
-  .model-title { font-size: 15px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-card-head .head-controls { display: flex; align-items: center; gap: 9px; margin-left: auto; min-width: 0; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  /* The toggle and the buttons are grouped in .head-controls; inside that group
-     the toggle comes first and the buttons stay right-aligned. */
-  .model-actions { display: flex; gap: 6px; }
+  /* The toggle and the buttons are grouped in .head-controls. The two buttons
+     stack so the group never needs a second header line. */
+  .model-actions { display: flex; flex-direction: column; gap: 6px; }
+  .model-actions button { min-height: 32px; padding: 5px 10px; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
@@ -833,7 +842,7 @@
       <h2>4&nbsp;·&nbsp;Цепочки</h2>
       <button class="primary" id="m-add">+ Добавить цепочку</button>
     </div>
-    <p class="section-sub">Здесь собираются цепочки failover. Переключатель справа временно убирает цепочку из публикации.</p>
+    <p class="section-sub">Цепочка — это список моделей, которые прокси пробует по очереди: если первая не ответила, берётся следующая. Кнопка «Изменить» задаёт этот список, а переключатель «Активна» временно скрывает цепочку из публикации, не удаляя её.</p>
     <div id="models"></div>
   </section>
 
@@ -1557,7 +1566,9 @@ function renderModels() {
       <div class="model-card-head">
         <span class="model-head-title">
           <b class="model-title">${esc(name)}</b>
-          <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
+          <span class="model-badges">
+            <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `${ups.length} в цепочке` : "цепочка пуста"}</span>${chainContextBadge(ups)}
+          </span>
         </span>
         <div class="head-controls">
           <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}">
@@ -1581,7 +1592,7 @@ function renderModels() {
         </div>`,
               )
               .join("")
-         : `<div class="muted">добавь хотя бы одного провайдера — кнопка «Изменить»</div>`}
+         : `<div class="chain-empty">добавьте хотя бы одного провайдера</div>`}
        </div>`
      div.querySelector('[data-a="edit"]').onclick = (event) => {
        event.preventDefault()
