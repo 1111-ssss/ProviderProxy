@@ -21,9 +21,10 @@
 | `fix/stream-tool-calls` | паника на кириллице (ответ обрывался без ошибки) и дубли `tool_call` |
 | `fix/usage-stats` | «пропущено из-за кулдауна» отделено от ошибок провайдера |
 | `feat/usage-lifetime-tokens` | токены за всё время — отдельный счётчик, не сумма 7 дней |
-| `fix/ui-layout-adaptive` | переполнение карточек настроек, длинные имена провайдеров, `dvh` |
+| `fix/ui-layout-adaptive` | переполнение карточек настроек, длинные имена провайдеров, `dvh`, схлопывание формы изображений и карточек цепочек |
 | `feat/split-shortcuts` | две кнопки: ярлык в меню приложений и на рабочем столе |
 | `feat/tray-autostart` | тумблер «стартовать свёрнутым в трей» (`--tray`) для Windows и Linux |
+| `fix/autostart-tray-permission` | тумблер трея блокировался ACL, автозапуск брал пустую базу, второй запуск не вытеснял первый |
 | `integration/all-fixes` | все ветки вместе; конфликтов по смыслу нет |
 
 Конфликт при слиянии был один и только в CSS: строка `.legend-name`
@@ -34,7 +35,8 @@
 ```bash
 git checkout master
 git branch -D fix/stream-tool-calls fix/usage-stats feat/usage-lifetime-tokens \
-  fix/ui-layout-adaptive feat/split-shortcuts feat/tray-autostart integration/all-fixes
+  fix/ui-layout-adaptive feat/split-shortcuts feat/tray-autostart \
+  fix/autostart-tray-permission integration/all-fixes
 ```
 
 ## Проверки перед коммитом
