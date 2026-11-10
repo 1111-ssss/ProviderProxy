@@ -105,6 +105,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.match(html, /\.settings-grid \.setting-action \{ display: flex;[\s\S]*?flex-wrap: wrap; \}/, "long shortcut paths should drop the button under the text")
     assert.ok(html.includes(".token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }"), "provider names should ellipsize instead of overflowing")
     assert.ok(html.includes("min-height: 100dvh"), "the shell should follow the visible viewport on mobile browsers")
+    assert.ok(html.includes("@container (max-width: 420px)"), "the outcome legend should stack instead of being squeezed")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {

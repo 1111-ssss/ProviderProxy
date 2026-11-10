@@ -351,6 +351,12 @@
           "markdownDescription": "Enables the autostart_enabled command without any pre-configured scope."
         },
         {
+          "description": "Enables the autostart_tray_enabled command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-autostart-tray-enabled",
+          "markdownDescription": "Enables the autostart_tray_enabled command without any pre-configured scope."
+        },
+        {
           "description": "Enables the check_for_update command without any pre-configured scope.",
           "type": "string",
           "const": "allow-check-for-update",
@@ -385,6 +391,12 @@
           "type": "string",
           "const": "deny-autostart-enabled",
           "markdownDescription": "Denies the autostart_enabled command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the autostart_tray_enabled command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-autostart-tray-enabled",
+          "markdownDescription": "Denies the autostart_tray_enabled command without any pre-configured scope."
         },
         {
           "description": "Denies the check_for_update command without any pre-configured scope.",

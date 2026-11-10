@@ -251,6 +251,15 @@
   .legend-dot.failed { background: var(--danger); }
   .legend-dot.other { background: var(--accent); }
   .legend-name { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The outcome card is half the grid on desktop and full width on mobile.
+     When the card leaves the donut too little room, stack the legend under it
+     instead of squeezing it to a few characters. */
+  .chart-card { container-type: inline-size; }
+  @container (max-width: 420px) {
+    .outcome-layout { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+    .chart-legend { width: 100%; }
+    .legend-name { white-space: normal; }
+  }
   .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
   .token-bars { display: grid; gap: 13px; }
   .token-legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; }
