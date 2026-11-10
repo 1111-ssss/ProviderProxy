@@ -61,6 +61,20 @@ pub(crate) struct ImageUsage {
     pub(crate) last_mode: Option<String>,
 }
 
+/// Per-hour slice of a day: key "HH" (00..23 local time). Lets the statistics
+/// page draw tokens/requests by hour without persisting individual requests.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct HourUsage {
+    pub(crate) requests: u64,
+    pub(crate) ok: u64,
+    pub(crate) failed: u64,
+    #[serde(rename = "tokensIn")]
+    pub(crate) tokens_in: u64,
+    #[serde(rename = "tokensOut")]
+    pub(crate) tokens_out: u64,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct Usage {
@@ -82,6 +96,7 @@ pub(crate) struct Usage {
     pub(crate) images_generated: u64,
     pub(crate) providers: HashMap<String, ProviderUsage>,
     pub(crate) models: HashMap<String, ModelUsage>,
+    pub(crate) hours: HashMap<String, HourUsage>,
     pub(crate) images: HashMap<String, ImageUsage>,
     #[serde(rename = "recentImages")]
     pub(crate) recent_images: Vec<Value>,
@@ -105,6 +120,7 @@ impl Default for Usage {
             images_generated: 0,
             providers: HashMap::new(),
             models: HashMap::new(),
+            hours: HashMap::new(),
             images: HashMap::new(),
             recent_images: Vec::new(),
             last_image_model: None,

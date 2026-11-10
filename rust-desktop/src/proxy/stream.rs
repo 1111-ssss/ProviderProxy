@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
-    metrics::{push_log, tally_usage},
+    metrics::{hour_stat, push_log, tally_usage},
     types::AppState,
 };
 
@@ -498,6 +498,11 @@ pub(super) async fn stream_upstream_response(
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
         let mut model_stat = usage.models.remove(&exposed).unwrap_or_default();
         let (tokens_in, tokens_out) = tally_usage(&tail, &mut usage, &mut provider_stat, &mut model_stat);
+        {
+            let hour = hour_stat(&mut usage);
+            hour.tokens_in += tokens_in;
+            hour.tokens_out += tokens_out;
+        }
         usage.providers.insert(provider, provider_stat);
         usage.models.insert(exposed, model_stat);
         drop(usage);

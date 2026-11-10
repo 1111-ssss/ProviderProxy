@@ -405,7 +405,10 @@ const cool = (key, ms) => cooldowns.set(key, Date.now() + ms)
 // in SQLite, separately from the config row so usage history never contains provider credentials.
 const USAGE_RETENTION_DAYS = 7
 const usageScalarKeys = ["requests", "ok", "failed", "skipped", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
-const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
+const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, hours: {}, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
+// Hour bucket "HH" of the local day, for the by-hour charts.
+const hourKey = () => String(new Date().getHours()).padStart(2, "0")
+const hourStat = () => (usage.hours[hourKey()] ??= { requests: 0, ok: 0, failed: 0, tokensIn: 0, tokensOut: 0 })
 const cloneData = (value) => JSON.parse(JSON.stringify(value))
 const localDayKey = (date = new Date()) => {
   const p = (n) => String(n).padStart(2, "0")
@@ -424,6 +427,7 @@ const usageDayKeys = (today = localDayKey()) => {
 function normalizeUsageSnapshot(value) {
   const out = emptyUsage()
   for (const key of usageScalarKeys) out[key] = Math.max(0, Number(value?.[key]) || 0)
+  out.hours = value?.hours && typeof value.hours === "object" ? cloneData(value.hours) : {}
   out.images = value?.images && typeof value.images === "object" ? cloneData(value.images) : {}
   out.providers = value?.providers && typeof value.providers === "object" ? cloneData(value.providers) : {}
   out.models = value?.models && typeof value.models === "object" ? cloneData(value.models) : {}
@@ -579,6 +583,9 @@ const tally = (text, ...stats) => {
     s.tokensIn += tin
     s.tokensOut += tout
   }
+  const hour = hourStat()
+  hour.tokensIn += tin
+  hour.tokensOut += tout
   addLifetime(tin, tout)
 }
 
@@ -1382,6 +1389,7 @@ async function proxyChat(body, res) {
   // If the client (opencode) disconnects, drop the upstream call too.
   active++
   usage.requests++
+  hourStat().requests++
   const mStat = statM(exposed)
   mStat.requests++
   let current = null
@@ -1468,6 +1476,7 @@ async function proxyChat(body, res) {
       }
       res.writeHead(resp.status, headers)
       usage.ok++
+      hourStat().ok++
       pStat.ok++
       mStat.ok++
       if (!resp.body) return res.end()
@@ -1520,6 +1529,7 @@ async function proxyChat(body, res) {
   }
 
   usage.failed++
+  hourStat().failed++
   if (!attempted) usage.skipped++
   res.writeHead(502, { "content-type": "application/json" })
   res.end(JSON.stringify({ error: { message: `all upstreams failed for ${exposed}: ${lastError}` } }))

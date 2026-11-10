@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     config::Storage,
-    types::{AppState, LifetimeTokens, ModelUsage, ProviderUsage, Usage},
+    types::{AppState, HourUsage, LifetimeTokens, ModelUsage, ProviderUsage, Usage},
 };
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
@@ -234,6 +234,19 @@ pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
     while logs.len() > state.log_max {
         logs.pop_front();
     }
+}
+
+/// Bucket key for the current local hour, "HH".
+pub(crate) fn hour_key() -> String {
+    Local::now().format("%H").to_string()
+}
+
+/// Current-hour bucket. Requests are counted once at the start of a request and
+/// the outcome/tokens at the points where the day counters already move, so the
+/// hourly chart and the day totals cannot drift apart.
+pub(crate) fn hour_stat<'a>(usage: &'a mut Usage) -> &'a mut HourUsage {
+    let key = hour_key();
+    usage.hours.entry(key).or_default()
 }
 
 pub(crate) fn provider_stat<'a>(usage: &'a mut Usage, name: &str) -> &'a mut ProviderUsage {

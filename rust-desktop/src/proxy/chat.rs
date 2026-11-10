@@ -11,7 +11,7 @@ use tokio::time::timeout;
 use super::{
     auth::authorized,
     handlers::json_error,
-    metrics::{model_stat, provider_stat, push_log},
+    metrics::{hour_stat, model_stat, provider_stat, push_log},
     routing::{failover_status, with_model},
     stream::stream_upstream_response,
     types::AppState,
@@ -52,6 +52,7 @@ pub(super) async fn chat_completions(
         let mut usage = state.usage.lock().unwrap();
         usage.requests += 1;
         model_stat(&mut usage, &exposed).requests += 1;
+        hour_stat(&mut usage).requests += 1;
     }
     let mut last_error = "all upstreams are cooling down".to_string();
     let mut attempted = false;
@@ -213,6 +214,7 @@ pub(super) async fn chat_completions(
             usage.ok += 1;
             provider_stat(&mut usage, &upstream.name).ok += 1;
             model_stat(&mut usage, &exposed).ok += 1;
+            hour_stat(&mut usage).ok += 1;
         }
         push_log(
             &state,
@@ -243,6 +245,7 @@ pub(super) async fn chat_completions(
     if !attempted {
         usage.skipped += 1;
     }
+    hour_stat(&mut usage).failed += 1;
     drop(usage);
     json_error(
         StatusCode::BAD_GATEWAY,
