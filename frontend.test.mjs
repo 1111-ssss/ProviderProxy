@@ -97,6 +97,9 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('class="chain-toggle-text">${enabled ? "Активна" : "Скрыта"}</span>'), "chain status should use compact labels")
     assert.ok(!html.includes("провайдер активен"), "direct model status should not have a provider subtitle")
     assert.ok(html.includes(".direct-model-card .chain-toggle { width: 134px;") && html.includes("#models .chain-toggle { width: 134px;"), "model and chain status buttons should have the same width")
+    assert.ok(html.includes('id="s-autostart-tray"'), "autostart should offer a tray-only start")
+    assert.ok(html.includes('tauriInvoke("set_autostart", { enabled, tray })'), "the tray choice must reach the command")
+    assert.ok(html.includes('tauriInvoke("autostart_tray_enabled")'), "the tray choice must be read back from the OS")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {

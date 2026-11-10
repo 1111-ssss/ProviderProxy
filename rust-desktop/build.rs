@@ -7,6 +7,7 @@ fn main() {
                 "restart_app",
                 "autostart_enabled",
                 "set_autostart",
+                "autostart_tray_enabled",
                 "create_app_shortcut",
             ]),
         );
