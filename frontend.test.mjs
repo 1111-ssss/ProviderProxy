@@ -108,6 +108,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('id="s-autostart-tray"'), "autostart should offer a tray-only start")
     assert.ok(html.includes('tauriInvoke("set_autostart", { enabled, tray })'), "the tray choice must reach the command")
     assert.ok(html.includes('tauriInvoke("autostart_tray_enabled")'), "the tray choice must be read back from the OS")
+    assert.ok(html.includes("@container (max-width: 420px)"), "the outcome legend should stack instead of being squeezed")
   })
 
   test(`${file}: only selected Connections image models are available`, () => {
