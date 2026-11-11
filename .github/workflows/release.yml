@@ -18,6 +18,7 @@ jobs:
   publish:
     name: Build and publish ZIP assets
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
@@ -40,9 +41,23 @@ jobs:
           sed -i "/name = \"provider-proxy-desktop\"/{n;s/version = \"[^\"]*\"/version = \"$version\"/;}" rust-desktop/Cargo.lock
 
       - name: Install build dependencies
+        timeout-minutes: 15
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          set -euo pipefail
+          # The runner's apt mirror occasionally stalls; a bare apt-get then sits
+          # silent until the job is cancelled. Cap each attempt and retry.
+          for attempt in 1 2 3; do
+            if sudo timeout 180 apt-get update -o Acquire::Retries=3; then
+              break
+            fi
+            echo "apt-get update failed (attempt $attempt)" >&2
+            [ "$attempt" -eq 3 ] && exit 1
+            sleep 10
+          done
+          sudo timeout 600 apt-get install -y --no-install-recommends \
+            -o DPkg::Lock::Timeout=120 \
             gcc-mingw-w64-x86-64 mingw-w64-tools imagemagick zip \
             libwebkit2gtk-4.1-dev libappindicator3-dev \
             librsvg2-dev patchelf libfuse2 file
