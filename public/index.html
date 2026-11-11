@@ -146,6 +146,14 @@
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
   .model-actions { display: flex; flex-direction: row; gap: 8px; }
+  /* Provider rows use the same borderless icon actions as the model cards, so
+     the two lists read as one app instead of a table with boxy buttons. */
+  .provider-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
+  .provider-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  .provider-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .provider-actions .icon-action.danger { color: #e08f8f; }
+  .provider-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  .provider-actions .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   /* Borderless icon buttons: the row reads as three quiet controls, and only
      hover paints a surface behind the one under the pointer. */
   .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; color: var(--muted); }
@@ -398,13 +406,15 @@
   /* The hint is drawn on hover/focus instead of relying on a native tooltip,
      which lags behind the pointer on a 24-column chart. */
   .hour-col { position: relative; }
-  .hour-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 5; display: none; width: max-content; max-width: 200px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.45; text-align: left; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translateX(-50%); pointer-events: none; }
+  /* The hint follows the pointer, so the numbers appear where the eye already
+     is instead of above the whole chart. JS sets --hint-x/--hint-y and clamps
+     them to the card. */
+  .hour-hint { position: absolute; left: 50%; top: var(--hint-y, 70px); z-index: 5; display: none; width: max-content; max-width: 200px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.45; text-align: left; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; }
   .hour-hint span { display: block; }
   .hour-hint-time { display: block; margin-bottom: 2px; text-align: center; font-variant-numeric: tabular-nums; }
   /* Near either edge the centred hint would hang outside the window, so it
      anchors to the column side instead. */
-  .hour-hint-left { left: 0; transform: none; }
-  .hour-hint-right { left: auto; right: 0; transform: none; }
+  .hour-hint-left, .hour-hint-right { transform: translate(-50%, calc(-100% - 8px)); }
   .hour-col:hover .hour-hint, .hour-col:focus-visible .hour-hint { display: block; }
   .hour-col:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .hour-total { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
@@ -421,8 +431,11 @@
   .token-fill.output { background: linear-gradient(90deg, #a66ae0, #d9b5fa); }
   .chart-empty { color: var(--muted); font-size: 12px; padding: 24px 0; text-align: center; }
   /* One row that scrolls sideways instead of wrapping: seven days never fit on
-     a narrow window, and a wrapped block pushed the charts down. */
-  .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+     a narrow window, and a wrapped block pushed the charts down. The scrollbar
+     itself is hidden — the wheel and trackpad scroll it — because a visible bar
+     under the tabs looked like a second control row. */
+  .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+  .usage-days::-webkit-scrollbar { display: none; }
   .usage-day { flex: 0 0 auto; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
   .usage-day strong { color: inherit; font-size: 12px; }
   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
@@ -559,8 +572,9 @@
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
   .integration-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  /* A bare switch, so it needs no room for a label and no min-width. */
-  .integration-card .chain-toggle { margin: 0; }
+  /* A bare switch: no card, no label, no reserved width. */
+  .integration-card .chain-toggle { margin: 0; padding: 0; gap: 0; border-color: transparent; background: none; min-height: 32px; }
+  .integration-card .chain-toggle:hover { border-color: transparent; background: none; }
   /* Two labelled fields under the panel title. Both labels sit above their
      input, with the same gap, so they read as one group instead of a label
      floating beside a box. */
@@ -894,11 +908,11 @@
           <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
         <div class="integration-actions">
+          <button id="opencode-sync" type="button">Синхронизировать</button>
           <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию">
             <input id="opencode-enabled" type="checkbox" checked>
             <span class="chain-switch" aria-hidden="true"></span>
           </label>
-          <button id="opencode-sync" type="button">Синхронизировать</button>
         </div>
       </div>
       <div class="opencode-config-grid">
@@ -1639,10 +1653,10 @@ function renderProviders() {
       <td class="muted">${esc(p.baseURL ?? "")}</td>
       <td class="muted">${p.apiKeyConfigured ? "••••••" : "—"}</td>
       <td class="muted">${models.length || "—"}</td>
-      <td style="white-space:nowrap;text-align:right">
+      <td class="provider-actions">
         ${p.checkin ? `<button data-a="checkin">Чекин</button>` : ""}
-        <button data-a="edit">Изменить</button>
-        <button data-a="del">✕</button>
+        <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
+        <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
       </td>`
     if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
     tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
@@ -3497,7 +3511,10 @@ function renderProviderProblemChart(obj) {
       const other = Math.max(0, requests - ok - limits - errors)
       return { name, requests, ok, limits, errors, other }
     })
-    .filter((row) => row.requests > 0)
+    // A provider with attempts but no result yet (still in flight, or the client
+    // left) has nothing to show: an empty grey bar reads as "0% проблемности"
+    // and only adds rows to the list.
+    .filter((row) => row.ok + row.limits + row.errors > 0)
     .sort((a, b) => b.requests - a.requests)
   const width = (row, value) => Math.max(0, (value / row.requests) * 100).toFixed(1)
   $("u-token-chart").innerHTML = rows.length
@@ -3565,10 +3582,9 @@ function renderUsageHourChart(u, report) {
         `Err ${fmtNum(v.failed)}`,
       ]
       const hint = `${time} — ${lines.join(", ")}`
-      // The hint flips to the column's left edge near the chart's right edge, so
-      // it cannot be clipped by the window.
-      // Right-edge columns extend the hint leftwards, left-edge ones rightwards.
-      const edge = i >= 18 ? " hour-hint-right" : i <= 3 ? " hour-hint-left" : ""
+      // Right-edge columns extend the hint leftwards, left-edge ones rightwards;
+      // the middle ones stay centred over the column.
+      const edge = i >= 20 ? " hour-hint-right" : i <= 3 ? " hour-hint-left" : ""
       return `<div class="hour-col${empty ? " empty" : ""}" tabindex="0" aria-label="${esc(hint)}">
         <span class="hour-hint${edge}"><strong class="hour-hint-time">${time}</strong>${lines.map((line) => `<span>${line}</span>`).join("")}</span>
         <div class="hour-col-stack"><span class="hour-bar" style="height:${((v.tin / maxTokens) * 100).toFixed(1)}%"></span></div>
@@ -3576,6 +3592,32 @@ function renderUsageHourChart(u, report) {
       </div>`
     })
     .join("")
+  // The hint used to sit above the whole 150px column, so the numbers appeared
+  // far from the pointer. Anchor it to the cursor and keep it inside the card.
+  $("u-hour-chart").onpointermove = (event) => {
+    const col = event.target.closest?.(".hour-col")
+    const hint = col?.querySelector(".hour-hint")
+    if (!col || !hint) return
+    const card = col.closest(".chart-card")?.getBoundingClientRect()
+    const colBox = col.getBoundingClientRect()
+    const box = hint.getBoundingClientRect()
+    if (!card || !box.width) return
+    const half = box.width / 2 + 6
+    const left = Math.min(
+      Math.max(event.clientX - colBox.left, card.left + half - colBox.left),
+      card.right - half - colBox.left,
+    )
+    const top = Math.max(event.clientY - colBox.top, box.height + 10)
+    hint.style.left = `${left}px`
+    hint.style.setProperty("--hint-y", `${top}px`)
+  }
+  // Keyboard focus has no pointer: fall back to a centred hint above the column.
+  $("u-hour-chart").onfocusin = (event) => {
+    const hint = event.target.closest?.(".hour-col")?.querySelector(".hour-hint")
+    if (!hint) return
+    hint.style.left = ""
+    hint.style.removeProperty("--hint-y")
+  }
 }
 
 // Compact two-row-per-record table: Имя | Req | OK/429/Err | вход/выход.
