@@ -3625,9 +3625,14 @@ function renderUsageHourChart(u, report) {
 // bar; the title attribute still spells the exact counts out.
 function usageCompactTable(obj) {
   const rows = Object.entries(obj ?? {})
-    // A row whose every counter is zero carries no information: it appears when
-    // an upstream was tried but never answered, and only adds noise to the table.
-    .filter(([, stat]) => (Number(stat.requests) || 0) + (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0) > 0)
+    // A row needs a recorded outcome to say anything. Requests without ok, limit
+    // or err are attempts that never resolved (and old rows written before the
+    // pass-through fix); they only add noise, so the table matches the chart.
+    .filter(([, stat]) => {
+      const outcome = (Number(stat.ok) || 0) + (Number(stat.limits) || 0) + (Number(stat.errors) || 0)
+      const tokens = (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0)
+      return outcome > 0 || tokens > 0
+    })
     .sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   if (!rows.length) return `<tr><td class="muted">данных пока нет</td></tr>`
   const cell = (name, stat) => {

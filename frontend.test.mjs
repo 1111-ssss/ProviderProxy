@@ -79,6 +79,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes("function renderUsageReportKeepingScroll"), "the poll must restore the scroll position after a redraw")
     assert.ok(html.includes("scrollbar-width: none"), "the day tabs must hide the scrollbar")
     assert.ok(html.includes("row.ok + row.limits + row.errors > 0"), "providers with no result yet must be left out of the problem chart")
+    assert.ok(html.includes("return outcome > 0 || tokens > 0"), "rows with no recorded outcome must be left out of the tables")
     assert.ok(html.includes('class="provider-actions"'), "provider rows use borderless icon actions")
     assert.ok(!html.includes('<button data-a="edit">Изменить</button>'), "provider rows no longer use text buttons")
     assert.ok(html.includes("onpointermove"), "the hour hint follows the pointer")
