@@ -546,9 +546,8 @@
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
   .integration-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-  /* The integration toggle toggles between "Активен" and "Отключен"; reserving
-     the wider label's width stops the switch from shifting on every click. */
-  .integration-card .chain-toggle { min-width: 132px; justify-content: flex-start; margin: 0; }
+  /* A bare switch, so it needs no room for a label and no min-width. */
+  .integration-card .chain-toggle { margin: 0; }
   /* Two labelled fields under the panel title. Both labels sit above their
      input, with the same gap, so they read as one group instead of a label
      floating beside a box. */

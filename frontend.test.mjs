@@ -78,6 +78,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes(".usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto;"), "day tabs must stay on one scrolling row")
     assert.ok(html.includes("function renderUsageReportKeepingScroll"), "the poll must restore the scroll position after a redraw")
     assert.ok(!html.includes('<span class="chain-toggle-text">Активен</span>'), "the integration switch must not carry a text label")
+    assert.ok(!html.includes("min-width: 132px"), "the bare switch must not reserve width for a removed label")
     assert.ok(!html.includes("Включена<small>"), "the integration toggle must not carry a second label line")
     assert.ok(html.includes("function reportEmptiedChains"), "emptying a chain must be reported once")
     assert.equal((html.match(/reportEmptiedChains\(chainsBefore\)/g) || []).length, 2, "provider and model removal must both report")
