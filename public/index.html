@@ -140,20 +140,21 @@
   .model-head-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; flex: 1 1 auto; }
   .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
   .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* Toggle and the two icon buttons sit in one row with the same 6px step. */
-  /* One frame around the toggle and both buttons, so they read as one control
-     group and share the same inner step. */
-  .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-left: auto; min-width: 0; flex: 0 0 auto; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+  /* Toggle and the two icon buttons: three bare controls in one row, no frame
+     and no background, so the header stays quiet next to the name. */
+  .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-left: auto; min-width: 0; flex: 0 0 auto; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
-  .model-actions { display: flex; flex-direction: row; gap: 6px; }
-  /* The buttons sit inside the shared frame, so their own borders would double
-     the outline: keep only the hover/active affordance. */
-  .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; }
-  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface); }
-  /* Icon-only actions: a 32px square keeps the row compact and the same gap
+  .model-actions { display: flex; flex-direction: row; gap: 8px; }
+  /* Borderless icon buttons: the row reads as three quiet controls, and only
+     hover paints a surface behind the one under the pointer. */
+  .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; color: var(--muted); }
+  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .model-card-head .model-actions .icon-action.danger { color: #e08f8f; }
+  .model-card-head .model-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  /* Icon-only actions: a 30px square keeps the row compact and the same gap
      between toggle, edit and delete. */
-  .model-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 32px; padding: 0; }
+  .model-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; }
   .model-actions .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   /* In the cards the toggle is the switch alone: no label, no box around it. */
   .model-card-head .chain-toggle { min-height: 32px; padding: 0; gap: 0; border-color: transparent; background: none; }
@@ -165,12 +166,25 @@
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   /* One card per model: checkbox, id and metadata in one frame, the ⋮ rides
      inside the same frame instead of owning a row of its own. */
+  /* Filter on the left, the "all models" bookmark on the right: one row, same
+     height as the filter input. */
+  .pm-filter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; margin-top: 8px; }
+  .pm-filter-row > input { min-width: 0; }
+  .pm-autoload { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); cursor: pointer; white-space: nowrap; }
+  .pm-autoload:hover { border-color: var(--border-strong); }
+  .pm-autoload-body { display: grid; gap: 1px; min-width: 0; }
+  .pm-autoload-body strong { font-size: 12px; font-weight: 650; }
+  .pm-autoload-body small { color: var(--muted); font-size: 10px; }
+  .pm-autoload input:checked ~ .pm-autoload-body strong { color: #9de8c0; }
   .provider-model-card { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
   .provider-model-card:hover { border-color: var(--border-strong); background: rgba(34, 45, 57, .55); }
   .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
-  .provider-model-card-body { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0; }
-  .provider-model-card-body code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; }
+  /* The id and its ctx badge flow as inline text: the badge stays on the same
+     line while there is room, and a long id wraps inside the card instead of
+     being cut — full info beats a tidy ellipsis here. */
+  .provider-model-card-body { display: block; flex: 1 1 auto; min-width: 0; }
+  .provider-model-card-body code { display: inline; overflow: visible; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+  .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; margin-left: 7px; vertical-align: baseline; }
   .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
   .model-settings-button:hover { color: var(--text); }
   /* Native checkboxes ignored the palette: a saturated blue square that looked
@@ -343,8 +357,8 @@
   }
   .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
   .token-bars { display: grid; gap: 13px; }
-  .token-legend { display: flex; gap: 12px; color: var(--muted); font-size: 11px; }
-  .token-key { display: inline-flex; align-items: center; gap: 5px; }
+  .token-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; line-height: 1; }
+  .token-key { display: inline-flex; align-items: center; gap: 5px; line-height: 1; }
   .token-key::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
   .token-key.success::before { background: #69d7a0; }
   .token-key.error::before { background: #ff9c9c; }
@@ -382,7 +396,13 @@
   /* The hint is drawn on hover/focus instead of relying on a native tooltip,
      which lags behind the pointer on a 24-column chart. */
   .hour-col { position: relative; }
-  .hour-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 5; display: none; width: max-content; max-width: 240px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.35; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translateX(-50%); pointer-events: none; }
+  .hour-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 5; display: none; width: max-content; max-width: 200px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.45; text-align: left; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translateX(-50%); pointer-events: none; }
+  .hour-hint span { display: block; }
+  .hour-hint-time { display: block; margin-bottom: 2px; text-align: center; font-variant-numeric: tabular-nums; }
+  /* Near either edge the centred hint would hang outside the window, so it
+     anchors to the column side instead. */
+  .hour-hint-left { left: 0; transform: none; }
+  .hour-hint-right { left: auto; right: 0; transform: none; }
   .hour-col:hover .hour-hint, .hour-col:focus-visible .hour-hint { display: block; }
   .hour-col:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .hour-total { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
@@ -559,8 +579,10 @@
   .provider-models { display: grid; gap: 8px; }
   /* Chains flow in up to three columns, filled top-to-bottom then left-to-right
      (grid-auto-flow: column), so the order matches the list order. */
-  #models { display: grid; grid-template-columns: repeat(var(--chain-cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--chain-rows, 1), auto); grid-auto-flow: column; gap: 12px; }
-  #models > .card { min-width: 0; margin: 0; }
+  /* The steps inside a chain flow in up to three columns, filling row by row,
+     so a nine-model chain is three compact rows instead of nine tall ones. */
+  .chain { grid-template-columns: repeat(var(--step-cols, 1), minmax(0, 1fr)); grid-auto-flow: row; }
+  .step { min-width: 0; }
   .provider-models .card { margin-bottom: 0; }
   .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
   .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
@@ -842,7 +864,16 @@
       <select id="pm-provider" class="sr-only" tabindex="-1" aria-hidden="true"></select>
       <button type="button" id="pm-refresh">обновить с /v1/models</button>
     </div>
-    <input id="pm-filter" placeholder="фильтр по имени…" style="width:100%;margin-top:8px">
+    <div class="pm-filter-row">
+      <input id="pm-filter" placeholder="фильтр по имени…">
+      <label class="pm-autoload" title="При каждом запуске обновлять список моделей с /v1/models, убирать исчезнувшие (добавленные вручную останутся) и включать все модели провайдера">
+        <input id="pm-autoload" type="checkbox">
+        <span class="pm-autoload-body">
+          <strong>добавлять все модели</strong>
+          <small>обновлять с /v1/models при запуске</small>
+        </span>
+      </label>
+    </div>
     <div id="pm-list" style="max-height:360px;overflow:auto;margin-top:8px;display:grid;grid-template-columns:repeat(var(--pm-cols,1),minmax(0,1fr));gap:6px"></div>
     <div class="row" style="margin-top:12px;padding:10px;border:1px dashed #3a4150;border-radius:8px">
       <input id="pm-manual" placeholder="ID модели вручную" style="flex:1">
@@ -1039,9 +1070,8 @@
           <div class="chart-head">
             <div>
               <h3>Проблемность провайдеров</h3>
-              <p>Доля OK, ratelimit и ошибок у каждого провайдера. Полоса всегда во всю ширину, поэтому два упавших запроса из двух — это сплошная красная.</p>
             </div>
-            <div class="token-legend"><span class="token-key success">OK</span><span class="token-key limit">ratelimit</span><span class="token-key error">Err</span><span class="token-key other">прочее</span></div>
+            <div class="token-legend"><span class="token-key success">Ok</span><span class="token-key limit">RateLimit</span><span class="token-key error">Err</span><span class="token-key other">Прочее</span></div>
           </div>
           <div class="token-bars" id="u-token-chart"></div>
         </article>
@@ -1052,7 +1082,6 @@
         <div class="chart-head">
           <div>
             <h3>Последние 24 часа</h3>
-            <p>Входные токены по часам; правый столбец — текущий час. Наведи на столбец, чтобы увидеть запросы, выход и ошибки этого часа.</p>
           </div>
           <div class="token-legend"><span class="token-key input">вход</span></div>
         </div>
@@ -1651,7 +1680,7 @@ function renderModels() {
       <div class="model-card-head">
         <b class="model-title">${esc(name)}</b>
         <div class="model-badges">
-          <span class="pill ${ups.length ? "" : "empty"}">${ups.length ? `x${ups.length}` : "пусто"}</span>${chainContextBadge(ups)}
+          ${ups.length > 1 ? `<span class="pill">x${ups.length}</span>` : ups.length ? "" : `<span class="pill empty">пусто</span>`}${chainContextBadge(ups)}
         </div>
         <div class="head-controls">
           <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}" aria-label="${enabled ? "Активна" : "Скрыта"}">
@@ -1702,32 +1731,28 @@ function renderModels() {
      box.append(div)
    }
    if (!entries.length) box.innerHTML = `<p class="muted">цепочек пока нет — нажми «+ Добавить цепочку»</p>`
-   applyChainColumns(box, entries.length)
+   applyStepColumns(box)
  }
 
-// Chains fill up to three columns only when each still has room for its own
-// content: columns are filled top-to-bottom, then left-to-right, so reading
-// order stays the same as the list.
-let chainColumnsObserver = null
-function applyChainColumns(box, count) {
-  if (!count) return
-  const gap = 12
-  const MIN_CARD = 300
+// The steps inside every chain flow in as many columns as a single upstream chip
+// needs, capped at three. One count for the whole tab keeps the chains aligned;
+// the row gap matches the column gap so the result reads as a tidy grid.
+let stepColumnsObserver = null
+function applyStepColumns(box) {
+  const MIN_STEP = 240
+  const gap = 8
   const fit = () => {
-    const available = box.clientWidth
+    const available = box.querySelector(".card .chain")?.clientWidth ?? 0
     if (!available) return // hidden tab: the observer fires once it has width
-    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_CARD + gap))))
-    const rows = Math.ceil(count / cols)
-    const key = `${cols}x${rows}`
-    if (box.dataset.chainCols === key) return
-    box.dataset.chainCols = key
-    box.style.setProperty("--chain-cols", cols)
-    box.style.setProperty("--chain-rows", rows)
+    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_STEP + gap))))
+    if (box.dataset.stepCols === String(cols)) return
+    box.dataset.stepCols = String(cols)
+    for (const chain of box.querySelectorAll(".chain")) chain.style.setProperty("--step-cols", cols)
   }
   fit()
-  chainColumnsObserver?.disconnect()
-  chainColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
-  chainColumnsObserver.observe(box)
+  stepColumnsObserver?.disconnect()
+  stepColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
+  stepColumnsObserver.observe(box)
 }
 
 // Cards are rebuilt after every save. Keep one document-level handler so
@@ -1888,7 +1913,7 @@ function renderOpencodeModels() {
            return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
-              <div class="model-badges"><span class="pill ${ids.length ? "" : "empty"}">${ids.length ? `x${ids.length}` : "пусто"}</span></div>
+              <div class="model-badges">${ids.length > 1 ? `<span class="pill">x${ids.length}</span>` : ids.length ? "" : `<span class="pill empty">пусто</span>`}</div>
               <div class="head-controls">
                 <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}" aria-label="${enabled ? "Активен" : "Скрыт"}">
                   <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
@@ -2731,6 +2756,7 @@ function renderProviderModels() {
     }
   })
   $("pm-filter").value = pmState.filter
+  $("pm-autoload").checked = isAutoAllProvider(pmState.provider)
   const saved = cfg.providers[pmState.provider].models ?? []
   $("pm-status").textContent = pmState.loading
     ? "загружаю /v1/models…"
@@ -2738,6 +2764,50 @@ function renderProviderModels() {
       ? `не удалось загрузить (${pmState.error}) — показаны сохранённые`
       : `выбрано ${saved.length} из ${pmState.ids.length}`
   renderPmList()
+}
+
+// "Add all models" bookmark for a provider: every start re-reads /v1/models,
+// drops models the provider no longer serves (unless the user typed them in by
+// hand), keeps the selection at "all", and re-syncs the direct-models list on
+// the Models tab so both stay in step.
+const providerAutoAll = () => (cfg.providerAutoAll ??= {})
+const isAutoAllProvider = (name) => providerAutoAll()[name] === true
+async function syncAutoAllProvider(name) {
+  const provider = cfg.providers[name]
+  if (!provider) return
+  const res = await fetchProviderModels(name)
+  if (res.error) return
+  const returned = new Set(res.ids)
+  const manual = new Set((provider.manualModels ?? []).map(String))
+  const kept = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
+  const merged = [...new Set([...kept, ...res.ids])]
+  provider.models = merged
+  provider.modelAvailability ??= {}
+  const at = new Date().toISOString()
+  for (const id of merged) provider.modelAvailability[id] = { available: returned.has(id), checkedAt: at }
+  mergeProviderModelDetails(provider, res.details)
+  // Every model of this provider is selected by definition, and the Models tab
+  // reads `all`, so it widens together with the Connections list.
+  const direct = (cfg.opencodeModels ??= {})[name]
+  if (direct) {
+    direct.all = true
+    direct.models = [...merged]
+  }
+  cleanupModelMetadata()
+  const chainsChanged = removeImageModelsFromChains()
+  save()
+  if (chainsChanged) renderModels()
+  renderOpenCode()
+}
+async function syncAutoAllProviders() {
+  for (const name of Object.keys(cfg.providers ?? {})) {
+    if (!isAutoAllProvider(name)) continue
+    try {
+      await syncAutoAllProvider(name)
+    } catch {
+      /* один провайдер не должен ломать запуск остальных */
+    }
+  }
 }
 
 async function loadPmModels(name) {
@@ -2789,6 +2859,34 @@ $("pm-provider").onchange = (e) => {
   loadPmModels(pmState.provider)
 }
 $("pm-refresh").onclick = () => loadPmModels(pmState.provider)
+$("pm-autoload").onchange = async (e) => {
+  const name = pmState.provider
+  if (!name) return
+  const map = providerAutoAll()
+  if (e.target.checked) {
+    map[name] = true
+    cfg.opencodeModels ??= {}
+    const direct = (cfg.opencodeModels[name] ??= {})
+    direct.all = true
+    direct.models = directModelIds(name, { ...direct, all: true })
+    await syncAutoAllProvider(name)
+    flash(true, `«${esc(name)}»: все модели будут обновляться при запуске`)
+  } else {
+    delete map[name]
+    cfg.opencodeModels ??= {}
+    const direct = cfg.opencodeModels[name]
+    if (direct?.all === true) {
+      direct.all = false
+      direct.models = [...(cfg.providers[name]?.models ?? [])]
+    }
+    save()
+    flash(true, `«${esc(name)}»: только выбранные модели`)
+  }
+  save()
+  renderProviderModels()
+  renderOpencodeModels()
+  renderOpenCode()
+}
 $("pm-filter").oninput = (e) => {
   pmState.filter = e.target.value
   renderPmList()
@@ -2800,9 +2898,13 @@ $("pm-add").onclick = () => {
   if (!pmState.provider) return flash(false, "сначала добавь провайдера")
   const id = $("pm-manual").value.trim()
   if (!id) return flash(false, "впиши ID модели")
-  const arr = (cfg.providers[pmState.provider].models ??= [])
+  const provider = cfg.providers[pmState.provider]
+  const arr = (provider.models ??= [])
   if (arr.includes(id)) return flash(false, "уже есть")
   arr.push(id)
+  // A typed-in model must survive the "/v1/models" refresh, which otherwise
+  // treats anything missing from the response as removed.
+  ;(provider.manualModels ??= []).push(id)
   if (!pmState.ids.includes(id)) pmState.ids.unshift(id)
   $("pm-manual").value = ""
   save()
@@ -2944,16 +3046,26 @@ function renderPmList() {
   applyPmColumns($("pm-list"))
 }
 
-// Up to three model cards per row, same count for the whole list. 210px is the
-// narrowest a card (checkbox + id + ⋮) reads without squeezing the id.
+// Cards per row: as many as the widest model id still fits on one line, capped
+// at three. A column of full names beats three columns of cut ones.
 let pmColumnsObserver = null
 function applyPmColumns(box) {
-  const MIN_CARD = 210
+  const CHROME = 92 // checkbox, gaps, ⋮ and card padding
   const gap = 6
+  const widestId = () => {
+    let widest = 0
+    for (const el of box.querySelectorAll(".provider-model-card-body code")) {
+      el.style.whiteSpace = "nowrap"
+      widest = Math.max(widest, el.getBoundingClientRect().width)
+      el.style.whiteSpace = ""
+    }
+    return widest
+  }
   const fit = () => {
     const available = box.clientWidth
     if (!available) return // hidden tab: the observer fires once it has width
-    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_CARD + gap))))
+    const needed = (widestId() || 210) + CHROME
+    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (needed + gap))))
     if (box.dataset.pmCols === String(cols)) return
     box.dataset.pmCols = String(cols)
     box.style.setProperty("--pm-cols", cols)
@@ -3387,11 +3499,11 @@ function renderProviderProblemChart(obj) {
         .map((row) => {
           const bad = row.limits + row.errors
           const problemRate = Math.round((bad / row.requests) * 100)
-          const details = `${fmtNum(row.requests)} попыток: OK ${fmtNum(row.ok)}, ratelimit ${fmtNum(row.limits)}, Err ${fmtNum(row.errors)}${row.other ? `, переключено ${fmtNum(row.other)}` : ""}`
+          const details = `${fmtNum(row.requests)} попыток: Ok ${fmtNum(row.ok)}, RateLimit ${fmtNum(row.limits)}, Err ${fmtNum(row.errors)}${row.other ? `, переключено ${fmtNum(row.other)}` : ""}`
           return `<div class="token-row" title="${esc(`${row.name} — ${details}`)}">
             <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate" style="color:${problemColor(problemRate)}">${problemRate}% проблемности</span></div>
             <div class="token-track"><span class="token-fill success" style="width:${width(row, row.ok)}%"></span><span class="token-fill limit" style="width:${width(row, row.limits)}%"></span><span class="token-fill error" style="width:${width(row, row.errors)}%"></span><span class="token-fill other" style="width:${width(row, row.other)}%"></span></div>
-            <div class="token-row-foot"><span>OK: ${fmtNum(row.ok)}</span><span>ratelimit: ${fmtNum(row.limits)}</span><span>Err: ${fmtNum(row.errors)}</span></div>
+            <div class="token-row-foot"><span>Ok: ${fmtNum(row.ok)}</span><span>RateLimit: ${fmtNum(row.limits)}</span><span>Err: ${fmtNum(row.errors)}</span></div>
           </div>`
         })
         .join("")
@@ -3434,11 +3546,23 @@ function renderUsageHourChart(u, report) {
   const maxTokens = Math.max(1, ...values.map((v) => v.tin))
   const label = (at) => (at.getHours() === 0 ? `${String(at.getDate()).padStart(2, "0")}.${String(at.getMonth() + 1).padStart(2, "0")}` : String(at.getHours()).padStart(2, "0"))
   $("u-hour-chart").innerHTML = values
-    .map((v) => {
+    .map((v, i) => {
       const empty = !v.tin && !v.tout && !v.requests
-      const hint = `${String(v.at.getHours()).padStart(2, "0")}:00 — вход ${fmtTok(v.tin)}, выход ${fmtTok(v.tout)}; ${fmtNum(v.requests)} запросов (OK ${fmtNum(v.ok)}, Err ${fmtNum(v.failed)})`
+      const time = `${String(v.at.getHours()).padStart(2, "0")}:00`
+      const lines = [
+        `вход ${fmtTok(v.tin)}`,
+        `выход ${fmtTok(v.tout)}`,
+        `запросов ${fmtNum(v.requests)}`,
+        `Ok ${fmtNum(v.ok)}`,
+        `Err ${fmtNum(v.failed)}`,
+      ]
+      const hint = `${time} — ${lines.join(", ")}`
+      // The hint flips to the column's left edge near the chart's right edge, so
+      // it cannot be clipped by the window.
+      // Right-edge columns extend the hint leftwards, left-edge ones rightwards.
+      const edge = i >= 18 ? " hour-hint-right" : i <= 3 ? " hour-hint-left" : ""
       return `<div class="hour-col${empty ? " empty" : ""}" tabindex="0" aria-label="${esc(hint)}">
-        <span class="hour-hint">${esc(hint)}</span>
+        <span class="hour-hint${edge}"><strong class="hour-hint-time">${time}</strong>${lines.map((line) => `<span>${line}</span>`).join("")}</span>
         <div class="hour-col-stack"><span class="hour-bar" style="height:${((v.tin / maxTokens) * 100).toFixed(1)}%"></span></div>
         <span class="hour-label">${label(v.at)}</span>
       </div>`
@@ -3451,6 +3575,9 @@ function renderUsageHourChart(u, report) {
 // bar; the title attribute still spells the exact counts out.
 function usageCompactTable(obj) {
   const rows = Object.entries(obj ?? {})
+    // A row whose every counter is zero carries no information: it appears when
+    // an upstream was tried but never answered, and only adds noise to the table.
+    .filter(([, stat]) => (Number(stat.requests) || 0) + (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0) > 0)
     .sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   if (!rows.length) return `<tr><td class="muted">данных пока нет</td></tr>`
   const cell = (name, stat) => {
@@ -3578,7 +3705,11 @@ async function load() {
     renderAll()
     applyTheme(appSettings().theme)
     debugLog("boot-ok", { providers: Object.keys(cfg.providers).length, chains: Object.keys(cfg.models).length })
-    if (pmState.provider) loadPmModels(pmState.provider) // список моделей подтягиваем при открытии вкладки
+    // Providers bookmarked "all models" refresh before anything renders, so the
+    // Connections list and the Models tab agree from the first paint.
+    syncAutoAllProviders().then(() => {
+      if (pmState.provider) loadPmModels(pmState.provider)
+    })
     syncAutostartSetting()
     setTimeout(checkForDesktopUpdate, 1500)
   } catch {
