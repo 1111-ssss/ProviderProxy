@@ -536,6 +536,37 @@ const statP = (name) => (usage.providers[name] ??= { requests: 0, ok: 0, limits:
 // Keyed by the real upstream model, not the chain alias: a chain is just a
 // name, and two chains on one upstream would otherwise double count it.
 const statM = (up) => (usage.models[`${up.name}/${up.model}`] ??= { requests: 0, ok: 0, limits: 0, errors: 0, failovers: 0, tokensIn: 0, tokensOut: 0 })
+// Best-effort session titles. Accounting never reads the harness files: this
+// only labels the rows with the name the user already sees in the harness.
+// Cached for a minute so the 3-second poll does not reopen the database.
+let sessionTitleCache = { at: 0, titles: {} }
+function sessionTitles() {
+  const now = Date.now()
+  if (now - sessionTitleCache.at < 60_000) return sessionTitleCache.titles
+  const titles = {}
+  const candidates = [
+    join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "opencode", "opencode.db"),
+    join(homedir(), ".local", "share", "opencode", "opencode.db"),
+  ]
+  for (const path of new Set(candidates)) {
+    if (!existsSync(path)) continue
+    try {
+      const db = new DatabaseSync(path, { readOnly: true })
+      for (const table of ["session_v2", "session"]) {
+        try {
+          for (const row of db.prepare(`SELECT id, title FROM ${table}`).all()) {
+            if (String(row.title ?? "").trim()) titles[row.id] ??= row.title
+          }
+        } catch { /* the other table schema */ }
+      }
+      db.close()
+    } catch { /* unreadable database: fall back to ids */ }
+    if (Object.keys(titles).length) break
+  }
+  sessionTitleCache = { at: now, titles }
+  return titles
+}
+
 // One harness session, keyed by the id it sends in x-opencode-session-id.
 // Nothing is read from the harness's files: only proxied traffic is counted.
 const statS = (session) => {
@@ -1371,7 +1402,7 @@ const server = http.createServer(async (req, res) => {
           return { model, upstream, until }
         })
       res.writeHead(200, { "content-type": "application/json" })
-      return res.end(JSON.stringify({ ...usage, cooldowns: coolingNow, uptimeMs: now - usage.since, today: usageDay, retentionDays: USAGE_RETENTION_DAYS, days: usageHistoryView(), lifetimeTokens }))
+      return res.end(JSON.stringify({ ...usage, cooldowns: coolingNow, uptimeMs: now - usage.since, today: usageDay, retentionDays: USAGE_RETENTION_DAYS, days: usageHistoryView(), lifetimeTokens, sessionTitles: sessionTitles() }))
     }
 
     res.writeHead(404, { "content-type": "application/json" })

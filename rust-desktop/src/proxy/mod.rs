@@ -10,6 +10,7 @@ mod handlers;
 mod metrics;
 mod opencode;
 mod routing;
+mod session_titles;
 mod server;
 mod stream;
 mod types;

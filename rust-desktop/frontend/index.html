@@ -162,7 +162,7 @@
   .pm-autoload-body strong { font-size: 12px; font-weight: 650; }
   .pm-autoload-body small { color: var(--muted); font-size: 10px; }
   .pm-autoload input:checked ~ .pm-autoload-body strong { color: #9de8c0; }
-  .provider-model-card { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
+  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
   .provider-model-card:hover { border-color: var(--border-strong); background: rgba(34, 45, 57, .55); }
   .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
   /* The id and its ctx badge flow as inline text: the badge stays on the same
@@ -171,7 +171,7 @@
   .provider-model-card-body { display: block; flex: 1 1 auto; min-width: 0; }
   .provider-model-card-body code { display: inline; overflow: visible; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
   .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; margin-left: 7px; vertical-align: baseline; }
-  .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+  .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; margin-left: auto; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
   .model-settings-button:hover { color: var(--text); }
   /* Native checkboxes ignored the palette: a saturated blue square that looked
      foreign in every theme. Draw them from the theme tokens instead. */
@@ -448,7 +448,10 @@
   .settings-page { min-height: 0; }
   /* Two fixed columns squeezed every settings card to ~200px while the sidebar
      was still visible. Stack the cards whenever a column would be unusable. */
-  .settings-page-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
+  /* Two columns at most: auto-fit opened a third empty slot beside a pair of
+     cards and left a dead column of background. */
+  .settings-page-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  @media (min-width: 920px) { .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .48); }
   .settings-block.wide { grid-column: 1 / -1; }
   .settings-block h3 { margin: 0; font-size: 14px; }
@@ -500,6 +503,17 @@
   .settings-page .setting-option small { color: var(--muted); font-size: 11px; }
   .settings-page .setting-option.is-disabled { opacity: .6; }
   .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
+  /* The name gets the room the short numeric columns leave, and wraps instead
+     of being cut when the window is narrow. */
+  .session-name { display: block; cursor: copy; overflow-wrap: anywhere; }
+  /* The name absorbs the width the short numeric columns leave free; the
+     numeric headers stay on one line instead of wrapping into a two-line block. */
+  #u-sessions th:first-child, #u-sessions td:first-child { width: 100%; }
+  #u-sessions th:not(:first-child), #u-sessions td:not(:first-child) { white-space: nowrap; }
+  .session-name:hover { color: var(--accent); text-decoration: underline dotted; }
+  .usage-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .usage-pager button { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+  .usage-pager .muted { font-variant-numeric: tabular-nums; }
   .rollback-list { display: grid; gap: 6px; max-height: min(46vh, 420px); overflow: auto; padding: 2px; }
   .rollback-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--control-background); color: var(--text); text-align: left; }
   .rollback-row:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
@@ -527,6 +541,10 @@
   .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
   .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+  /* One label wraps to two lines, so the pair must stretch to a shared height
+     instead of leaving two differently sized buttons. */
+  .shortcut-actions { align-items: stretch; }
+  .shortcut-actions button { flex: 1 1 0; min-width: 0; min-height: 38px; white-space: normal; }
   /* A saved shortcut path is one long unbreakable string on Windows; let it
      wrap inside the card instead of pushing the button out of view. Below
      roughly 300px of column the button drops under the text instead of
@@ -596,6 +614,9 @@
   .direct-model-card .opencode-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 10px; background: rgba(19, 27, 36, .72); }
   .direct-model-card .opencode-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chain .step { min-width: 0; }
+  /* A chip sized to its text left the columns ragged; filling the cell makes
+     every row line up, with the ellipsis handling the long ids. */
+  .chain .step .opencode-model { flex: 1 1 auto; min-width: 0; }
   .chain .chain-model { min-width: 0; }
   .chain .chain-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
@@ -875,7 +896,7 @@
         </span>
       </label>
     </div>
-    <div id="pm-list" style="max-height:360px;overflow:auto;margin-top:8px;display:grid;grid-template-columns:repeat(var(--pm-cols,1),minmax(0,1fr));gap:6px"></div>
+    <div id="pm-list" style="max-height:360px;overflow:auto;margin-top:8px;padding-right:2px;scrollbar-gutter:stable;display:grid;grid-template-columns:repeat(var(--pm-cols,1),minmax(0,1fr));gap:8px"></div>
     <div class="row" style="margin-top:12px;padding:10px;border:1px dashed #3a4150;border-radius:8px">
       <input id="pm-manual" placeholder="ID модели вручную" style="flex:1">
       <button type="button" id="pm-add">＋ добавить</button>
@@ -1093,8 +1114,14 @@
       <table id="u-models"></table>
     </div>
     <div class="usage-panel" data-panel="sessions">
-      <p class="section-sub">Сессии считаются по заголовку <code>x-opencode-session-id</code> в запросах, прошедших через прокси. Названия сессий недоступны, а запросы в обход прокси сюда не попадают.</p>
+      <div class="filter-bar">
+        <label class="search-field" style="margin:0">
+          <input id="u-session-search" type="search" placeholder="Поиск по сессии" aria-label="Поиск по сессии">
+        </label>
+        <span class="filter-result" id="u-session-count"></span>
+      </div>
       <table id="u-sessions"></table>
+      <div class="usage-pager" id="u-session-pager"></div>
     </div>
     <div class="usage-panel" data-panel="images">
       <h3>Генерация изображений</h3>
@@ -1196,7 +1223,7 @@
           </label>
           <div class="setting-option setting-action" id="s-shortcut-wrap">
             <span>Ярлыки приложения<small id="s-shortcut-help">Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе.</small></span>
-            <div class="row" style="margin-left:auto">
+            <div class="row shortcut-actions" style="margin-left:auto">
               <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
               <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
             </div>
@@ -1478,6 +1505,32 @@ function showFieldHint(button) {
   fieldHint.style.left = `${left}px`
 }
 const hideFieldHint = () => { fieldHint.hidden = true }
+// A session name is long and gets truncated, so hovering shows it whole and a
+// click copies it. The copy uses the clipboard API and falls back to a hidden
+// textarea, because the desktop webview may not expose navigator.clipboard.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    const area = document.createElement("textarea")
+    area.value = text
+    area.style.position = "fixed"
+    area.style.opacity = "0"
+    document.body.appendChild(area)
+    area.select()
+    const copied = document.execCommand("copy")
+    area.remove()
+    return copied
+  }
+}
+document.addEventListener("click", async (event) => {
+  const target = event.target.closest?.("[data-session-copy]")
+  if (!target) return
+  const text = target.dataset.sessionCopy
+  const copied = await copyText(text)
+  flash(copied, copied ? `скопировано: ${text}` : "не удалось скопировать")
+})
 document.addEventListener("pointerover", (event) => {
   const button = event.target.closest?.(".field-help")
   if (button) showFieldHint(button)
@@ -2521,6 +2574,11 @@ $("s-auth").onchange = (e) => {
   save()
 }
 
+$("u-session-search").oninput = (e) => {
+  sessionQuery = e.target.value
+  sessionPage = 0
+  renderUsageReportKeepingScroll(usageReport)
+}
 $("providers-filter").oninput = (e) => {
   providersFilter = e.target.value
   renderProviders()
@@ -3785,31 +3843,54 @@ function usageTable(obj, cols) {
   )
 }
 
-// A session row is keyed by the harness id, which is long and opaque. Show a
-// short prefix (full id in the title) and sort by the last request seen.
-function usageSessionTable(obj) {
-  const rows = Object.entries(obj ?? {})
+// The harness name is a label: when it is missing the row shows the session id.
+// The harness sends a shortened id, so a title keyed by the full id still fits.
+function sessionTitle(titles, id) {
+  if (!titles) return ""
+  const key = titles[id] ? id : Object.keys(titles).find((full) => full.startsWith(id))
+  return key ? titles[key] : ""
+}
+const SESSION_PAGE_SIZE = 20
+let sessionQuery = ""
+let sessionPage = 0
+function usageSessionRows(obj, titles) {
+  const query = sessionQuery.trim().toLowerCase()
+  return Object.entries(obj ?? {})
     .filter(([, stat]) => {
       const outcome = (Number(stat.ok) || 0) + (Number(stat.limits) || 0) + (Number(stat.errors) || 0)
       const tokens = (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0)
       return outcome > 0 || tokens > 0
     })
-    .sort(([, a], [, b]) => (Number(b.lastSeen) || 0) - (Number(a.lastSeen) || 0))
-  if (!rows.length) return `<tr><td class="muted">сессий пока нет</td></tr>`
+    .map(([id, stat]) => ({ id, stat, title: sessionTitle(titles, id) }))
+    .filter(({ id, title }) => !query || title.toLowerCase().includes(query) || id.toLowerCase().includes(query))
+    .sort((a, b) => (Number(b.stat.lastSeen) || 0) - (Number(a.stat.lastSeen) || 0))
+}
+function usageSessionTable(rows, titles) {
+  const all = usageSessionRows(rows, titles)
+  const pages = Math.max(1, Math.ceil(all.length / SESSION_PAGE_SIZE))
+  if (sessionPage >= pages) sessionPage = pages - 1
+  const list = all.slice(sessionPage * SESSION_PAGE_SIZE, (sessionPage + 1) * SESSION_PAGE_SIZE)
+  $("u-session-count").textContent = all.length ? `${all.length} сессий` : ""
+  // Pages appear only past one page worth of sessions.
+  $("u-session-pager").innerHTML = pages > 1
+    ? `<button type="button" data-page="${sessionPage - 1}"${sessionPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${sessionPage + 1} / ${pages}</span><button type="button" data-page="${sessionPage + 1}"${sessionPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
+    : ""
+  $("u-session-pager").querySelectorAll("[data-page]").forEach((button) => {
+    button.onclick = () => {
+      sessionPage = Number(button.dataset.page) || 0
+      renderUsageReportKeepingScroll(usageReport)
+    }
+  })
+  if (!list.length) return `<tr><td class="muted">${sessionQuery ? "ничего не найдено" : "сессий пока нет"}</td></tr>`
   const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
-  const cell = (id, stat) => {
-    const ok = Number(stat.ok) || 0
-    const limits = Number(stat.limits) || 0
-    const errors = Number(stat.errors) || 0
-    return `<tr>
-      <td title="${esc(id)}">${esc(id.slice(0, 8))}${id.length > 8 ? "…" : ""}</td>
+  const cell = ({ id, stat, title }) => `<tr>
+      <td><span class="session-name" title="${esc(title || id)}" data-session-copy="${esc(id)}">${esc(title || id)}</span></td>
       <td class="muted">${fmtNum(stat.requests)}</td>
-      <td class="muted"><span class="${ok ? "ok-cell" : ""}">${fmtNum(ok)}</span><span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span></td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
+      <td class="muted">${esc(fmtUptime((Number(stat.lastSeen) || 0) - (Number(stat.firstSeen) || 0)))}</td>
       <td class="muted">${esc(when(stat.lastSeen))}</td>
     </tr>`
-  }
-  return `<tr><th>сессия</th><th>Req</th><th>OK<span class="sep">/</span>ratelimit<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th><th>последний запрос</th></tr>${rows.map(([id, stat]) => cell(id, stat)).join("")}`
+  return `<tr><th>сессия</th><th>Req</th><th>Токены</th><th>Длительность</th><th>Последний запрос</th></tr>${list.map(cell).join("")}`
 }
 
 let usageReport = null
@@ -3877,7 +3958,7 @@ function renderUsageReport(report) {
   })
   $("u-providers").innerHTML = usageCompactTable(u.providers)
   $("u-models").innerHTML = usageCompactTable(u.models)
-  $("u-sessions").innerHTML = usageSessionTable(u.sessions)
+  $("u-sessions").innerHTML = usageSessionTable(u.sessions, report.sessionTitles)
   const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   $("u-image-tiles").innerHTML = tile("запросов", imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)) + tile("сгенерировано", u.imagesGenerated ?? 0) + tile("успешных", imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)) + tile("ошибок", imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0))
   const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"

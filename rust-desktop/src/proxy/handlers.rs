@@ -900,6 +900,25 @@ pub(crate) async fn get_logs(State(state): State<AppState>, headers: HeaderMap) 
     Json(json!({ "lines": lines, "max": state.log_max })).into_response()
 }
 
+/// Titles for every session the seven-day window knows, so the GUI can show a
+/// name instead of an opaque id. Looked up from the harness only as a label.
+fn session_titles(state: &AppState) -> std::collections::HashMap<String, String> {
+    let mut keys: Vec<String> = state
+        .usage
+        .lock()
+        .unwrap()
+        .sessions
+        .keys()
+        .cloned()
+        .collect();
+    for day in state.usage_history.lock().unwrap().values() {
+        keys.extend(day.sessions.keys().cloned());
+    }
+    keys.sort_unstable();
+    keys.dedup();
+    super::session_titles::titles_for(&keys)
+}
+
 pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap) -> Response {
     if !authorized(&state, &headers) {
         return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
@@ -921,6 +940,7 @@ pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap)
         );
         object.insert("retentionDays".into(), json!(USAGE_RETENTION_DAYS));
         object.insert("days".into(), Value::Array(usage_history_view(&state)));
+        object.insert("sessionTitles".into(), json!(session_titles(&state)));
         object.insert(
             "lifetimeTokens".into(),
             serde_json::to_value(*state.lifetime.lock().unwrap()).unwrap_or_else(|_| json!({})),
