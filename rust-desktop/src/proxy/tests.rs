@@ -391,6 +391,79 @@ async fn streams_a_long_russian_answer_without_cutting_it_off() {
     let _ = fs::remove_file(&opencode);
 }
 
+/// Harness mode: a failing upstream must not end the run with 502. The proxy
+/// waits out the cooldown and tries the chain again until something answers.
+#[tokio::test]
+async fn retries_the_chain_until_an_upstream_answers_in_retry_mode() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    let calls = std::sync::Arc::new(AtomicUsize::new(0));
+    let counter = calls.clone();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(move || {
+                let counter = counter.clone();
+                async move {
+                    // Fail once, then answer: exactly the case where a plain
+                    // failover would have already returned 502 to the client.
+                    if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+                        return axum::response::IntoResponse::into_response((
+                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                            axum::Json(json!({ "error": { "message": "boom" } })),
+                        ));
+                    }
+                    axum::response::IntoResponse::into_response(axum::Json(json!({
+                        "id": "chatcmpl-test",
+                        "choices": [{ "index": 0, "message": { "role": "assistant", "content": "готово" }, "finish_reason": "stop" }],
+                        "usage": { "prompt_tokens": 3, "completion_tokens": 2 }
+                    })))
+                }
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-retry-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "retryForever": true,
+            "errorCooldownSec": 1,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [{ "provider": "p", "model": "m" }] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let response = Client::new()
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({
+            "model": "chain",
+            "messages": [{ "role": "user", "content": "тест" }]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        response.status().is_success(),
+        "retry mode must wait and try again instead of failing the run"
+    );
+    assert!(calls.load(Ordering::SeqCst) >= 2, "the chain must be retried");
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
 #[tokio::test]
 async fn serves_the_desktop_api_from_a_local_port() {
     let path = std::env::temp_dir().join(format!("provider-proxy-rust-test-{}.json", now_ms()));

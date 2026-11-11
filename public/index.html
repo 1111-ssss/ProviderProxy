@@ -420,8 +420,10 @@
   .token-fill.input { background: linear-gradient(90deg, #4f7fe0, #8fb4ff); }
   .token-fill.output { background: linear-gradient(90deg, #a66ae0, #d9b5fa); }
   .chart-empty { color: var(--muted); font-size: 12px; padding: 24px 0; text-align: center; }
-  .usage-days { display: flex; gap: 7px; flex-wrap: wrap; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
-  .usage-day { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+  /* One row that scrolls sideways instead of wrapping: seven days never fit on
+     a narrow window, and a wrapped block pushed the charts down. */
+  .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+  .usage-day { flex: 0 0 auto; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
   .usage-day strong { color: inherit; font-size: 12px; }
   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
   .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
@@ -893,12 +895,11 @@
           <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
         <div class="integration-actions">
-          <button id="opencode-sync" type="button">Синхронизировать</button>
           <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию">
             <input id="opencode-enabled" type="checkbox" checked>
             <span class="chain-switch" aria-hidden="true"></span>
-            <span class="chain-toggle-text">Активен</span>
           </label>
+          <button id="opencode-sync" type="button">Синхронизировать</button>
         </div>
       </div>
       <div class="opencode-config-grid">
@@ -1034,7 +1035,6 @@
       <span class="muted" id="u-info"></span>
     </div>
     <p class="muted" id="u-lifetime" style="margin:8px 0 0"></p>
-    <p class="section-sub">История сохраняется локально за последние 7 дней и не сбрасывается при перезапуске. Токены видны, когда upstream их присылает.</p>
     <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div id="u-groups" class="usage-groups" role="tablist" aria-label="Разделы статистики">
       <button type="button" class="usage-group" data-group="overview" role="tab">Обзор</button>
@@ -1090,7 +1090,6 @@
       <h3 style="margin-top:16px">Провайдеры</h3>
       <table id="u-providers"></table>
       <h3 style="margin-top:16px">Модели</h3>
-      <p class="muted" style="margin:0 0 8px">Считаются ответившие модели провайдеров, а не имена цепочек.</p>
       <table id="u-models"></table>
     </div>
     <div class="usage-panel" data-panel="images">
@@ -1099,7 +1098,6 @@
       <div class="card" id="u-image-recent" style="margin-top:10px"></div>
       <table id="u-images"></table>
     </div>
-    <div class="muted" id="u-cooling" style="margin-top:10px"></div>
   </section>
 
   <section data-tab="settings" class="settings-page">
@@ -1163,6 +1161,10 @@
               <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
             </span>
             <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
+          </label>
+          <label class="setting-option" id="s-retry-forever-wrap">
+            <input id="s-retry-forever" type="checkbox">
+            <span>Повторять, пока модель не ответит<small>Вместо ошибки 502 харнес ждёт окончания кулдауна и пробует цепочку снова — до 2 часов.</small></span>
           </label>
         </div>
       </div>
@@ -1858,9 +1860,6 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
   $("opencode-enabled").checked = enabled
   $("opencode-toggle").className = `chain-toggle ${enabled ? "is-on" : "is-off"}`
   $("opencode-toggle").title = enabled ? "Выключить интеграцию" : "Включить интеграцию"
-  // Same label pair as the model/chain toggles, and the toggle keeps a fixed
-  // width so it does not jump when the word changes.
-  $("opencode-toggle").querySelector(".chain-toggle-text").textContent = enabled ? "Активен" : "Отключен"
   if (enabled) renderOpenCodePreview("oc-preview", entries)
   else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
 }
@@ -1970,6 +1969,7 @@ function renderSettings() {
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
+  $("s-retry-forever").checked = cfg.retryForever === true
   $("s-version").textContent = cfg.appVersion ?? "—"
   $("s-theme").value = settings.theme
   $("s-auto-update").checked = settings.autoUpdate
@@ -2325,6 +2325,10 @@ num("s-port", "port")
 num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
+$("s-retry-forever").onchange = (e) => {
+  cfg.retryForever = e.target.checked
+  save()
+}
 $("s-theme").onchange = (e) => {
   appSettings().theme = e.target.value
   applyTheme(e.target.value)
@@ -3682,16 +3686,25 @@ function renderUsageReport(report) {
   $("u-images").innerHTML = imageEntries.length
     ? `<tr><th>провайдер</th><th>модель</th><th>запросов</th><th>успешных</th><th>ошибок</th><th>последний HTTP</th></tr>${imageEntries.map(([, s]) => `<tr><td>${esc(s.provider)}</td><td>${esc(s.model)}</td><td class="muted">${s.requests ?? 0}</td><td class="muted">${s.ok ?? 0}</td><td class="muted">${s.errors ?? 0}</td><td class="muted">${s.lastStatus || "—"}</td></tr>`).join("")}`
     : `<tr><td class="muted">генераций пока не было</td></tr>`
-  const cool = u.cooldowns ?? []
-  $("u-cooling").textContent = cool.length
-    ? "в кулдауне: " + cool.map((c) => `${c.model} → ${c.upstream} (до ${new Date(c.until).toLocaleTimeString()})`).join("; ")
-    : ""
+}
+
+// The 3-second poll rebuilds every block in place. Between two writes the page
+// is momentarily shorter, and the browser clamps the scroll position to the new
+// height — which felt like being thrown back to the top while reading. Remember
+// both scroll owners and put them back after the render.
+function renderUsageReportKeepingScroll(report) {
+  const section = document.querySelector('main > section[data-tab="usage"]')
+  const top = section?.scrollTop ?? 0
+  const page = window.scrollY
+  renderUsageReport(report)
+  if (section) section.scrollTop = top
+  if (window.scrollY !== page) window.scrollTo(0, page)
 }
 
 async function loadUsage() {
   try {
     usageReport = await (await api("/api/usage")).json()
-    renderUsageReport(usageReport)
+    renderUsageReportKeepingScroll(usageReport)
   } catch {
     /* прокси недоступен — следующий опрос повторит */
   }
