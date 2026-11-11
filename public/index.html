@@ -141,10 +141,16 @@
   .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
   .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Toggle and the two icon buttons sit in one row with the same 6px step. */
-  .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-left: auto; min-width: 0; flex: 0 0 auto; }
+  /* One frame around the toggle and both buttons, so they read as one control
+     group and share the same inner step. */
+  .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 6px; margin-left: auto; min-width: 0; flex: 0 0 auto; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
   .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
   .model-actions { display: flex; flex-direction: row; gap: 6px; }
+  /* The buttons sit inside the shared frame, so their own borders would double
+     the outline: keep only the hover/active affordance. */
+  .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; }
+  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface); }
   /* Icon-only actions: a 32px square keeps the row compact and the same gap
      between toggle, edit and delete. */
   .model-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 32px; padding: 0; }
@@ -157,11 +163,15 @@
   .model-card-head .chain-toggle.is-on .chain-switch::after { transform: translateX(14px); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-  .provider-model-row { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 6px; border: 1px solid transparent; border-radius: 8px; }
-  .provider-model-row:hover { border-color: var(--border); background: rgba(34, 45, 57, .35); }
-  .provider-model-row .check { flex: 1; min-width: 0; }
-  .provider-model-row .check code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .model-settings-button { flex: 0 0 auto; min-width: 30px; min-height: 28px; padding: 2px 7px; color: var(--muted); font-size: 18px; line-height: 1; }
+  /* One card per model: checkbox, id and metadata in one frame, the ⋮ rides
+     inside the same frame instead of owning a row of its own. */
+  .provider-model-card { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
+  .provider-model-card:hover { border-color: var(--border-strong); background: rgba(34, 45, 57, .55); }
+  .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
+  .provider-model-card-body { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0; }
+  .provider-model-card-body code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; }
+  .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
   .model-settings-button:hover { color: var(--text); }
   /* Native checkboxes ignored the palette: a saturated blue square that looked
      foreign in every theme. Draw them from the theme tokens instead. */
@@ -350,6 +360,7 @@
   .sep { opacity: .4; padding: 0 1px; }
   .warn { color: #f0b866; }
   .bad { color: #ff9c9c; }
+  .ok-cell { color: #69d7a0; }
   table .problem-rate { margin-left: 6px; color: var(--muted); font-size: 10px; }
   /* Statistics is split into groups so one long page does not bury the table a
      reader came for. The tabs reuse the day-selector look for consistency. */
@@ -368,6 +379,12 @@
   .hour-bar.req { background: #69d7a0; }
   .hour-label { text-align: center; font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .hour-col.empty .hour-label { opacity: .45; }
+  /* The hint is drawn on hover/focus instead of relying on a native tooltip,
+     which lags behind the pointer on a 24-column chart. */
+  .hour-col { position: relative; }
+  .hour-hint { position: absolute; bottom: calc(100% + 6px); left: 50%; z-index: 5; display: none; width: max-content; max-width: 240px; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.35; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translateX(-50%); pointer-events: none; }
+  .hour-col:hover .hour-hint, .hour-col:focus-visible .hour-hint { display: block; }
+  .hour-col:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .hour-total { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
   .token-row { display: grid; gap: 5px; }
   .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; min-width: 0; }
@@ -540,6 +557,10 @@
   .check .model-context { margin-left: auto; }
   .chip .model-context { padding-right: 4px; }
   .provider-models { display: grid; gap: 8px; }
+  /* Chains flow in up to three columns, filled top-to-bottom then left-to-right
+     (grid-auto-flow: column), so the order matches the list order. */
+  #models { display: grid; grid-template-columns: repeat(var(--chain-cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--chain-rows, 1), auto); grid-auto-flow: column; gap: 12px; }
+  #models > .card { min-width: 0; margin: 0; }
   .provider-models .card { margin-bottom: 0; }
   .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
   .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
@@ -703,7 +724,7 @@
   body[data-theme="light"] .direct-model-card {
     background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
   }
-  body[data-theme="light"] .provider-model-row:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+  body[data-theme="light"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
   body[data-theme="light"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 
   @media (prefers-color-scheme: light) {
@@ -720,7 +741,7 @@
     body[data-theme="system"] .direct-model-card {
       background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
     }
-    body[data-theme="system"] .provider-model-row:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+    body[data-theme="system"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
     body[data-theme="system"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
   }
 
@@ -822,7 +843,7 @@
       <button type="button" id="pm-refresh">обновить с /v1/models</button>
     </div>
     <input id="pm-filter" placeholder="фильтр по имени…" style="width:100%;margin-top:8px">
-    <div id="pm-list" style="max-height:320px;overflow:auto;margin-top:8px;display:grid;gap:6px"></div>
+    <div id="pm-list" style="max-height:360px;overflow:auto;margin-top:8px;display:grid;grid-template-columns:repeat(var(--pm-cols,1),minmax(0,1fr));gap:6px"></div>
     <div class="row" style="margin-top:12px;padding:10px;border:1px dashed #3a4150;border-radius:8px">
       <input id="pm-manual" placeholder="ID модели вручную" style="flex:1">
       <button type="button" id="pm-add">＋ добавить</button>
@@ -1018,9 +1039,9 @@
           <div class="chart-head">
             <div>
               <h3>Проблемность провайдеров</h3>
-              <p>Чем длиннее красная часть, тем чаще провайдер отвечает 429 или ошибкой.</p>
+              <p>Доля OK, ratelimit и ошибок у каждого провайдера. Полоса всегда во всю ширину, поэтому два упавших запроса из двух — это сплошная красная.</p>
             </div>
-            <div class="token-legend"><span class="token-key success">успешно</span><span class="token-key limit">429</span><span class="token-key error">ошибки</span><span class="token-key other">прочее</span></div>
+            <div class="token-legend"><span class="token-key success">OK</span><span class="token-key limit">ratelimit</span><span class="token-key error">Err</span><span class="token-key other">прочее</span></div>
           </div>
           <div class="token-bars" id="u-token-chart"></div>
         </article>
@@ -1030,10 +1051,10 @@
       <article class="chart-card">
         <div class="chart-head">
           <div>
-            <h3>По часам</h3>
-            <p>Запросы и токены по часам выбранного дня. Считаются в момент ответа upstream.</p>
+            <h3>Последние 24 часа</h3>
+            <p>Входные токены по часам; правый столбец — текущий час. Наведи на столбец, чтобы увидеть запросы, выход и ошибки этого часа.</p>
           </div>
-          <div class="token-legend"><span class="token-key input">вход</span><span class="token-key output">выход</span><span class="token-key success">запросы</span></div>
+          <div class="token-legend"><span class="token-key input">вход</span></div>
         </div>
         <div class="hour-chart" id="u-hour-chart"></div>
       </article>
@@ -1681,7 +1702,33 @@ function renderModels() {
      box.append(div)
    }
    if (!entries.length) box.innerHTML = `<p class="muted">цепочек пока нет — нажми «+ Добавить цепочку»</p>`
+   applyChainColumns(box, entries.length)
  }
+
+// Chains fill up to three columns only when each still has room for its own
+// content: columns are filled top-to-bottom, then left-to-right, so reading
+// order stays the same as the list.
+let chainColumnsObserver = null
+function applyChainColumns(box, count) {
+  if (!count) return
+  const gap = 12
+  const MIN_CARD = 300
+  const fit = () => {
+    const available = box.clientWidth
+    if (!available) return // hidden tab: the observer fires once it has width
+    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_CARD + gap))))
+    const rows = Math.ceil(count / cols)
+    const key = `${cols}x${rows}`
+    if (box.dataset.chainCols === key) return
+    box.dataset.chainCols = key
+    box.style.setProperty("--chain-cols", cols)
+    box.style.setProperty("--chain-rows", rows)
+  }
+  fit()
+  chainColumnsObserver?.disconnect()
+  chainColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
+  chainColumnsObserver.observe(box)
+}
 
 // Cards are rebuilt after every save. Keep one document-level handler so
 // actions cannot disappear when a card is re-rendered.
@@ -1815,11 +1862,16 @@ function applyModelColumns(box) {
     probe.remove()
     if (!available || !widest) return // hidden tab: the observer fires once it has width
     const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (widest + gap))))
+    // Writing only when the count changes keeps the grid from resizing itself
+    // into another observer callback, which browsers report as an interface
+    // error on every drag of the window edge.
+    if (box.dataset.modelCols === String(cols)) return
+    box.dataset.modelCols = String(cols)
     for (const card of cards) card.style.setProperty("--model-cols", cols)
   }
   fit()
   modelColumnsObserver?.disconnect()
-  modelColumnsObserver = new ResizeObserver(fit)
+  modelColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
   modelColumnsObserver.observe(box)
 }
 
@@ -2850,10 +2902,13 @@ function renderPmList() {
      ? shown
          .map(
            (id) => `
-        <div class="provider-model-row">
-          <label class="check">
+        <div class="provider-model-card">
+          <label class="provider-model-card-main">
             <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
-              <code>${esc(id)}</code>${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}
+            <span class="provider-model-card-body">
+              <code>${esc(id)}</code>
+              <span class="provider-model-card-meta">${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}</span>
+            </span>
           </label>
           <button type="button" class="model-settings-button" data-model-settings="${esc(id)}" aria-label="Параметры модели ${esc(id)}" title="Параметры модели">⋮</button>
         </div>`,
@@ -2886,6 +2941,27 @@ function renderPmList() {
   $("pm-list").querySelectorAll("button[data-model-settings]").forEach((button) => {
     button.onclick = () => openModelSettings(pmState.provider, button.dataset.modelSettings)
   })
+  applyPmColumns($("pm-list"))
+}
+
+// Up to three model cards per row, same count for the whole list. 210px is the
+// narrowest a card (checkbox + id + ⋮) reads without squeezing the id.
+let pmColumnsObserver = null
+function applyPmColumns(box) {
+  const MIN_CARD = 210
+  const gap = 6
+  const fit = () => {
+    const available = box.clientWidth
+    if (!available) return // hidden tab: the observer fires once it has width
+    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_CARD + gap))))
+    if (box.dataset.pmCols === String(cols)) return
+    box.dataset.pmCols = String(cols)
+    box.style.setProperty("--pm-cols", cols)
+  }
+  fit()
+  pmColumnsObserver?.disconnect()
+  pmColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
+  pmColumnsObserver.observe(box)
 }
 
 // ---------- общее ----------
@@ -3289,9 +3365,10 @@ function renderUsageCharts(u) {
   renderProviderProblemChart(u.providers)
 }
 
-// Provider health at a glance: one bar per provider split into ok / 429 /
-// errors / other. "Other" is an attempt that failed over before answering, so
-// the four parts always add up to the attempts the provider actually saw.
+// Provider health at a glance: one bar per provider, each bar full width and
+// split by its own attempts. Scaling bars against the busiest provider made a
+// provider with two failed calls look empty; here two failed calls are a
+// solid red bar, which is what "100% проблемности" should look like.
 function renderProviderProblemChart(obj) {
   const rows = Object.entries(obj ?? {})
     .map(([name, stat]) => {
@@ -3304,45 +3381,66 @@ function renderProviderProblemChart(obj) {
     })
     .filter((row) => row.requests > 0)
     .sort((a, b) => b.requests - a.requests)
-  const maxRequests = Math.max(1, ...rows.map((row) => row.requests))
-  const width = (value) => Math.max(0, (value / maxRequests) * 100).toFixed(1)
+  const width = (row, value) => Math.max(0, (value / row.requests) * 100).toFixed(1)
   $("u-token-chart").innerHTML = rows.length
     ? rows
         .map((row) => {
           const bad = row.limits + row.errors
-          const problemRate = row.requests ? Math.round((bad / row.requests) * 100) : 0
-          const details = `${fmtNum(row.requests)} попыток: ${fmtNum(row.ok)} успешно, ${fmtNum(row.limits)} 429, ${fmtNum(row.errors)} ошибок${row.other ? `, ${fmtNum(row.other)} переключено` : ""}`
+          const problemRate = Math.round((bad / row.requests) * 100)
+          const details = `${fmtNum(row.requests)} попыток: OK ${fmtNum(row.ok)}, ratelimit ${fmtNum(row.limits)}, Err ${fmtNum(row.errors)}${row.other ? `, переключено ${fmtNum(row.other)}` : ""}`
           return `<div class="token-row" title="${esc(`${row.name} — ${details}`)}">
-            <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate">${problemRate}% проблемности</span></div>
-            <div class="token-track"><span class="token-fill success" style="width:${width(row.ok)}%"></span><span class="token-fill limit" style="width:${width(row.limits)}%"></span><span class="token-fill error" style="width:${width(row.errors)}%"></span><span class="token-fill other" style="width:${width(row.other)}%"></span></div>
-            <div class="token-row-foot"><span>${fmtNum(row.ok)} ok</span><span>${fmtNum(row.limits)} 429</span><span>${fmtNum(row.errors)} err</span><span>${fmtNum(row.other)} переключено</span></div>
+            <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate" style="color:${problemColor(problemRate)}">${problemRate}% проблемности</span></div>
+            <div class="token-track"><span class="token-fill success" style="width:${width(row, row.ok)}%"></span><span class="token-fill limit" style="width:${width(row, row.limits)}%"></span><span class="token-fill error" style="width:${width(row, row.errors)}%"></span><span class="token-fill other" style="width:${width(row, row.other)}%"></span></div>
+            <div class="token-row-foot"><span>OK: ${fmtNum(row.ok)}</span><span>ratelimit: ${fmtNum(row.limits)}</span><span>Err: ${fmtNum(row.errors)}</span></div>
           </div>`
         })
         .join("")
     : `<div class="chart-empty">Данных о результатах пока нет</div>`
 }
 
+// Green at 0%, yellow at a quarter, red from half up — interpolated, so 30%
+// and 45% do not both read as the same yellow.
+function problemColor(rate) {
+  const clamped = Math.max(0, Math.min(50, Number(rate) || 0))
+  const hue = clamped <= 25 ? 130 - clamped * 3.4 : 45 - (clamped - 25) * 1.8
+  return `hsl(${hue.toFixed(0)} 72% 62%)`
+}
+
 // 24 slots, one per hour of the selected day. Bars share one scale so a busy
 // hour visibly dominates; requests are a separate colour, not a second axis.
-function renderUsageHourChart(u) {
-  const hours = u.hours && typeof u.hours === "object" ? u.hours : {}
-  const slot = (h) => hours[String(h).padStart(2, "0")] ?? {}
-  const values = Array.from({ length: 24 }, (_, h) => {
-    const s = slot(h)
-    return { h, tin: Math.max(0, Number(s.tokensIn) || 0), tout: Math.max(0, Number(s.tokensOut) || 0), requests: Math.max(0, Number(s.requests) || 0) }
+// A rolling 24 hours: the rightmost column is always the hour we are in, so the
+// chart answers "what happened lately" instead of "what happened today by 03:00".
+// Bars show input tokens only; everything else is spelled out in the hover hint.
+function renderUsageHourChart(u, report) {
+  const buckets = new Map(
+    (Array.isArray(report?.days) ? report.days : []).map((day) => [day.date, day.hours ?? {}]),
+  )
+  if (u?.date) buckets.set(u.date, u.hours ?? {})
+  const now = new Date()
+  const values = Array.from({ length: 24 }, (_, i) => {
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - (23 - i))
+    const key = String(at.getHours()).padStart(2, "0")
+    const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`
+    const s = buckets.get(date)?.[key] ?? {}
+    return {
+      at,
+      tin: Math.max(0, Number(s.tokensIn) || 0),
+      tout: Math.max(0, Number(s.tokensOut) || 0),
+      requests: Math.max(0, Number(s.requests) || 0),
+      ok: Math.max(0, Number(s.ok) || 0),
+      failed: Math.max(0, Number(s.failed) || 0),
+    }
   })
-  // Tokens and requests are different units: a shared scale made 60 requests
-  // invisible next to a million tokens, so each pair gets its own max.
-  const maxTokens = Math.max(1, ...values.map((v) => v.tin + v.tout))
-  const maxRequests = Math.max(1, ...values.map((v) => v.requests))
-  const percent = (value, max) => `${((value / max) * 100).toFixed(1)}%`
+  const maxTokens = Math.max(1, ...values.map((v) => v.tin))
+  const label = (at) => (at.getHours() === 0 ? `${String(at.getDate()).padStart(2, "0")}.${String(at.getMonth() + 1).padStart(2, "0")}` : String(at.getHours()).padStart(2, "0"))
   $("u-hour-chart").innerHTML = values
     .map((v) => {
       const empty = !v.tin && !v.tout && !v.requests
-      const title = `${String(v.h).padStart(2, "0")}:00 — ${fmtNum(v.requests)} запросов, вход ${fmtTok(v.tin)}, выход ${fmtTok(v.tout)}`
-      return `<div class="hour-col${empty ? " empty" : ""}" title="${esc(title)}">
-        <div class="hour-col-stack"><span class="hour-bar" style="height:${percent(v.tin, maxTokens)}"></span><span class="hour-bar out" style="height:${percent(v.tout, maxTokens)}"></span><span class="hour-bar req" style="height:${percent(v.requests, maxRequests)}"></span></div>
-        <span class="hour-label">${String(v.h).padStart(2, "0")}</span>
+      const hint = `${String(v.at.getHours()).padStart(2, "0")}:00 — вход ${fmtTok(v.tin)}, выход ${fmtTok(v.tout)}; ${fmtNum(v.requests)} запросов (OK ${fmtNum(v.ok)}, Err ${fmtNum(v.failed)})`
+      return `<div class="hour-col${empty ? " empty" : ""}" tabindex="0" aria-label="${esc(hint)}">
+        <span class="hour-hint">${esc(hint)}</span>
+        <div class="hour-col-stack"><span class="hour-bar" style="height:${((v.tin / maxTokens) * 100).toFixed(1)}%"></span></div>
+        <span class="hour-label">${label(v.at)}</span>
       </div>`
     })
     .join("")
@@ -3365,11 +3463,11 @@ function usageCompactTable(obj) {
     return `<tr>
       <td>${esc(name)}</td>
       <td class="muted">${fmtNum(requests)}</td>
-      <td class="muted">${fmtNum(ok)}<span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span>${bad ? `<small class="problem-rate">${problemRate}%</small>` : ""}</td>
+      <td class="muted"><span class="${ok ? "ok-cell" : ""}">${fmtNum(ok)}</span><span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span>${bad ? `<small class="problem-rate" style="color:${problemColor(problemRate)}">${problemRate}%</small>` : ""}</td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
     </tr>`
   }
-  return `<tr><th>Имя</th><th>Req</th><th>OK<span class="sep">/</span>429<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
+  return `<tr><th>Имя</th><th>Req</th><th>OK<span class="sep">/</span>ratelimit<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
 }
 
 function usageTable(obj, cols) {
@@ -3434,7 +3532,7 @@ function renderUsageReport(report) {
     ? `за всё время: ${fmtTok(lifetime.tokensIn)} вход · ${fmtTok(lifetime.tokensOut)} выход · ${fmtNum(lifetime.requests)} запросов`
     : "за всё время: пока нет данных"
   renderUsageCharts(u)
-  renderUsageHourChart(u)
+  renderUsageHourChart(u, report)
   renderUsageGroups()
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
     button.onclick = () => {
