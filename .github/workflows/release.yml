@@ -95,5 +95,5 @@ jobs:
               --notes "Unsigned portable ZIP builds for Rust desktop (Linux and Windows) and Node.js."
           fi
           gh release upload "$RELEASE_TAG" \
-            "$RUNNER_TEMP/provider-proxy-release/Provider-Proxy-v"*.zip \
+            "$RUNNER_TEMP/provider-proxy-release/"Provider-Proxy*.zip \
             --clobber
