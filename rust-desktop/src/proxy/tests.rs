@@ -2,7 +2,7 @@ use super::config::{
     database_path, export_config, merge_config_secrets, merge_imported_config, merge_redacted,
     open_storage, public_config,
 };
-use super::metrics::{hour_stat, load_usage, now_ms, tally_usage, USAGE_RETENTION_DAYS};
+use super::metrics::{hour_stat, load_usage, model_stat, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
 use super::server::{shutdown_running_instance, start_server};
 use super::types::{AppState, ModelUsage, ProviderUsage, Usage};
@@ -151,6 +151,23 @@ fn tallies_the_last_usage_object_for_streams() {
     assert_eq!(usage.tokens_out, 13);
     assert_eq!(provider.tokens_in, 7);
     assert_eq!(model.tokens_out, 13);
+}
+
+#[test]
+fn models_are_keyed_by_provider_and_upstream_model() {
+    let mut usage = Usage::default();
+    model_stat(&mut usage, "logfare", "deepseek-v4.1").ok += 1;
+    model_stat(&mut usage, "logfare", "deepseek-v4.1").tokens_in += 10;
+    model_stat(&mut usage, "aquadevs", "deepseek-v4.1").errors += 1;
+
+    assert_eq!(usage.models.len(), 2, "the same model name under two providers is two rows");
+    let row = usage
+        .models
+        .get("logfare/deepseek-v4.1")
+        .expect("rows are provider/model, never a chain alias");
+    assert_eq!(row.ok, 1);
+    assert_eq!(row.tokens_in, 10);
+    assert_eq!(usage.models["aquadevs/deepseek-v4.1"].errors, 1);
 }
 
 #[test]

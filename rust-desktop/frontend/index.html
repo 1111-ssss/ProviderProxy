@@ -311,6 +311,17 @@
   .token-key.error::before { background: #ff9c9c; }
   .token-key.input::before { background: #6f99ed; }
   .token-key.output::before { background: #c894f5; }
+  .token-key.limit::before { background: #f0b866; }
+  .token-key.other::before { background: #7b8798; }
+  .token-fill.limit { background: linear-gradient(90deg, #d99a3f, #f3cb8b); }
+  .token-fill.other { background: linear-gradient(90deg, #6b7686, #9aa5b3); }
+  /* Exact counts under each bar: the bar shows the shape, this row shows the
+     numbers the shape hides at small widths. */
+  .token-row-foot { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .sep { opacity: .4; padding: 0 1px; }
+  .warn { color: #f0b866; }
+  .bad { color: #ff9c9c; }
+  table .problem-rate { margin-left: 6px; color: var(--muted); font-size: 10px; }
   /* Statistics is split into groups so one long page does not bury the table a
      reader came for. The tabs reuse the day-selector look for consistency. */
   .usage-groups { display: flex; gap: 4px; flex-wrap: wrap; margin: 14px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
@@ -963,9 +974,7 @@
     <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div id="u-groups" class="usage-groups" role="tablist" aria-label="Разделы статистики">
       <button type="button" class="usage-group" data-group="overview" role="tab">Обзор</button>
-      <button type="button" class="usage-group" data-group="hourly" role="tab">По часам</button>
       <button type="button" class="usage-group" data-group="providers" role="tab">Провайдеры</button>
-      <button type="button" class="usage-group" data-group="models" role="tab">Модели</button>
       <button type="button" class="usage-group" data-group="images" role="tab">Изображения</button>
     </div>
     <div class="usage-panel" data-panel="overview">
@@ -996,16 +1005,16 @@
         <article class="chart-card">
           <div class="chart-head">
             <div>
-              <h3>Токены за день</h3>
-              <p>Вход и выход суммарно по выбранному дню.</p>
+              <h3>Проблемность провайдеров</h3>
+              <p>Чем длиннее красная часть, тем чаще провайдер отвечает 429 или ошибкой.</p>
             </div>
-            <div class="token-legend"><span class="token-key input">вход</span><span class="token-key output">выход</span></div>
+            <div class="token-legend"><span class="token-key success">успешно</span><span class="token-key limit">429</span><span class="token-key error">ошибки</span><span class="token-key other">прочее</span></div>
           </div>
-          <div class="token-bars" id="u-day-tokens"></div>
+          <div class="token-bars" id="u-token-chart"></div>
         </article>
       </div>
     </div>
-    <div class="usage-panel" data-panel="hourly">
+    <div class="usage-panel" data-panel="providers">
       <article class="chart-card">
         <div class="chart-head">
           <div>
@@ -1016,23 +1025,10 @@
         </div>
         <div class="hour-chart" id="u-hour-chart"></div>
       </article>
-    </div>
-    <div class="usage-panel" data-panel="providers">
-      <article class="chart-card">
-        <div class="chart-head">
-          <div>
-            <h3>Результаты по провайдерам</h3>
-            <p>Успешные ответы и ошибки upstream. Пропуски из-за кулдауна в эти проценты не входят.</p>
-          </div>
-          <div class="token-legend"><span class="token-key success">успешно</span><span class="token-key error">ошибки</span></div>
-        </div>
-        <div class="token-bars" id="u-token-chart"></div>
-      </article>
       <h3 style="margin-top:16px">Провайдеры</h3>
       <table id="u-providers"></table>
-    </div>
-    <div class="usage-panel" data-panel="models">
-      <h3>Модели</h3>
+      <h3 style="margin-top:16px">Модели</h3>
+      <p class="muted" style="margin:0 0 8px">Считаются ответившие модели провайдеров, а не имена цепочек.</p>
       <table id="u-models"></table>
     </div>
     <div class="usage-panel" data-panel="images">
@@ -3233,41 +3229,40 @@ function renderUsageCharts(u) {
     })
     .join("")
 
-  const providers = Object.entries(u.providers ?? {}).sort(([, a], [, b]) => {
-    const at = (Number(a.ok) || 0) + (Number(a.errors) || 0) + (Number(a.limits) || 0)
-    const bt = (Number(b.ok) || 0) + (Number(b.errors) || 0) + (Number(b.limits) || 0)
-    return bt - at
-  })
-  const maxRequests = Math.max(
-    1,
-    ...providers.map(([, stat]) => (Number(stat.ok) || 0) + (Number(stat.errors) || 0) + (Number(stat.limits) || 0)),
-  )
-  $("u-token-chart").innerHTML = providers.length
-    ? providers
-        .map(([name, stat]) => {
-          const success = Number(stat.ok) || 0
-          const errors = (Number(stat.errors) || 0) + (Number(stat.limits) || 0)
-          const total = success + errors
-          const problemRate = total ? Math.round((errors / total) * 100) : 0
-          return `<div class="token-row" title="${esc(name)}: ${fmtNum(success)} успешно, ${fmtNum(errors)} ошибок/лимитов">
-            <div class="token-row-head"><span>${esc(name)}</span><span class="problem-rate">${problemRate}% проблемности</span></div>
-            <div class="token-track"><span class="token-fill success" style="width:${Math.max(0, (success / maxRequests) * 100).toFixed(1)}%"></span><span class="token-fill error" style="width:${Math.max(0, (errors / maxRequests) * 100).toFixed(1)}%"></span></div>
+  renderProviderProblemChart(u.providers)
+}
+
+// Provider health at a glance: one bar per provider split into ok / 429 /
+// errors / other. "Other" is an attempt that failed over before answering, so
+// the four parts always add up to the attempts the provider actually saw.
+function renderProviderProblemChart(obj) {
+  const rows = Object.entries(obj ?? {})
+    .map(([name, stat]) => {
+      const requests = Number(stat.requests) || 0
+      const ok = Number(stat.ok) || 0
+      const limits = Number(stat.limits) || 0
+      const errors = Number(stat.errors) || 0
+      const other = Math.max(0, requests - ok - limits - errors)
+      return { name, requests, ok, limits, errors, other }
+    })
+    .filter((row) => row.requests > 0)
+    .sort((a, b) => b.requests - a.requests)
+  const maxRequests = Math.max(1, ...rows.map((row) => row.requests))
+  const width = (value) => Math.max(0, (value / maxRequests) * 100).toFixed(1)
+  $("u-token-chart").innerHTML = rows.length
+    ? rows
+        .map((row) => {
+          const bad = row.limits + row.errors
+          const problemRate = row.requests ? Math.round((bad / row.requests) * 100) : 0
+          const details = `${fmtNum(row.requests)} попыток: ${fmtNum(row.ok)} успешно, ${fmtNum(row.limits)} 429, ${fmtNum(row.errors)} ошибок${row.other ? `, ${fmtNum(row.other)} переключено` : ""}`
+          return `<div class="token-row" title="${esc(`${row.name} — ${details}`)}">
+            <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate">${problemRate}% проблемности</span></div>
+            <div class="token-track"><span class="token-fill success" style="width:${width(row.ok)}%"></span><span class="token-fill limit" style="width:${width(row.limits)}%"></span><span class="token-fill error" style="width:${width(row.errors)}%"></span><span class="token-fill other" style="width:${width(row.other)}%"></span></div>
+            <div class="token-row-foot"><span>${fmtNum(row.ok)} ok</span><span>${fmtNum(row.limits)} 429</span><span>${fmtNum(row.errors)} err</span><span>${fmtNum(row.other)} переключено</span></div>
           </div>`
         })
         .join("")
     : `<div class="chart-empty">Данных о результатах пока нет</div>`
-}
-
-// Day totals as one stacked pair, so the overview answers "how much did this
-// day move" before the reader opens the by-hour tab.
-function renderUsageDayTokens(u) {
-  const tin = Math.max(0, Number(u.tokensIn) || 0)
-  const tout = Math.max(0, Number(u.tokensOut) || 0)
-  const total = Math.max(1, tin + tout)
-  const row = (label, value, kind) => `<div class="token-row"><div class="token-row-head"><span>${label}</span><span>${fmtTok(value)}</span></div><div class="token-track"><span class="token-fill ${kind}" style="width:${((value / total) * 100).toFixed(1)}%"></span></div></div>`
-  $("u-day-tokens").innerHTML = tin + tout
-    ? row("вход", tin, "input") + row("выход", tout, "output")
-    : `<div class="chart-empty">Токенов пока нет — upstream не присылал usage</div>`
 }
 
 // 24 slots, one per hour of the selected day. Bars share one scale so a busy
@@ -3296,6 +3291,30 @@ function renderUsageHourChart(u) {
     .join("")
 }
 
+// Compact two-row-per-record table: Имя | Req | OK/429/Err | вход/выход.
+// Errors hide inside one cell so a long list stays readable without a scroll
+// bar; the title attribute still spells the exact counts out.
+function usageCompactTable(obj) {
+  const rows = Object.entries(obj ?? {})
+    .sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
+  if (!rows.length) return `<tr><td class="muted">данных пока нет</td></tr>`
+  const cell = (name, stat) => {
+    const requests = Number(stat.requests) || 0
+    const ok = Number(stat.ok) || 0
+    const limits = Number(stat.limits) || 0
+    const errors = Number(stat.errors) || 0
+    const bad = limits + errors
+    const problemRate = requests ? Math.round((bad / requests) * 100) : 0
+    return `<tr>
+      <td>${esc(name)}</td>
+      <td class="muted">${fmtNum(requests)}</td>
+      <td class="muted">${fmtNum(ok)}<span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span>${bad ? `<small class="problem-rate">${problemRate}%</small>` : ""}</td>
+      <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
+    </tr>`
+  }
+  return `<tr><th>Имя</th><th>Req</th><th>OK<span class="sep">/</span>429<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
+}
+
 function usageTable(obj, cols) {
   const names = Object.keys(obj ?? {}).sort((a, b) => (obj[b].requests ?? 0) - (obj[a].requests ?? 0))
   if (!names.length) return `<tr><td class="muted">данных пока нет</td></tr>`
@@ -3308,7 +3327,7 @@ function usageTable(obj, cols) {
 let usageReport = null
 let usageDay = ""
 let usageGroup = "overview"
-const usageGroups = ["overview", "hourly", "providers", "models", "images"]
+const usageGroups = ["overview", "providers", "images"]
 const renderUsageGroups = () => {
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
     const active = button.dataset.group === usageGroup
@@ -3360,7 +3379,6 @@ function renderUsageReport(report) {
     $("u-lifetime").textContent = "за всё время: пока нет данных"
   }
   renderUsageCharts(u)
-  renderUsageDayTokens(u)
   renderUsageHourChart(u)
   renderUsageGroups()
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
@@ -3369,21 +3387,8 @@ function renderUsageReport(report) {
       renderUsageGroups()
     }
   })
-  $("u-providers").innerHTML = usageTable(u.providers, [
-    { h: "запросов", f: (s) => s.requests ?? 0 },
-    { h: "ок", f: (s) => s.ok ?? 0 },
-    { h: "429", f: (s) => s.limits ?? 0 },
-    { h: "ошибок", f: (s) => s.errors ?? 0 },
-    { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
-    { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
-  ])
-  $("u-models").innerHTML = usageTable(u.models, [
-    { h: "запросов", f: (s) => s.requests ?? 0 },
-    { h: "ок", f: (s) => s.ok ?? 0 },
-    { h: "failover", f: (s) => s.failovers ?? 0 },
-    { h: "ток. вход", f: (s) => fmtTok(s.tokensIn) },
-    { h: "ток. выход", f: (s) => fmtTok(s.tokensOut) },
-  ])
+  $("u-providers").innerHTML = usageCompactTable(u.providers)
+  $("u-models").innerHTML = usageCompactTable(u.models)
   const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   $("u-image-tiles").innerHTML = tile("запросов", imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)) + tile("сгенерировано", u.imagesGenerated ?? 0) + tile("успешных", imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)) + tile("ошибок", imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0))
   const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"

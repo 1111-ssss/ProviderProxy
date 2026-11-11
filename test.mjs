@@ -589,11 +589,16 @@ try {
   assert.equal(u.providers.A.limits, 1)
   assert.equal(u.providers.A.errors, 1) // 400 unsupported on the img chain
   assert.equal(u.providers.B.ok, 10)
-  assert.equal(u.models.test.requests, 6)
-  assert.equal(u.models.img.requests, 1)
-  assert.equal(u.models.fresh.requests, 1)
-  assert.equal(u.models.paused.requests, 1)
-  assert.equal(u.models["B/model-b2"].requests, 1)
+  // A chain is an alias, not a model: rows are the real upstream models, so
+  // two chains on one provider model share a single row instead of splitting it.
+  assert.ok(!u.models.test && !u.models.img && !u.models.fresh && !u.models.paused, "chain names must not become model rows")
+  assert.equal(u.models["A/model-a"].requests, 2) // r1 (429) and 2b (400)
+  assert.equal(u.models["A/model-a"].limits, 1)
+  assert.equal(u.models["A/model-a"].errors, 1)
+  assert.equal(u.models["B/model-b2"].requests, 2) // fresh chain + direct call
+  const modelAttempts = Object.values(u.models).reduce((n, m) => n + (m.requests || 0), 0)
+  const providerAttempts = Object.values(u.providers).reduce((n, p) => n + (p.requests || 0), 0)
+  assert.equal(modelAttempts, providerAttempts, "model rows must add up to the attempts providers saw")
   assert.equal(u.tokensIn, 77) // 7 successful chats x 11 prompt tokens from B
   assert.equal(u.tokensOut, 154)
   assert.equal(u.tokensIn, 77)

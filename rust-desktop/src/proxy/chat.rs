@@ -51,7 +51,6 @@ pub(super) async fn chat_completions(
     {
         let mut usage = state.usage.lock().unwrap();
         usage.requests += 1;
-        model_stat(&mut usage, &exposed).requests += 1;
         hour_stat(&mut usage).requests += 1;
     }
     let mut last_error = "all upstreams are cooling down".to_string();
@@ -71,6 +70,7 @@ pub(super) async fn chat_completions(
         {
             let mut usage = state.usage.lock().unwrap();
             provider_stat(&mut usage, &upstream.name).requests += 1;
+            model_stat(&mut usage, &upstream.name, &upstream.model).requests += 1;
         }
         let mut request = state
             .client
@@ -109,7 +109,9 @@ pub(super) async fn chat_completions(
                 let mut usage = state.usage.lock().unwrap();
                 provider_stat(&mut usage, &upstream.name).errors += 1;
                 usage.failovers += 1;
-                model_stat(&mut usage, &exposed).failovers += 1;
+                let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+                stat.failovers += 1;
+                stat.errors += 1;
                 last_error = format!("{}: {err}", upstream.name);
                 push_log(
                     &state,
@@ -149,13 +151,20 @@ pub(super) async fn chat_completions(
                 .unwrap()
                 .insert(key, Instant::now() + Duration::from_secs(seconds));
             let mut usage = state.usage.lock().unwrap();
-            if status == StatusCode::TOO_MANY_REQUESTS {
+            let limited = status == StatusCode::TOO_MANY_REQUESTS;
+            if limited {
                 provider_stat(&mut usage, &upstream.name).limits += 1;
             } else {
                 provider_stat(&mut usage, &upstream.name).errors += 1;
             }
             usage.failovers += 1;
-            model_stat(&mut usage, &exposed).failovers += 1;
+            let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+            stat.failovers += 1;
+            if limited {
+                stat.limits += 1;
+            } else {
+                stat.errors += 1;
+            }
             last_error = format!("{}: HTTP {status}", upstream.name);
             push_log(
                 &state,
@@ -186,7 +195,9 @@ pub(super) async fn chat_completions(
                 let mut usage = state.usage.lock().unwrap();
                 provider_stat(&mut usage, &upstream.name).errors += 1;
                 usage.failovers += 1;
-                model_stat(&mut usage, &exposed).failovers += 1;
+                let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+                stat.failovers += 1;
+                stat.errors += 1;
                 last_error = format!("{}: HTTP 400, unsupported content", upstream.name);
                 push_log(
                     &state,
@@ -213,7 +224,7 @@ pub(super) async fn chat_completions(
             let mut usage = state.usage.lock().unwrap();
             usage.ok += 1;
             provider_stat(&mut usage, &upstream.name).ok += 1;
-            model_stat(&mut usage, &exposed).ok += 1;
+            model_stat(&mut usage, &upstream.name, &upstream.model).ok += 1;
             hour_stat(&mut usage).ok += 1;
         }
         push_log(

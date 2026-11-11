@@ -253,8 +253,18 @@ pub(crate) fn provider_stat<'a>(usage: &'a mut Usage, name: &str) -> &'a mut Pro
     usage.providers.entry(name.to_string()).or_default()
 }
 
-pub(crate) fn model_stat<'a>(usage: &'a mut Usage, name: &str) -> &'a mut ModelUsage {
-    usage.models.entry(name.to_string()).or_default()
+/// One upstream model, keyed `provider/model`. A chain is an alias: counting it
+/// hid which real model answered, and two chains sharing an upstream double
+/// counted it.
+pub(crate) fn model_stat<'a>(
+    usage: &'a mut Usage,
+    provider: &str,
+    model: &str,
+) -> &'a mut ModelUsage {
+    usage
+        .models
+        .entry(format!("{provider}/{model}"))
+        .or_default()
 }
 
 pub(crate) fn tally_usage(

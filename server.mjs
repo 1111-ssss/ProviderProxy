@@ -526,7 +526,9 @@ function addLifetime(tokensIn = 0, tokensOut = 0) {
 }
 loadUsageHistory()
 const statP = (name) => (usage.providers[name] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0 })
-const statM = (name) => (usage.models[name] ??= { requests: 0, ok: 0, failovers: 0, tokensIn: 0, tokensOut: 0 })
+// Keyed by the real upstream model, not the chain alias: a chain is just a
+// name, and two chains on one upstream would otherwise double count it.
+const statM = (up) => (usage.models[`${up.name}/${up.model}`] ??= { requests: 0, ok: 0, limits: 0, errors: 0, failovers: 0, tokensIn: 0, tokensOut: 0 })
 const statI = (provider, model) => (usage.images[`${provider}/${model}`] ??= { provider, model, requests: 0, ok: 0, errors: 0, lastStatus: 0, lastUsedAt: null, lastEditAt: null, lastMode: null })
 const imageTasks = new Map() // provider/task_id -> { imageKey, historyIndex }
 const imageModelIsEdit = (body) => typeof body?.image === "string" && body.image.trim().length > 0
@@ -1390,8 +1392,6 @@ async function proxyChat(body, res) {
   active++
   usage.requests++
   hourStat().requests++
-  const mStat = statM(exposed)
-  mStat.requests++
   let current = null
   res.on("close", () => {
     active--
@@ -1409,6 +1409,8 @@ async function proxyChat(body, res) {
     current = ctrl
     const pStat = statP(up.name)
     pStat.requests++
+    const mStat = statM(up)
+    mStat.requests++
     const timer = setTimeout(() => ctrl.abort(), HEADER_TIMEOUT_MS)
     try {
       const upstreamBody = normalizeChatPayload({ ...body, model: up.model })
@@ -1432,6 +1434,8 @@ async function proxyChat(body, res) {
         else pStat.errors++
         usage.failovers++
         mStat.failovers++
+        if (resp.status === 429) mStat.limits++
+        else mStat.errors++
         log(
           `${exposed} → свитч: ${up.name}/${up.model} заблокирован (HTTP ${resp.status}) на ${fmtDur(ms)}, пробую следующего`,
         )
@@ -1449,6 +1453,7 @@ async function proxyChat(body, res) {
           pStat.errors++
           usage.failovers++
           mStat.failovers++
+          mStat.errors++
           log(
             `${exposed} → свитч: ${up.name}/${up.model} не поддерживает запрос (HTTP 400) на ${fmtDur(ERROR_COOLDOWN_MS)}, пробую следующего`,
           )
@@ -1521,6 +1526,7 @@ async function proxyChat(body, res) {
       pStat.errors++
       usage.failovers++
       mStat.failovers++
+      mStat.errors++
       lastError = `${up.name}: ${err.name === "AbortError" ? "timeout" : (err.cause?.code ?? err.message)}`
       log(
         `${exposed} → свитч: ${up.name}/${up.model} заблокирован (${lastError}) на ${fmtDur(ERROR_COOLDOWN_MS)}, пробую следующего`,

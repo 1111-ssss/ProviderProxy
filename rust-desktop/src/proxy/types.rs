@@ -36,6 +36,10 @@ pub(crate) struct ProviderUsage {
 pub(crate) struct ModelUsage {
     pub(crate) requests: u64,
     pub(crate) ok: u64,
+    /// Upstream answers 429 (rate limit) for this exact model.
+    pub(crate) limits: u64,
+    /// Any other upstream failure for this exact model.
+    pub(crate) errors: u64,
     pub(crate) failovers: u64,
     #[serde(rename = "tokensIn")]
     pub(crate) tokens_in: u64,
