@@ -36,7 +36,7 @@ database.exec(`
 try { chmodSync(dbPath, 0o600) } catch { /* Windows or a read-only existing database */ }
 const CONFIG_KEY_PREFIX = "enc:v1:"
 const API_VERSION = 3
-const APP_VERSION = "0.1.5"
+const APP_VERSION = "0.1.6"
 const configKeyPath = process.env.PP_CONFIG_KEY_FILE ?? join(homedir(), ".config", "provider-proxy", "master.key")
 let cachedConfigKey = null
 // In-memory log ring the GUI reads; old lines fall off on their own (nothing is written to disk).
