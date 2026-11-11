@@ -350,9 +350,11 @@
      numbers the shape hides at small widths. */
   .token-row-foot { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
   .sep { opacity: .4; padding: 0 1px; }
-  .warn { color: #f0b866; }
-  .bad { color: #ff9c9c; }
-  .ok-cell { color: #69d7a0; }
+  /* Table text stays readable but quieter than the chart fills: the numbers are
+     the point, the colour is only a hint. */
+  .warn { color: #d3b183; }
+  .bad { color: #d99a9a; }
+  .ok-cell { color: #86c7a7; }
   table .problem-rate { margin-left: 6px; color: var(--muted); font-size: 10px; }
   /* Statistics is split into groups so one long page does not bury the table a
      reader came for. The tabs reuse the day-selector look for consistency. */
@@ -3487,10 +3489,12 @@ function renderProviderProblemChart(obj) {
 
 // Green at 0%, yellow at a quarter, red from half up — interpolated, so 30%
 // and 45% do not both read as the same yellow.
+// 0% green, 25% yellow, 50%+ red: a gradient, so 20% reads calmer than 30%.
+// Kept low-saturation because it colours text, not a fill.
 function problemColor(rate) {
   const clamped = Math.max(0, Math.min(50, Number(rate) || 0))
   const hue = clamped <= 25 ? 130 - clamped * 3.4 : 45 - (clamped - 25) * 1.8
-  return `hsl(${hue.toFixed(0)} 72% 62%)`
+  return `hsl(${hue.toFixed(0)} 48% 58%)`
 }
 
 // 24 slots, one per hour of the selected day. Bars share one scale so a busy
