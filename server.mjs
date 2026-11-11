@@ -405,7 +405,8 @@ const cool = (key, ms) => cooldowns.set(key, Date.now() + ms)
 // in SQLite, separately from the config row so usage history never contains provider credentials.
 const USAGE_RETENTION_DAYS = 7
 const usageScalarKeys = ["requests", "ok", "failed", "skipped", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
-const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, hours: {}, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
+const MODEL_ROWS_VERSION = 2
+const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, modelsVersion: MODEL_ROWS_VERSION, hours: {}, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
 // Hour bucket "HH" of the local day, for the by-hour charts.
 const hourKey = () => String(new Date().getHours()).padStart(2, "0")
 const hourStat = () => (usage.hours[hourKey()] ??= { requests: 0, ok: 0, failed: 0, tokensIn: 0, tokensOut: 0 })
@@ -431,9 +432,11 @@ function normalizeUsageSnapshot(value) {
   out.images = value?.images && typeof value.images === "object" ? cloneData(value.images) : {}
   out.providers = value?.providers && typeof value.providers === "object" ? cloneData(value.providers) : {}
   out.models = value?.models && typeof value.models === "object" ? cloneData(value.models) : {}
-  // Legacy rows are chain aliases, which never contain "/". Real rows are
-  // always "provider/model", so aliases are dropped instead of mixed in.
-  for (const key of Object.keys(out.models)) if (!key.includes("/")) delete out.models[key]
+  // Snapshots written before provider/model keys may hold chain aliases, which a
+  // name check cannot detect (a chain may contain "/"). The version flag drops
+  // them once; rows rebuild from live traffic.
+  if ((Number(value?.modelsVersion) || 0) < MODEL_ROWS_VERSION) out.models = {}
+  out.modelsVersion = MODEL_ROWS_VERSION
   out.recentImages = Array.isArray(value?.recentImages) ? cloneData(value.recentImages).slice(-30) : []
   out.lastImageModel = value?.lastImageModel && typeof value.lastImageModel === "object" ? cloneData(value.lastImageModel) : null
   out.lastEditImageModel = value?.lastEditImageModel && typeof value.lastEditImageModel === "object" ? cloneData(value.lastEditImageModel) : null

@@ -10,7 +10,7 @@ use std::{
 
 use super::{
     config::Storage,
-    types::{AppState, HourUsage, LifetimeTokens, ModelUsage, ProviderUsage, Usage},
+    types::{AppState, HourUsage, LifetimeTokens, ModelUsage, ProviderUsage, Usage, MODEL_ROWS_VERSION},
 };
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
@@ -80,10 +80,13 @@ pub(crate) fn load_usage(
         }) {
             for row in iter.flatten() {
                 if let Ok(mut snapshot) = serde_json::from_str::<Usage>(&row.1) {
-                    // Rows written before models were keyed provider/model are
-                    // chain aliases and carry no slash. Drop them on load so the
-                    // table never mixes aliases with real models.
-                    snapshot.models.retain(|key, _| key.contains('/'));
+                    // Older snapshots keyed model rows by chain alias. A chain
+                    // name may contain a slash too (`logfare/economy/...`), so a
+                    // name check cannot separate them; the version flag can.
+                    if snapshot.models_version < MODEL_ROWS_VERSION {
+                        snapshot.models.clear();
+                        snapshot.models_version = MODEL_ROWS_VERSION;
+                    }
                     history.insert(row.0, snapshot);
                 }
             }
@@ -271,11 +274,14 @@ pub(crate) fn model_stat<'a>(
         .or_default()
 }
 
+/// Parse the last `usage` object in `text` and add it to the day and provider
+/// counters. Model rows are left to the caller: keying them by `provider/model`
+/// means they cannot be borrowed for a whole request, and taking them out of the
+/// map let a concurrent request's increment land on an orphaned copy.
 pub(crate) fn tally_usage(
     text: &str,
     usage: &mut Usage,
     provider: &mut ProviderUsage,
-    model: &mut ModelUsage,
 ) -> (u64, u64) {
     let Some(start) = text.rfind("\"usage\"") else {
         return (0, 0);
@@ -298,8 +304,6 @@ pub(crate) fn tally_usage(
     usage.tokens_out += output;
     provider.tokens_in += input;
     provider.tokens_out += output;
-    model.tokens_in += input;
-    model.tokens_out += output;
     (input, output)
 }
 pub(crate) fn cooldown_snapshot(state: &AppState) -> Vec<Value> {

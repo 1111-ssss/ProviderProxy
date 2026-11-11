@@ -496,19 +496,21 @@ pub(super) async fn stream_upstream_response(
         }
         let mut usage = usage_state.lock().unwrap();
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
-        let mut model_row = usage
-            .models
-            .remove(&format!("{provider}/{upstream_model}"))
-            .unwrap_or_default();
-        let (tokens_in, tokens_out) =
-            tally_usage(&tail, &mut usage, &mut provider_stat, &mut model_row);
+        let (tokens_in, tokens_out) = tally_usage(&tail, &mut usage, &mut provider_stat);
         {
             let hour = hour_stat(&mut usage);
             hour.tokens_in += tokens_in;
             hour.tokens_out += tokens_out;
         }
         usage.providers.insert(provider.clone(), provider_stat);
-        usage.models.insert(format!("{provider}/{upstream_model}"), model_row);
+        // Borrow the row in place: removing it first lost any increment a
+        // concurrent request made while this stream was being tallied.
+        let row = usage
+            .models
+            .entry(format!("{provider}/{upstream_model}"))
+            .or_default();
+        row.tokens_in += tokens_in;
+        row.tokens_out += tokens_out;
         drop(usage);
         let mut lifetime = lifetime_state.lock().unwrap();
         lifetime.tokens_in += tokens_in;

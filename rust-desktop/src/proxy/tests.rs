@@ -140,17 +140,15 @@ fn exports_optional_sections_and_preserves_secrets_on_partial_import() {
 fn tallies_the_last_usage_object_for_streams() {
     let mut usage = Usage::default();
     let mut provider = ProviderUsage::default();
-    let mut model = ModelUsage::default();
     tally_usage(
             "data: {\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}\n\ndata: {\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":13}}",
             &mut usage,
             &mut provider,
-            &mut model,
         );
     assert_eq!(usage.tokens_in, 7);
     assert_eq!(usage.tokens_out, 13);
     assert_eq!(provider.tokens_in, 7);
-    assert_eq!(model.tokens_out, 13);
+    assert_eq!(provider.tokens_out, 13);
 }
 
 #[test]

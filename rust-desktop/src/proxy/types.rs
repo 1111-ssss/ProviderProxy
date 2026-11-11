@@ -79,6 +79,9 @@ pub(crate) struct HourUsage {
     pub(crate) tokens_out: u64,
 }
 
+/// Bump when the key shape of `Usage::models` changes.
+pub(crate) const MODEL_ROWS_VERSION: u32 = 2;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct Usage {
@@ -100,6 +103,11 @@ pub(crate) struct Usage {
     pub(crate) images_generated: u64,
     pub(crate) providers: HashMap<String, ProviderUsage>,
     pub(crate) models: HashMap<String, ModelUsage>,
+    /// 0 (absent) means the `models` map was written when rows were keyed by
+    /// chain alias. Those rows cannot be told apart by name, so a snapshot below
+    /// the current version drops them once and rebuilds from live traffic.
+    #[serde(rename = "modelsVersion", default)]
+    pub(crate) models_version: u32,
     pub(crate) hours: HashMap<String, HourUsage>,
     pub(crate) images: HashMap<String, ImageUsage>,
     #[serde(rename = "recentImages")]
@@ -124,6 +132,7 @@ impl Default for Usage {
             images_generated: 0,
             providers: HashMap::new(),
             models: HashMap::new(),
+            models_version: MODEL_ROWS_VERSION,
             hours: HashMap::new(),
             images: HashMap::new(),
             recent_images: Vec::new(),
