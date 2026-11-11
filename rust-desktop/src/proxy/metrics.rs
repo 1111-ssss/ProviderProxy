@@ -79,7 +79,11 @@ pub(crate) fn load_usage(
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         }) {
             for row in iter.flatten() {
-                if let Ok(snapshot) = serde_json::from_str::<Usage>(&row.1) {
+                if let Ok(mut snapshot) = serde_json::from_str::<Usage>(&row.1) {
+                    // Rows written before models were keyed provider/model are
+                    // chain aliases and carry no slash. Drop them on load so the
+                    // table never mixes aliases with real models.
+                    snapshot.models.retain(|key, _| key.contains('/'));
                     history.insert(row.0, snapshot);
                 }
             }

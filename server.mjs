@@ -431,6 +431,9 @@ function normalizeUsageSnapshot(value) {
   out.images = value?.images && typeof value.images === "object" ? cloneData(value.images) : {}
   out.providers = value?.providers && typeof value.providers === "object" ? cloneData(value.providers) : {}
   out.models = value?.models && typeof value.models === "object" ? cloneData(value.models) : {}
+  // Legacy rows are chain aliases, which never contain "/". Real rows are
+  // always "provider/model", so aliases are dropped instead of mixed in.
+  for (const key of Object.keys(out.models)) if (!key.includes("/")) delete out.models[key]
   out.recentImages = Array.isArray(value?.recentImages) ? cloneData(value.recentImages).slice(-30) : []
   out.lastImageModel = value?.lastImageModel && typeof value.lastImageModel === "object" ? cloneData(value.lastImageModel) : null
   out.lastEditImageModel = value?.lastEditImageModel && typeof value.lastEditImageModel === "object" ? cloneData(value.lastEditImageModel) : null
