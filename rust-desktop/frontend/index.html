@@ -589,7 +589,7 @@
   .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
   .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
   .direct-model-card .model-card-head { min-height: 38px; }
-  /* Chips flow in rows of at most three. --model-cols is set once for the whole
+  /* Chips flow in rows of at most four. --model-cols is set once for the whole
      list, so every card uses the same count instead of one card fitting three
      and its neighbour two. */
   .provider-model-list { display: grid; grid-template-columns: repeat(var(--model-cols, 1), minmax(0, 1fr)); gap: 8px; }
@@ -1734,7 +1734,7 @@ function applyStepColumns(box) {
   const fit = () => {
     const available = box.querySelector(".card .chain")?.clientWidth ?? 0
     if (!available) return // hidden tab: the observer fires once it has width
-    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_STEP + gap))))
+    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (MIN_STEP + gap))))
     box.dataset.stepCols = String(cols)
     for (const chain of box.querySelectorAll(".chain")) {
       const rows = Math.max(1, Math.ceil(chain.querySelectorAll(".step").length / cols))
@@ -1852,7 +1852,7 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
   else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
 }
 
-// Chips sit in rows of at most three, and every card uses the same count: a
+// Chips sit in rows of at most four, and every card uses the same count: a
 // card that would fit three next to a neighbour that fits two would look
 // broken, so the count is the smallest that fits the widest chip in the list.
 let modelColumnsObserver = null
@@ -1876,7 +1876,7 @@ function applyModelColumns(box) {
     const available = box.querySelector(".provider-model-list")?.clientWidth ?? 0
     probe.remove()
     if (!available || !widest) return // hidden tab: the observer fires once it has width
-    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (widest + gap))))
+    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (widest + gap))))
     // Writing only when the count changes keeps the grid from resizing itself
     // into another observer callback, which browsers report as an interface
     // error on every drag of the window edge.
@@ -3060,7 +3060,7 @@ function applyPmColumns(box) {
     const available = box.clientWidth
     if (!available) return // hidden tab: the observer fires once it has width
     const needed = (widestId() || 210) + CHROME
-    const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (needed + gap))))
+    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (needed + gap))))
     if (box.dataset.pmCols === String(cols)) return
     box.dataset.pmCols = String(cols)
     box.style.setProperty("--pm-cols", cols)

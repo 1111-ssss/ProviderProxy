@@ -1465,6 +1465,12 @@ async function proxyChat(body, res) {
           )
           continue
         }
+        // A plain 400 is passed through as-is, but it is still an outcome:
+        // without this the provider showed one request and no ok/err at all.
+        pStat.errors++
+        mStat.errors++
+        usage.failed++
+        hourStat().failed++
         log(`${exposed} → ошибка: ${up.name}/${up.model} (HTTP 400${t.trim() ? `: ${upstreamErrorMessage(t)}` : ""})`)
         res.writeHead(400, { "content-type": resp.headers.get("content-type") ?? "application/json" })
         return res.end(t)
@@ -1486,10 +1492,19 @@ async function proxyChat(body, res) {
         log(`${exposed} → ${up.name}/${up.model}: upstream вернул обычный JSON вместо SSE, адаптирую поток`)
       }
       res.writeHead(resp.status, headers)
-      usage.ok++
-      hourStat().ok++
-      pStat.ok++
-      mStat.ok++
+      // "ok" means the upstream answered successfully. A 401/404 passed straight
+      // through is a failed attempt, not a success.
+      if (resp.ok) {
+        usage.ok++
+        hourStat().ok++
+        pStat.ok++
+        mStat.ok++
+      } else {
+        usage.failed++
+        hourStat().failed++
+        pStat.errors++
+        mStat.errors++
+      }
       if (!resp.body) return res.end()
 
       // Stream the body through untouched, watching for a usage report on the way (see tally()).

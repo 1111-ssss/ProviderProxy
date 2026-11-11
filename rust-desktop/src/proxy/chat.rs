@@ -212,6 +212,15 @@ pub(super) async fn chat_completions(
                     );
                     continue;
                 }
+                // A plain 400 is passed through as-is, but it is still an
+                // outcome: without this the provider showed one request and no
+                // ok/err at all, because the counters sat after the return.
+                {
+                    let mut usage = state.usage.lock().unwrap();
+                    provider_stat(&mut usage, &upstream.name).errors += 1;
+                    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+                    stat.errors += 1;
+                }
                 push_log(
                     &state,
                     format!(
@@ -228,11 +237,22 @@ pub(super) async fn chat_completions(
             }
 
             {
+                // "ok" means the upstream answered successfully. A 401/404 that
+                // is passed straight through is a failed attempt, not a success:
+                // counting it as ok made the tables show green for dead keys.
                 let mut usage = state.usage.lock().unwrap();
-                usage.ok += 1;
-                provider_stat(&mut usage, &upstream.name).ok += 1;
-                model_stat(&mut usage, &upstream.name, &upstream.model).ok += 1;
-                hour_stat(&mut usage).ok += 1;
+                if status.is_success() {
+                    usage.ok += 1;
+                    provider_stat(&mut usage, &upstream.name).ok += 1;
+                    model_stat(&mut usage, &upstream.name, &upstream.model).ok += 1;
+                    hour_stat(&mut usage).ok += 1;
+                } else {
+                    usage.failed += 1;
+                    hour_stat(&mut usage).failed += 1;
+                    provider_stat(&mut usage, &upstream.name).errors += 1;
+                    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+                    stat.errors += 1;
+                }
             }
             push_log(
                 &state,

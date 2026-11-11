@@ -68,7 +68,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes(".model-actions .icon-action svg"), "card action buttons are icon-only")
 
     assert.ok(html.includes("repeat(var(--model-cols, 1), minmax(0, 1fr))"), "model chips flow in a grid of equal columns")
-    assert.ok(html.includes("Math.min(3, Math.floor((available + gap) / (widest + gap)))"), "the chip grid must cap at three columns")
+    assert.ok(html.includes("Math.min(4, Math.floor((available + gap) / (widest + gap)))"), "the chip grid must cap at four columns")
     assert.ok(html.includes('id="opencode-toggle" class="chain-toggle'), "the integration toggle stays a bare switch")
     assert.ok(html.indexOf('id="opencode-sync"') < html.indexOf('id="opencode-toggle"'), "sync sits before the on/off switch")
     assert.ok(html.includes('id="s-retry-forever"'), "settings needs the retry-until-answered option")
@@ -82,6 +82,7 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('class="provider-actions"'), "provider rows use borderless icon actions")
     assert.ok(!html.includes('<button data-a="edit">Изменить</button>'), "provider rows no longer use text buttons")
     assert.ok(html.includes("onpointermove"), "the hour hint follows the pointer")
+    assert.equal((html.match(/Math\.min\(4,/g) || []).length, 3, "chains, model chips and connection cards all cap at four columns")
     assert.ok(!html.includes('<span class="chain-toggle-text">Активен</span>'), "the integration switch must not carry a text label")
     assert.ok(!html.includes("min-width: 132px"), "the bare switch must not reserve width for a removed label")
     assert.ok(!html.includes("Включена<small>"), "the integration toggle must not carry a second label line")

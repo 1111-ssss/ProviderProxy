@@ -391,6 +391,68 @@ async fn streams_a_long_russian_answer_without_cutting_it_off() {
     let _ = fs::remove_file(&opencode);
 }
 
+/// A 400 that is passed straight through is still an outcome. It used to return
+/// before the counters, so the table showed one request with 0 ok / 0 err.
+#[tokio::test]
+async fn counts_a_passed_through_400_as_an_error() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|| async {
+                (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    axum::Json(json!({ "error": { "message": "messages: field required" } })),
+                )
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-400-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [{ "provider": "p", "model": "m" }] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let client = Client::new();
+    let response = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "chain", "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    let usage: Value = client
+        .get(format!("http://127.0.0.1:{}/api/usage", server.port))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let provider = &usage["days"][0]["providers"]["p"];
+    assert_eq!(provider["requests"], 1, "the attempt is counted: {usage}");
+    assert_eq!(provider["errors"], 1, "a passed-through 400 is an error: {usage}");
+    assert_eq!(provider["ok"], 0, "it is not a success: {usage}");
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
 /// Harness mode: a failing upstream must not end the run with 502. The proxy
 /// waits out the cooldown and tries the chain again until something answers.
 #[tokio::test]
