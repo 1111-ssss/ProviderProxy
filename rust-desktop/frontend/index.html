@@ -566,11 +566,9 @@
   .check .model-context { margin-left: auto; }
   .chip .model-context { padding-right: 4px; }
   .provider-models { display: grid; gap: 8px; }
-  /* Chains flow in up to three columns, filled top-to-bottom then left-to-right
-     (grid-auto-flow: column), so the order matches the list order. */
-  /* The steps inside a chain flow in up to three columns, filling row by row,
-     so a nine-model chain is three compact rows instead of nine tall ones. */
-  .chain { grid-template-columns: repeat(var(--step-cols, 1), minmax(0, 1fr)); grid-auto-flow: row; }
+  /* Steps fill a column top-to-bottom, then the next column: 1..5 down the
+     left, 6..9 down the right, so the numbering reads like a list. */
+  .chain { grid-template-columns: repeat(var(--step-cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--step-rows, 1), auto); grid-auto-flow: column; }
   .step { min-width: 0; }
   .provider-models .card { margin-bottom: 0; }
   .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
@@ -1713,7 +1711,7 @@ function renderModels() {
 
 // The steps inside every chain flow in as many columns as a single upstream chip
 // needs, capped at three. One count for the whole tab keeps the chains aligned;
-// the row gap matches the column gap so the result reads as a tidy grid.
+// each chain then gets the row count that fills its columns top-to-bottom.
 let stepColumnsObserver = null
 function applyStepColumns(box) {
   const MIN_STEP = 240
@@ -1722,9 +1720,12 @@ function applyStepColumns(box) {
     const available = box.querySelector(".card .chain")?.clientWidth ?? 0
     if (!available) return // hidden tab: the observer fires once it has width
     const cols = Math.max(1, Math.min(3, Math.floor((available + gap) / (MIN_STEP + gap))))
-    if (box.dataset.stepCols === String(cols)) return
     box.dataset.stepCols = String(cols)
-    for (const chain of box.querySelectorAll(".chain")) chain.style.setProperty("--step-cols", cols)
+    for (const chain of box.querySelectorAll(".chain")) {
+      const rows = Math.max(1, Math.ceil(chain.querySelectorAll(".step").length / cols))
+      if (chain.style.getPropertyValue("--step-cols") !== String(cols)) chain.style.setProperty("--step-cols", cols)
+      if (chain.style.getPropertyValue("--step-rows") !== String(rows)) chain.style.setProperty("--step-rows", rows)
+    }
   }
   fit()
   stepColumnsObserver?.disconnect()

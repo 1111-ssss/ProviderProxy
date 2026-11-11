@@ -11,9 +11,15 @@ use super::{
     types::AppState,
 };
 
+#[derive(Default)]
 struct SseNormalizer {
     tool_indexes: HashMap<String, usize>,
     open_tool_index: HashMap<usize, usize>,
+    /// The id every fragment of a tool call must repeat. Gateways that omit it
+    /// leave the client to fall back to the response id (`chatcmpl-…`), so two
+    /// calls in one answer collide on one id and the client rejects the stream
+    /// with "Duplicate tool input start".
+    tool_ids: HashMap<(usize, usize), String>,
     finish_reasons: HashMap<usize, String>,
     tool_choices: BTreeSet<usize>,
     choice_indexes: BTreeSet<usize>,
@@ -206,6 +212,18 @@ impl SseNormalizer {
                         .unwrap_or(call_position),
                 };
                 self.open_tool_index.insert(choice_index, call_index);
+                let slot = (choice_index, call_index);
+                let id = if call_id.is_empty() {
+                    self.tool_ids
+                        .entry(slot)
+                        .or_insert_with(|| format!("call_{choice_index}_{call_index}"))
+                        .clone()
+                } else {
+                    let id = call_id.to_string();
+                    self.tool_ids.insert(slot, id.clone());
+                    id
+                };
+                call.insert("id".into(), Value::String(id));
                 call.insert("index".into(), serde_json::json!(call_index));
                 if !call.get("type").is_some_and(Value::is_string)
                     && call.get("function").is_some_and(Value::is_object)
@@ -275,6 +293,23 @@ fn completion_to_sse(bytes: &[u8], upstream_model: &str) -> Option<String> {
         for key in ["role", "content", "tool_calls", "function_call"] {
             if let Some(value) = message.get(key) {
                 delta.insert(key.into(), value.clone());
+            }
+        }
+        // Same rule as the streaming path: a tool call without an id would make
+        // the client fall back to the response id, and two calls would collide.
+        if let Some(calls) = delta.get_mut("tool_calls").and_then(Value::as_array_mut) {
+            for (position, call) in calls.iter_mut().enumerate() {
+                let Some(call) = call.as_object_mut() else { continue };
+                let missing = call
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .is_empty();
+                if missing {
+                    call.insert("id".into(), Value::String(format!("call_{index}_{position}")));
+                }
+                call.entry("index")
+                    .or_insert_with(|| serde_json::json!(position));
             }
         }
         first_choices.push(serde_json::json!({
@@ -364,15 +399,7 @@ pub(super) async fn stream_upstream_response(
         let mut buffer = String::new();
         let mut regular_body = Vec::new();
         let mut upstream_error = None;
-        let mut normalizer = SseNormalizer {
-            tool_indexes: HashMap::new(),
-            open_tool_index: HashMap::new(),
-            finish_reasons: HashMap::new(),
-            tool_choices: BTreeSet::new(),
-            choice_indexes: BTreeSet::new(),
-            last_meta: serde_json::Map::new(),
-            done_seen: false,
-        };
+        let mut normalizer = SseNormalizer::default();
         // A panic anywhere below used to kill this task silently: the response
         // body just ended mid-answer, the client saw a clean end of stream and
         // the agent stopped without any error. Catch it and report a stream
@@ -549,15 +576,7 @@ mod tests {
     /// log "neither choices nor usage" and drop the whole stream with an error.
     #[test]
     fn keeps_the_stream_alive_when_a_frame_has_no_choices() {
-        let mut normalizer = SseNormalizer {
-            tool_indexes: HashMap::new(),
-            open_tool_index: HashMap::new(),
-            finish_reasons: HashMap::new(),
-            tool_choices: BTreeSet::new(),
-            choice_indexes: BTreeSet::new(),
-            last_meta: serde_json::Map::new(),
-            done_seen: false,
-        };
+        let mut normalizer = SseNormalizer::default();
         // Metadata ping without choices or usage: skipped, stream continues.
         assert!(normalizer
             .normalize_event("data: {\"id\":\"x\",\"object\":\"chat.completion.chunk\"}\n\n")
@@ -579,15 +598,7 @@ mod tests {
 
     #[test]
     fn emits_finish_reason_when_done_has_no_choices() {
-        let mut normalizer = SseNormalizer {
-            tool_indexes: HashMap::new(),
-            open_tool_index: HashMap::new(),
-            finish_reasons: HashMap::new(),
-            tool_choices: BTreeSet::new(),
-            choice_indexes: BTreeSet::new(),
-            last_meta: serde_json::Map::new(),
-            done_seen: false,
-        };
+        let mut normalizer = SseNormalizer::default();
         assert!(normalizer
             .normalize_event("data: {\"choices\":[]}\n\n")
             .unwrap()
@@ -602,15 +613,7 @@ mod tests {
 
     #[test]
     fn detects_an_sse_stream_that_ends_before_done() {
-        let mut normalizer = SseNormalizer {
-            tool_indexes: HashMap::new(),
-            open_tool_index: HashMap::new(),
-            finish_reasons: HashMap::new(),
-            tool_choices: BTreeSet::new(),
-            choice_indexes: BTreeSet::new(),
-            last_meta: serde_json::Map::new(),
-            done_seen: false,
-        };
+        let mut normalizer = SseNormalizer::default();
         normalizer
             .normalize_event("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
             .unwrap();
@@ -620,15 +623,7 @@ mod tests {
 
     #[test]
     fn keeps_argument_fragments_on_the_open_tool_call() {
-        let mut normalizer = SseNormalizer {
-            tool_indexes: HashMap::new(),
-            open_tool_index: HashMap::new(),
-            finish_reasons: HashMap::new(),
-            tool_choices: BTreeSet::new(),
-            choice_indexes: BTreeSet::new(),
-            last_meta: serde_json::Map::new(),
-            done_seen: false,
-        };
+        let mut normalizer = SseNormalizer::default();
         let open_first = normalizer
             .normalize_event(
                 "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"id\":\"call_a\",\"function\":{\"name\":\"read\"}}]}}]}\n\n",
@@ -659,6 +654,37 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(second_args.contains("\"index\":1"), "{second_args}");
+    }
+
+    /// Fragments without an id used to reach the client bare, so it fell back to
+    /// the response id for every call and rejected the stream with
+    /// "Duplicate tool input start". Each slot now gets its own stable id.
+    #[test]
+    fn gives_every_tool_call_its_own_id_when_upstream_omits_it() {
+        let mut normalizer = SseNormalizer::default();
+        let first = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(first.contains("\"id\":\"call_0_0\""), "{first}");
+        // Argument fragments of the same call repeat that id.
+        let args = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" {}\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(args.contains("\"id\":\"call_0_0\""), "{args}");
+        // A second call must not inherit the first one's id.
+        let second = normalizer
+            .normalize_event(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":1,\"function\":{\"name\":\"write\",\"arguments\":\"{}\"}}]}}]}\n\n",
+            )
+            .unwrap()
+            .unwrap();
+        assert!(second.contains("\"id\":\"call_0_1\""), "{second}");
     }
 
     #[test]
