@@ -406,7 +406,7 @@ const cool = (key, ms) => cooldowns.set(key, Date.now() + ms)
 const USAGE_RETENTION_DAYS = 7
 const usageScalarKeys = ["requests", "ok", "failed", "skipped", "failovers", "tokensIn", "tokensOut", "imagesGenerated"]
 const MODEL_ROWS_VERSION = 2
-const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, modelsVersion: MODEL_ROWS_VERSION, hours: {}, images: {}, providers: {}, models: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
+const emptyUsage = () => ({ since: Date.now(), requests: 0, ok: 0, failed: 0, skipped: 0, failovers: 0, tokensIn: 0, tokensOut: 0, imagesGenerated: 0, modelsVersion: MODEL_ROWS_VERSION, hours: {}, images: {}, providers: {}, models: {}, sessions: {}, recentImages: [], lastImageModel: null, lastEditImageModel: null })
 // Hour bucket "HH" of the local day, for the by-hour charts.
 const hourKey = () => String(new Date().getHours()).padStart(2, "0")
 const hourStat = () => (usage.hours[hourKey()] ??= { requests: 0, ok: 0, failed: 0, tokensIn: 0, tokensOut: 0 })
@@ -432,6 +432,7 @@ function normalizeUsageSnapshot(value) {
   out.images = value?.images && typeof value.images === "object" ? cloneData(value.images) : {}
   out.providers = value?.providers && typeof value.providers === "object" ? cloneData(value.providers) : {}
   out.models = value?.models && typeof value.models === "object" ? cloneData(value.models) : {}
+  out.sessions = value?.sessions && typeof value.sessions === "object" ? cloneData(value.sessions) : {}
   // Snapshots written before provider/model keys may hold chain aliases, which a
   // name check cannot detect (a chain may contain "/"). The version flag drops
   // them once; rows rebuild from live traffic.
@@ -535,6 +536,15 @@ const statP = (name) => (usage.providers[name] ??= { requests: 0, ok: 0, limits:
 // Keyed by the real upstream model, not the chain alias: a chain is just a
 // name, and two chains on one upstream would otherwise double count it.
 const statM = (up) => (usage.models[`${up.name}/${up.model}`] ??= { requests: 0, ok: 0, limits: 0, errors: 0, failovers: 0, tokensIn: 0, tokensOut: 0 })
+// One harness session, keyed by the id it sends in x-opencode-session-id.
+// Nothing is read from the harness's files: only proxied traffic is counted.
+const statS = (session) => {
+  const key = typeof session === "string" ? session.trim() : ""
+  if (!key) return null
+  const row = (usage.sessions[key] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0, firstSeen: Date.now(), lastSeen: Date.now() })
+  row.lastSeen = Date.now()
+  return row
+}
 const statI = (provider, model) => (usage.images[`${provider}/${model}`] ??= { provider, model, requests: 0, ok: 0, errors: 0, lastStatus: 0, lastUsedAt: null, lastEditAt: null, lastMode: null })
 const imageTasks = new Map() // provider/task_id -> { imageKey, historyIndex }
 const imageModelIsEdit = (body) => typeof body?.image === "string" && body.image.trim().length > 0
@@ -588,6 +598,7 @@ const tally = (text, ...stats) => {
   const tin = num("prompt_tokens")
   const tout = num("completion_tokens")
   for (const s of [usage, ...stats]) {
+    if (!s) continue // no session id on this request
     s.tokensIn += tin
     s.tokensOut += tout
   }
@@ -1011,7 +1022,8 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { "content-type": "application/json" })
         return res.end(JSON.stringify({ error: { message: "invalid JSON body" } }))
       }
-      return await proxyChat(body, res)
+      const session = String(req.headers["x-opencode-session-id"] ?? "").trim() || null
+      return await proxyChat(body, res, session)
     }
 
     // ---- GUI API ----
@@ -1385,7 +1397,7 @@ const fmtDur = (ms) => {
   return m >= 1 ? `${m}m ${s % 60}s` : `${s}s`
 }
 
-async function proxyChat(body, res) {
+async function proxyChat(body, res, session = null) {
   rollUsageDay()
   const exposed = body.model
   const chain = chains.get(exposed)
@@ -1398,6 +1410,8 @@ async function proxyChat(body, res) {
   active++
   usage.requests++
   hourStat().requests++
+  const sStat = statS(session)
+  if (sStat) sStat.requests++
   let current = null
   res.on("close", () => {
     active--
@@ -1442,6 +1456,10 @@ async function proxyChat(body, res) {
         mStat.failovers++
         if (resp.status === 429) mStat.limits++
         else mStat.errors++
+        if (sStat) {
+          if (resp.status === 429) sStat.limits++
+          else sStat.errors++
+        }
         log(
           `${exposed} → свитч: ${up.name}/${up.model} заблокирован (HTTP ${resp.status}) на ${fmtDur(ms)}, пробую следующего`,
         )
@@ -1460,6 +1478,7 @@ async function proxyChat(body, res) {
           usage.failovers++
           mStat.failovers++
           mStat.errors++
+          if (sStat) sStat.errors++
           log(
             `${exposed} → свитч: ${up.name}/${up.model} не поддерживает запрос (HTTP 400) на ${fmtDur(ERROR_COOLDOWN_MS)}, пробую следующего`,
           )
@@ -1471,6 +1490,7 @@ async function proxyChat(body, res) {
         mStat.errors++
         usage.failed++
         hourStat().failed++
+        if (sStat) sStat.errors++
         log(`${exposed} → ошибка: ${up.name}/${up.model} (HTTP 400${t.trim() ? `: ${upstreamErrorMessage(t)}` : ""})`)
         res.writeHead(400, { "content-type": resp.headers.get("content-type") ?? "application/json" })
         return res.end(t)
@@ -1499,11 +1519,13 @@ async function proxyChat(body, res) {
         hourStat().ok++
         pStat.ok++
         mStat.ok++
+        if (sStat) sStat.ok++
       } else {
         usage.failed++
         hourStat().failed++
         pStat.errors++
         mStat.errors++
+        if (sStat) sStat.errors++
       }
       if (!resp.body) return res.end()
 
@@ -1516,14 +1538,14 @@ async function proxyChat(body, res) {
             if (!res.write(event)) await once(res, "drain")
           }
           res.end()
-          tally(tail, pStat, mStat)
+          // tally happens in finally, also on an interrupted stream
         } else {
           const chunks = []
           for await (const chunk of Readable.fromWeb(resp.body)) chunks.push(chunk)
           const text = Buffer.concat(chunks).toString("utf8")
           const normalized = streamRequested ? completionToSse(text, up) : null
           res.end(normalized ?? text)
-          tally(text, pStat, mStat)
+          tally(text, pStat, mStat, sStat)
         }
       } catch (err) {
         if (!res.destroyed && !res.writableEnded) {
@@ -1537,7 +1559,7 @@ async function proxyChat(body, res) {
           }
         }
       } finally {
-        if (isSse) tally(tail, pStat, mStat)
+        if (isSse) tally(tail, pStat, mStat, sStat)
       }
       return
     } catch (err) {
@@ -1548,6 +1570,7 @@ async function proxyChat(body, res) {
       usage.failovers++
       mStat.failovers++
       mStat.errors++
+      if (sStat) sStat.errors++
       lastError = `${up.name}: ${err.name === "AbortError" ? "timeout" : (err.cause?.code ?? err.message)}`
       log(
         `${exposed} → свитч: ${up.name}/${up.model} заблокирован (${lastError}) на ${fmtDur(ERROR_COOLDOWN_MS)}, пробую следующего`,
@@ -1558,6 +1581,7 @@ async function proxyChat(body, res) {
   usage.failed++
   hourStat().failed++
   if (!attempted) usage.skipped++
+  if (sStat) sStat.errors++ // the client got a 502, so the session sees an error
   res.writeHead(502, { "content-type": "application/json" })
   res.end(JSON.stringify({ error: { message: `all upstreams failed for ${exposed}: ${lastError}` } }))
 }

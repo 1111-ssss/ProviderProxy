@@ -649,6 +649,22 @@ try {
   const afterRestart = await (await fetch(`${base(PROXY)}/api/usage`)).json()
   assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 10, "today stats should survive restart")
   assert.equal(afterRestart.days.find((day) => day.date === dayKey(-1)).requests, 3, "previous day stats should survive restart")
+
+  // 13. Sessions are counted from the harness header alone.
+  const sessionResponse = await fetch(`${base(PROXY)}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-opencode-session-id": "ses_smoke_1" },
+    body: JSON.stringify({ model: "fresh", messages: [{ role: "user", content: "hi" }] }),
+  })
+  assert.equal(sessionResponse.status, 200)
+  await sessionResponse.text()
+  const sessionUsage = await (await fetch(`${base(PROXY)}/api/usage`)).json()
+  const sessionRow = sessionUsage.days.find((day) => day.date === dayKey(0)).sessions?.ses_smoke_1
+  assert.ok(sessionRow, "a request with x-opencode-session-id must create a session row")
+  assert.equal(sessionRow.requests, 1)
+  assert.equal(sessionRow.ok, 1)
+  assert.equal(sessionRow.tokensIn, 11, "session tokens come from the streamed usage report")
+  assert.ok(sessionRow.lastSeen >= sessionRow.firstSeen)
   const restartShutdown = await fetch(`${base(PROXY)}/api/shutdown`, { method: "POST" })
   assert.equal(restartShutdown.status, 200)
   await new Promise((resolve) => restartedChild.once("exit", resolve))

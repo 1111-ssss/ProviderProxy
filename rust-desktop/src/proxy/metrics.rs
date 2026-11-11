@@ -10,7 +10,10 @@ use std::{
 
 use super::{
     config::Storage,
-    types::{AppState, HourUsage, LifetimeTokens, ModelUsage, ProviderUsage, Usage, MODEL_ROWS_VERSION},
+    types::{
+        AppState, HourUsage, LifetimeTokens, ModelUsage, ProviderUsage, SessionUsage, Usage,
+        MODEL_ROWS_VERSION,
+    },
 };
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
@@ -254,6 +257,26 @@ pub(crate) fn hour_key() -> String {
 pub(crate) fn hour_stat<'a>(usage: &'a mut Usage) -> &'a mut HourUsage {
     let key = hour_key();
     usage.hours.entry(key).or_default()
+}
+
+/// The session row for the id the client sent. An empty id (a client that does
+/// not send `x-opencode-session-id`) is ignored rather than lumped into one
+/// fake session.
+pub(crate) fn session_stat<'a>(
+    usage: &'a mut Usage,
+    session: Option<&str>,
+) -> Option<&'a mut SessionUsage> {
+    let key = session?.trim();
+    if key.is_empty() {
+        return None;
+    }
+    let now = now_ms();
+    let entry = usage.sessions.entry(key.to_string()).or_insert_with(|| SessionUsage {
+        first_seen: now,
+        ..SessionUsage::default()
+    });
+    entry.last_seen = now;
+    Some(entry)
 }
 
 pub(crate) fn provider_stat<'a>(usage: &'a mut Usage, name: &str) -> &'a mut ProviderUsage {

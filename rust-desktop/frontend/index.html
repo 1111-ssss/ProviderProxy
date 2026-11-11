@@ -1039,6 +1039,7 @@
     <div id="u-groups" class="usage-groups" role="tablist" aria-label="Разделы статистики">
       <button type="button" class="usage-group" data-group="overview" role="tab">Обзор</button>
       <button type="button" class="usage-group" data-group="providers" role="tab">Провайдеры</button>
+      <button type="button" class="usage-group" data-group="sessions" role="tab">Сессии</button>
       <button type="button" class="usage-group" data-group="images" role="tab">Изображения</button>
     </div>
     <div class="usage-panel" data-panel="overview">
@@ -1091,6 +1092,10 @@
       <table id="u-providers"></table>
       <h3 style="margin-top:16px">Модели</h3>
       <table id="u-models"></table>
+    </div>
+    <div class="usage-panel" data-panel="sessions">
+      <p class="section-sub">Сессии считаются по заголовку <code>x-opencode-session-id</code> в запросах, прошедших через прокси. Названия сессий недоступны, а запросы в обход прокси сюда не попадают.</p>
+      <table id="u-sessions"></table>
     </div>
     <div class="usage-panel" data-panel="images">
       <h3>Генерация изображений</h3>
@@ -1214,6 +1219,11 @@
           <div class="setting-option setting-action" id="s-check-update-wrap">
             <span>Проверить обновления<small id="s-check-update-help">Проверяет последний GitHub Release.</small></span>
             <button type="button" id="s-check-update">Проверить</button>
+          </div>
+          <div class="setting-option setting-action" id="s-rollback-wrap">
+            <span>Откатиться на прежнюю версию<small id="s-rollback-help">Список опубликованных версий. Настройки и статистика сохраняются.</small></span>
+            <select id="s-rollback-version" aria-label="Версия для отката"><option value="">загружаю…</option></select>
+            <button type="button" id="s-rollback" class="danger">Откатить</button>
           </div>
         </div>
       </div>
@@ -1971,6 +1981,9 @@ function renderSettings() {
   $("s-check-update").disabled = !desktop
   $("s-check-update-wrap").classList.toggle("is-disabled", !desktop)
   $("s-check-update-help").textContent = desktop ? "Проверяет последний GitHub Release." : "доступно в desktop-версии"
+  $("s-rollback-version").disabled = !desktop
+  $("s-rollback").disabled = !desktop
+  $("s-rollback-wrap").classList.toggle("is-disabled", !desktop)
   $("s-autostart").checked = settings.autostart
   $("s-autostart").disabled = !desktop
   $("s-autostart-wrap").classList.toggle("is-disabled", !desktop)
@@ -2329,6 +2342,35 @@ $("s-auto-update").onchange = (e) => {
   if (e.target.checked) checkForDesktopUpdate()
 }
 $("s-check-update").onclick = () => checkForDesktopUpdate(true)
+let rollbackLoaded = false
+async function loadRollbackVersions() {
+  if (!isDesktopApp() || rollbackLoaded) return
+  const select = $("s-rollback-version")
+  try {
+    const versions = await tauriInvoke("list_versions")
+    rollbackLoaded = true
+    select.innerHTML = versions.length
+      ? versions.map((v) => `<option value="${esc(v.version)}"${v.current ? " selected" : ""}>${esc(v.version)}${v.current ? " (текущая)" : ""}</option>`).join("")
+      : '<option value="">нет доступных версий</option>'
+  } catch (error) {
+    select.innerHTML = `<option value="">${esc(error.message ?? error)}</option>`
+  }
+}
+$("s-rollback-version").onfocus = loadRollbackVersions
+$("s-rollback-version").onpointerdown = loadRollbackVersions
+$("s-rollback").onclick = async () => {
+  const version = $("s-rollback-version").value
+  if (!version || updateBusy) return
+  updateBusy = true
+  setUpdateBanner(`<strong>Откатываю на ${esc(version)}…</strong>`)
+  try {
+    if (!(await tauriInvoke("rollback_to", { version }))) setUpdateBanner("")
+  } catch (error) {
+    setUpdateBanner(`Не удалось откатить: ${esc(error.message ?? error)}`, "Повторить", () => $("s-rollback").click())
+  } finally {
+    updateBusy = false
+  }
+}
 $("s-auto-restart").onchange = (e) => {
   appSettings().autoRestart = e.target.checked
   save()
@@ -3636,10 +3678,37 @@ function usageTable(obj, cols) {
   )
 }
 
+// A session row is keyed by the harness id, which is long and opaque. Show a
+// short prefix (full id in the title) and sort by the last request seen.
+function usageSessionTable(obj) {
+  const rows = Object.entries(obj ?? {})
+    .filter(([, stat]) => {
+      const outcome = (Number(stat.ok) || 0) + (Number(stat.limits) || 0) + (Number(stat.errors) || 0)
+      const tokens = (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0)
+      return outcome > 0 || tokens > 0
+    })
+    .sort(([, a], [, b]) => (Number(b.lastSeen) || 0) - (Number(a.lastSeen) || 0))
+  if (!rows.length) return `<tr><td class="muted">сессий пока нет</td></tr>`
+  const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
+  const cell = (id, stat) => {
+    const ok = Number(stat.ok) || 0
+    const limits = Number(stat.limits) || 0
+    const errors = Number(stat.errors) || 0
+    return `<tr>
+      <td title="${esc(id)}">${esc(id.slice(0, 8))}${id.length > 8 ? "…" : ""}</td>
+      <td class="muted">${fmtNum(stat.requests)}</td>
+      <td class="muted"><span class="${ok ? "ok-cell" : ""}">${fmtNum(ok)}</span><span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span></td>
+      <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
+      <td class="muted">${esc(when(stat.lastSeen))}</td>
+    </tr>`
+  }
+  return `<tr><th>сессия</th><th>Req</th><th>OK<span class="sep">/</span>ratelimit<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th><th>последний запрос</th></tr>${rows.map(([id, stat]) => cell(id, stat)).join("")}`
+}
+
 let usageReport = null
 let usageDay = ""
 let usageGroup = "overview"
-const usageGroups = ["overview", "providers", "images"]
+const usageGroups = ["overview", "providers", "sessions", "images"]
 const renderUsageGroups = () => {
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
     const active = button.dataset.group === usageGroup
@@ -3701,6 +3770,7 @@ function renderUsageReport(report) {
   })
   $("u-providers").innerHTML = usageCompactTable(u.providers)
   $("u-models").innerHTML = usageCompactTable(u.models)
+  $("u-sessions").innerHTML = usageSessionTable(u.sessions)
   const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   $("u-image-tiles").innerHTML = tile("запросов", imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)) + tile("сгенерировано", u.imagesGenerated ?? 0) + tile("успешных", imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)) + tile("ошибок", imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0))
   const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"

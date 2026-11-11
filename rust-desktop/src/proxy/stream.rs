@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
-    metrics::{hour_stat, push_log, tally_usage},
+    metrics::{hour_stat, push_log, session_stat, tally_usage},
     types::AppState,
 };
 
@@ -375,6 +375,7 @@ pub(super) async fn stream_upstream_response(
     provider: String,
     upstream_model: String,
     stream_requested: bool,
+    session: Option<String>,
 ) -> Response {
     let status = response.status();
     let mut headers = response.headers().clone();
@@ -538,6 +539,10 @@ pub(super) async fn stream_upstream_response(
             .or_default();
         row.tokens_in += tokens_in;
         row.tokens_out += tokens_out;
+        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+            row.tokens_in += tokens_in;
+            row.tokens_out += tokens_out;
+        }
         drop(usage);
         let mut lifetime = lifetime_state.lock().unwrap();
         lifetime.tokens_in += tokens_in;

@@ -15,12 +15,19 @@ use std::{
 use zip::ZipArchive;
 
 const RELEASE_API: &str = "https://api.github.com/repos/1111-ssss/ProviderProxy/releases/latest";
+const RELEASES_API: &str = "https://api.github.com/repos/1111-ssss/ProviderProxy/releases?per_page=30";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct UpdateInfo {
     pub(crate) version: String,
     pub(crate) current_version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct VersionInfo {
+    pub(crate) version: String,
+    pub(crate) current: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +94,105 @@ fn parse_release_version(tag: &str) -> Result<Version, String> {
         .or_else(|| tag.strip_prefix('v'))
         .unwrap_or(tag);
     Version::parse(version).map_err(|error| format!("некорректная версия релиза {tag}: {error}"))
+}
+
+async fn github_releases() -> Result<Vec<GithubRelease>, String> {
+    let response = reqwest::Client::new()
+        .get(RELEASES_API)
+        .header(ACCEPT, "application/vnd.github+json")
+        .header(USER_AGENT, format!("Provider-Proxy/{CURRENT_VERSION}"))
+        .send()
+        .await
+        .map_err(|error| format!("не удалось получить список релизов: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "GitHub Releases вернул HTTP {}",
+            response.status()
+        ));
+    }
+    response
+        .json()
+        .await
+        .map_err(|error| format!("не удалось прочитать список релизов: {error}"))
+}
+
+/// The download URL for `version` on this platform, if the release has one.
+fn release_asset(release: &GithubRelease, version: &Version) -> Option<String> {
+    let name = format!("Provider-Proxy-v{version}-{}", asset_suffix());
+    release
+        .assets
+        .iter()
+        .find(|asset| asset.name == name)
+        .map(|asset| asset.browser_download_url.clone())
+}
+
+fn current_version() -> Result<Version, String> {
+    Version::parse(CURRENT_VERSION)
+        .map_err(|error| format!("некорректная текущая версия {CURRENT_VERSION}: {error}"))
+}
+
+/// Published releases, newest first. Only ones with a ZIP for this platform are
+/// offered: a version the app cannot install is not a rollback target.
+pub(crate) async fn list_versions() -> Result<Vec<VersionInfo>, String> {
+    if std::env::var_os("PP_DISABLE_UPDATES").is_some() {
+        return Ok(Vec::new());
+    }
+    let current = current_version()?;
+    let versions = rollback_targets(github_releases().await?, &current);
+    Ok(versions
+        .into_iter()
+        .map(|version| VersionInfo {
+            current: version == current,
+            version: version.to_string(),
+        })
+        .collect())
+}
+
+/// Published versions this app can actually install, newest first. A version
+/// newer than the running one is not a rollback target, and one without a ZIP
+/// for this platform cannot be installed at all.
+fn rollback_targets(releases: Vec<GithubRelease>, current: &Version) -> Vec<Version> {
+    let mut versions: Vec<Version> = releases
+        .iter()
+        .filter_map(|release| {
+            let version = parse_release_version(&release.tag_name).ok()?;
+            if &version > current || release_asset(release, &version).is_none() {
+                return None;
+            }
+            Some(version)
+        })
+        .collect();
+    versions.sort_unstable();
+    versions.dedup();
+    versions.reverse();
+    versions
+}
+
+/// Install an older published release and restart into it. The config lives
+/// outside the binary, so settings and history survive the swap.
+pub(crate) async fn rollback_to(version: String) -> Result<bool, String> {
+    if cfg!(debug_assertions) {
+        return Err("откат доступен только в release-сборке приложения".into());
+    }
+    let target = Version::parse(&version)
+        .map_err(|error| format!("некорректная версия {version}: {error}"))?;
+    if target == current_version()? {
+        return Err(format!("{version} уже установлена"));
+    }
+    let release = github_releases()
+        .await?
+        .into_iter()
+        .find(|release| {
+            parse_release_version(&release.tag_name)
+                .map(|tag| tag == target)
+                .unwrap_or(false)
+        })
+        .ok_or_else(|| format!("релиз {version} не найден"))?;
+    let url = release_asset(&release, &target)
+        .ok_or_else(|| format!("в релизе {version} нет ZIP для этой платформы"))?;
+    let bytes = download(&url).await?;
+    schedule_update(stage_update(&version, &bytes)?)?;
+    Ok(true)
 }
 
 async fn latest_update() -> Result<Option<RemoteUpdate>, String> {
@@ -348,4 +454,40 @@ pub(crate) fn restart_pending() -> Result<bool, String> {
     };
     schedule_update(pending)?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn release(tag: &str, assets: &[&str]) -> GithubRelease {
+        GithubRelease {
+            tag_name: tag.to_string(),
+            assets: assets
+                .iter()
+                .map(|name| GithubAsset {
+                    name: name.to_string(),
+                    browser_download_url: format!("https://example.invalid/{name}"),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn offers_only_older_versions_with_a_platform_zip() {
+        let zip = format!("Provider-Proxy-v{{}}-{}", asset_suffix());
+        let releases = vec![
+            release("app-v9.0.0", &[&zip.replace("{}", "9.0.0")]),
+            release("v0.1.5", &[&zip.replace("{}", "0.1.5")]),
+            release("v0.1.4", &[&zip.replace("{}", "0.1.4")]),
+            // A release without the platform ZIP cannot be installed.
+            release("v0.1.3", &["Provider-Proxy-v0.1.3-macos.zip"]),
+        ];
+        let current = Version::parse("0.1.5").unwrap();
+        let versions = rollback_targets(releases, &current);
+        assert_eq!(
+            versions.iter().map(Version::to_string).collect::<Vec<_>>(),
+            vec!["0.1.5", "0.1.4"]
+        );
+    }
 }

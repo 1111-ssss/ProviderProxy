@@ -35,6 +35,20 @@ async fn install_update(app: tauri::AppHandle, restart: bool) -> Result<bool, St
 }
 
 #[tauri::command]
+async fn list_versions() -> Result<Vec<updater::VersionInfo>, String> {
+    updater::list_versions().await
+}
+
+#[tauri::command]
+async fn rollback_to(app: tauri::AppHandle, version: String) -> Result<bool, String> {
+    let installed = updater::rollback_to(version).await?;
+    if installed {
+        app.exit(0);
+    }
+    Ok(installed)
+}
+
+#[tauri::command]
 fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
     if updater::restart_pending()? {
         app.exit(0);
@@ -434,6 +448,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             check_for_update,
             install_update,
+            list_versions,
+            rollback_to,
             restart_app,
             autostart_enabled,
             set_autostart,

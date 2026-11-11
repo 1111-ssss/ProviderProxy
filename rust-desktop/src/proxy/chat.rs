@@ -11,7 +11,7 @@ use tokio::time::timeout;
 use super::{
     auth::authorized,
     handlers::json_error,
-    metrics::{hour_stat, model_stat, provider_stat, push_log},
+    metrics::{hour_stat, model_stat, provider_stat, push_log, session_stat},
     routing::{failover_status, with_model},
     stream::stream_upstream_response,
     types::AppState,
@@ -48,10 +48,19 @@ pub(super) async fn chat_completions(
     let Some(chain) = chain else {
         return json_error(StatusCode::NOT_FOUND, format!("unknown model: {exposed}"));
     };
+    // The harness names each conversation in a header, so sessions can be
+    // counted from traffic alone — no reading of its database or logs.
+    let session = headers
+        .get("x-opencode-session-id")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
     {
         let mut usage = state.usage.lock().unwrap();
         usage.requests += 1;
         hour_stat(&mut usage).requests += 1;
+        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+            row.requests += 1;
+        }
     }
     let mut last_error = "all upstreams are cooling down".to_string();
     let mut attempted = false;
@@ -119,6 +128,9 @@ pub(super) async fn chat_completions(
                     let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
                     stat.failovers += 1;
                     stat.errors += 1;
+                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                        row.errors += 1;
+                    }
                     last_error = format!("{}: {err}", upstream.name);
                     push_log(
                         &state,
@@ -172,6 +184,13 @@ pub(super) async fn chat_completions(
                 } else {
                     stat.errors += 1;
                 }
+                if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                    if limited {
+                        row.limits += 1;
+                    } else {
+                        row.errors += 1;
+                    }
+                }
                 last_error = format!("{}: HTTP {status}", upstream.name);
                 push_log(
                     &state,
@@ -205,6 +224,9 @@ pub(super) async fn chat_completions(
                     let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
                     stat.failovers += 1;
                     stat.errors += 1;
+                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                        row.errors += 1;
+                    }
                     last_error = format!("{}: HTTP 400, unsupported content", upstream.name);
                     push_log(
                         &state,
@@ -220,6 +242,9 @@ pub(super) async fn chat_completions(
                     provider_stat(&mut usage, &upstream.name).errors += 1;
                     let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
                     stat.errors += 1;
+                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                        row.errors += 1;
+                    }
                 }
                 push_log(
                     &state,
@@ -241,7 +266,8 @@ pub(super) async fn chat_completions(
                 // is passed straight through is a failed attempt, not a success:
                 // counting it as ok made the tables show green for dead keys.
                 let mut usage = state.usage.lock().unwrap();
-                if status.is_success() {
+                let succeeded = status.is_success();
+                if succeeded {
                     usage.ok += 1;
                     provider_stat(&mut usage, &upstream.name).ok += 1;
                     model_stat(&mut usage, &upstream.name, &upstream.model).ok += 1;
@@ -252,6 +278,13 @@ pub(super) async fn chat_completions(
                     provider_stat(&mut usage, &upstream.name).errors += 1;
                     let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
                     stat.errors += 1;
+                }
+                if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                    if succeeded {
+                        row.ok += 1;
+                    } else {
+                        row.errors += 1;
+                    }
                 }
             }
             push_log(
@@ -275,6 +308,7 @@ pub(super) async fn chat_completions(
                 upstream.name.clone(),
                 upstream.model.clone(),
                 stream_requested,
+                session.clone(),
             )
             .await;
         }
@@ -320,6 +354,11 @@ pub(super) async fn chat_completions(
         usage.skipped += 1;
     }
     hour_stat(&mut usage).failed += 1;
+    // The client got a 502, so the session sees an error even when no upstream
+    // was tried. Without this the row would read one request and no outcome.
+    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+        row.errors += 1;
+    }
     drop(usage);
     json_error(
         StatusCode::BAD_GATEWAY,

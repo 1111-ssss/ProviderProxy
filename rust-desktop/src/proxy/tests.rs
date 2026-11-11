@@ -526,6 +526,98 @@ async fn retries_the_chain_until_an_upstream_answers_in_retry_mode() {
     let _ = fs::remove_file(&opencode);
 }
 
+/// The harness names each conversation in `x-opencode-session-id`. Sessions are
+/// counted from traffic alone, so the id in the header must create a row with
+/// that request's outcome and tokens.
+#[tokio::test]
+async fn counts_requests_per_harness_session() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|| async {
+                let body = format!(
+                    "data: {}\n\ndata: [DONE]\n\n",
+                    json!({
+                        "id": "chatcmpl-test",
+                        "object": "chat.completion.chunk",
+                        "model": "upstream-model",
+                        "choices": [{ "index": 0, "delta": { "content": "ok" }, "finish_reason": null }],
+                        "usage": { "prompt_tokens": 5, "completion_tokens": 3 }
+                    })
+                );
+                ([("content-type", "text/event-stream")], body)
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-session-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [{ "provider": "p", "model": "m" }] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let client = Client::new();
+    let response = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .header("x-opencode-session-id", "ses_test_1")
+        .json(&json!({ "model": "chain", "stream": true, "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let _ = response.text().await.unwrap();
+    // A request without the header must not be lumped into a fake session.
+    let plain = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "chain", "stream": true, "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    let _ = plain.text().await.unwrap();
+
+    // The stream tallies tokens after the body ends, so give that task a moment.
+    let mut session = Value::Null;
+    for _ in 0..40 {
+        let usage: Value = client
+            .get(format!("http://127.0.0.1:{}/api/usage", server.port))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let row = &usage["days"][0]["sessions"]["ses_test_1"];
+        if row["tokensIn"].as_u64() == Some(5) {
+            session = row.clone();
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    assert_eq!(session["requests"], 1, "one request for this session: {session}");
+    assert_eq!(session["ok"], 1, "the upstream answered: {session}");
+    assert_eq!(session["errors"], 0, "no error for this session: {session}");
+    assert_eq!(session["tokensIn"], 5, "tokens are counted per session: {session}");
+    assert_eq!(session["tokensOut"], 3, "tokens are counted per session: {session}");
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
 #[tokio::test]
 async fn serves_the_desktop_api_from_a_local_port() {
     let path = std::env::temp_dir().join(format!("provider-proxy-rust-test-{}.json", now_ms()));

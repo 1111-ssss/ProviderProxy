@@ -79,6 +79,29 @@ pub(crate) struct HourUsage {
     pub(crate) tokens_out: u64,
 }
 
+/// One harness session, keyed by the id the client sends in
+/// `x-opencode-session-id`. Nothing is read from the harness's own files: only
+/// the requests that pass through this proxy are counted, so a session that
+/// predates the feature or bypasses the proxy does not appear.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct SessionUsage {
+    pub(crate) requests: u64,
+    pub(crate) ok: u64,
+    pub(crate) limits: u64,
+    pub(crate) errors: u64,
+    #[serde(rename = "tokensIn")]
+    pub(crate) tokens_in: u64,
+    #[serde(rename = "tokensOut")]
+    pub(crate) tokens_out: u64,
+    /// Epoch millis of the first and last request, so the table can sort by
+    /// recency without storing a log of individual calls.
+    #[serde(rename = "firstSeen")]
+    pub(crate) first_seen: u128,
+    #[serde(rename = "lastSeen")]
+    pub(crate) last_seen: u128,
+}
+
 /// Bump when the key shape of `Usage::models` changes.
 pub(crate) const MODEL_ROWS_VERSION: u32 = 2;
 
@@ -103,6 +126,7 @@ pub(crate) struct Usage {
     pub(crate) images_generated: u64,
     pub(crate) providers: HashMap<String, ProviderUsage>,
     pub(crate) models: HashMap<String, ModelUsage>,
+    pub(crate) sessions: HashMap<String, SessionUsage>,
     /// 0 (absent) means the `models` map was written when rows were keyed by
     /// chain alias. Those rows cannot be told apart by name, so a snapshot below
     /// the current version drops them once and rebuilds from live traffic.
@@ -132,6 +156,7 @@ impl Default for Usage {
             images_generated: 0,
             providers: HashMap::new(),
             models: HashMap::new(),
+            sessions: HashMap::new(),
             models_version: MODEL_ROWS_VERSION,
             hours: HashMap::new(),
             images: HashMap::new(),
