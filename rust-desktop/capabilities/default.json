@@ -14,6 +14,8 @@
     "allow-autostart-enabled",
     "allow-autostart-tray-enabled",
     "allow-set-autostart",
-    "allow-create-app-shortcut"
+    "allow-create-app-shortcut",
+    "allow-list-versions",
+    "allow-rollback-to"
   ]
 }

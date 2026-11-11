@@ -9,6 +9,8 @@ fn main() {
                 "set_autostart",
                 "autostart_tray_enabled",
                 "create_app_shortcut",
+                "list_versions",
+                "rollback_to",
             ]),
         );
         tauri_build::try_build(attributes).expect("failed to run tauri-build");

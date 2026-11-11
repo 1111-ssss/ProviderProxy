@@ -7,6 +7,7 @@ use std::{
     ffi::OsString,
     fs::{self, File},
     io::{self, Cursor},
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Command,
     sync::{Mutex, OnceLock},
@@ -28,12 +29,21 @@ pub(crate) struct UpdateInfo {
 pub(crate) struct VersionInfo {
     pub(crate) version: String,
     pub(crate) current: bool,
+    /// Publication date as the API reports it, so the picker can show when a
+    /// version was released instead of a bare number.
+    pub(crate) published: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct GithubRelease {
     tag_name: String,
     assets: Vec<GithubAsset>,
+    #[serde(default, rename = "published_at")]
+    published_at: Option<String>,
+    #[serde(default)]
+    prerelease: bool,
+    #[serde(default)]
+    draft: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,12 +148,23 @@ pub(crate) async fn list_versions() -> Result<Vec<VersionInfo>, String> {
         return Ok(Vec::new());
     }
     let current = current_version()?;
-    let versions = rollback_targets(github_releases().await?, &current);
-    Ok(versions
+    let releases = github_releases().await?;
+    let published: HashMap<String, String> = releases
+        .iter()
+        .filter_map(|release| {
+            let version = parse_release_version(&release.tag_name).ok()?;
+            Some((version.to_string(), release.published_at.clone()?))
+        })
+        .collect();
+    Ok(rollback_targets(releases, &current)
         .into_iter()
-        .map(|version| VersionInfo {
-            current: version == current,
-            version: version.to_string(),
+        .map(|version| {
+            let published = published.get(&version.to_string()).cloned().unwrap_or_default();
+            VersionInfo {
+                current: version == current,
+                version: version.to_string(),
+                published,
+            }
         })
         .collect())
 }
@@ -155,6 +176,9 @@ fn rollback_targets(releases: Vec<GithubRelease>, current: &Version) -> Vec<Vers
     let mut versions: Vec<Version> = releases
         .iter()
         .filter_map(|release| {
+            if release.draft || release.prerelease {
+                return None;
+            }
             let version = parse_release_version(&release.tag_name).ok()?;
             if &version > current || release_asset(release, &version).is_none() {
                 return None;
@@ -470,6 +494,9 @@ mod tests {
                     browser_download_url: format!("https://example.invalid/{name}"),
                 })
                 .collect(),
+            published_at: Some("2026-11-03T20:33:32Z".to_string()),
+            prerelease: false,
+            draft: false,
         }
     }
 

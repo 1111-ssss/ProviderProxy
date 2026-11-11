@@ -495,16 +495,13 @@
     cursor: help;
   }
   .field-help:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: transparent; }
-  /* The settings section scrolls (overflow:auto), so a tooltip centred above
-     the button was clipped at the card edge. Anchor it under the button and
-     open it to the right, where the field has room. */
-  .field-help::after {
-    content: attr(data-hint);
-    position: absolute;
-    left: -4px;
-    top: calc(100% + 7px);
-    width: max-content;
-    max-width: min(260px, calc(100vw - 48px));
+  /* The hint is a fixed layer placed by script next to the "?" it belongs to.
+     An absolutely positioned tooltip was clipped by the scrolling settings
+     card, and a hover target on the whole label blocked the input under it. */
+  .field-hint-layer {
+    position: fixed;
+    z-index: 60;
+    max-width: min(280px, calc(100vw - 24px));
     padding: 7px 9px;
     border: 1px solid var(--border-strong);
     border-radius: 8px;
@@ -514,20 +511,22 @@
     text-align: left;
     white-space: normal;
     box-shadow: var(--shadow);
-    opacity: 0;
-    visibility: hidden;
     pointer-events: none;
-    transform: translateY(-3px);
-    transition: opacity .13s ease, transform .13s ease, visibility .13s;
-    z-index: 20;
   }
-  .field-help:hover::after, .field-help:focus-visible::after { opacity: 1; visibility: visible; transform: translateY(0); }
-  .settings-page .setting-option { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
-  .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
+  .field-hint-layer[hidden] { display: none; }
+  .settings-page .setting-option { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 0; }
   .settings-page .setting-option span { display: grid; gap: 2px; }
   .settings-page .setting-option small { color: var(--muted); font-size: 11px; }
   .settings-page .setting-option.is-disabled { opacity: .6; }
   .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
+  .rollback-list { display: grid; gap: 6px; max-height: min(46vh, 420px); overflow: auto; padding: 2px; }
+  .rollback-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--control-background); color: var(--text); text-align: left; }
+  .rollback-row:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
+  .rollback-row.is-current { opacity: .6; }
+  .rollback-version { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .rollback-tag { padding: 1px 7px; border-radius: 10px; background: rgba(111, 153, 237, .16); color: var(--accent); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .rollback-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
   .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   /* Inside a card the two field columns must collapse too, or a numeric input
@@ -536,8 +535,8 @@
   .settings-grid label { margin: 0; min-width: 0; }
   /* A field must shrink with its column, but checkboxes keep their own size. */
   .settings-grid label input:not([type="checkbox"]), .settings-grid label select { width: 100%; min-width: 0; }
-  .settings-grid .setting-option { display: flex; align-items: flex-start; gap: 9px; grid-column: 1 / -1; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
-  .settings-grid .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 3px 0 0; }
+  .settings-grid .setting-option { display: flex; align-items: center; gap: 9px; grid-column: 1 / -1; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-grid .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 0; }
   /* The text column must be a shrinkable flex item with a minmax(0,1fr) track.
      A plain `display: grid` sizes the track to the longest line's max-content,
      so a long help text spilled out of the card and collapsed its own width. */
@@ -1182,7 +1181,7 @@
           </label>
           <label class="setting-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
-            <span>Повторять, пока модель не ответит<small>Вместо ошибки 502 харнес ждёт окончания кулдауна и пробует цепочку снова — до 2 часов.</small></span>
+            <span>Повторять, пока модель не ответит<small>Вместо ошибки 502 харнес ждёт окончания кулдауна и пробует цепочку снова — до 1 часа.</small></span>
           </label>
         </div>
       </div>
@@ -1234,9 +1233,8 @@
             <button type="button" id="s-check-update">Проверить</button>
           </div>
           <div class="setting-option setting-action" id="s-rollback-wrap">
-            <span>Откатиться на прежнюю версию<small id="s-rollback-help">Список опубликованных версий. Настройки и статистика сохраняются.</small></span>
-            <select id="s-rollback-version" aria-label="Версия для отката"><option value="">загружаю…</option></select>
-            <button type="button" id="s-rollback" class="danger">Откатить</button>
+            <span>Откатиться на прежнюю версию<small id="s-rollback-help">Откроет список опубликованных версий с поиском. Настройки и статистика сохраняются.</small></span>
+            <button type="button" id="s-rollback-open">Выбрать версию</button>
           </div>
         </div>
       </div>
@@ -1447,10 +1445,80 @@
   </form>
 </dialog>
 
+<!-- Диалог: выбор версии для отката -->
+<dialog id="dlg-rollback" aria-labelledby="rollback-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="rollback-title">Откат на прежнюю версию</h3>
+      <p>Выбранная версия скачается и заменит текущий бинарник после перезапуска. Настройки и статистика остаются на месте.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="filter-bar">
+        <label class="search-field" style="margin:0">
+          <input id="rollback-search" type="search" placeholder="Поиск по версии" aria-label="Поиск по версии">
+        </label>
+        <select id="rollback-filter" aria-label="Фильтр версий" style="flex:0 0 auto;width:auto">
+          <option value="older">Только старше текущей</option>
+          <option value="all">Все версии</option>
+          <option value="current">Только текущая</option>
+        </select>
+        <span class="filter-result" id="rollback-count"></span>
+      </div>
+      <div class="rollback-list" id="rollback-list"></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="rollback-cancel">Отмена</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="field-hint-layer" id="field-hint" role="tooltip" hidden></div>
+
 <script>
 const $ = (id) => document.getElementById(id)
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
+
+// The settings cards scroll, so the "?" hint is a fixed layer placed next to
+// the button and clamped to the viewport. It opens only for the button itself:
+// hovering the label used to cover the input and block typing.
+const fieldHint = $("field-hint")
+function showFieldHint(button) {
+  const hint = button?.dataset.hint
+  if (!hint) return
+  fieldHint.textContent = hint
+  fieldHint.hidden = false
+  const anchor = button.getBoundingClientRect()
+  const box = fieldHint.getBoundingClientRect()
+  const margin = 8
+  // Beside the button, not under it: the field it explains sits right below,
+  // and a hint on top of the input still hides what the user is typing.
+  let left = anchor.right + 8
+  if (left + box.width > window.innerWidth - margin) left = anchor.left - box.width - 8
+  if (left < margin) {
+    left = Math.max(margin, Math.min(anchor.left, window.innerWidth - box.width - margin))
+  }
+  const top = Math.max(margin, Math.min(anchor.top + anchor.height / 2 - box.height / 2, window.innerHeight - box.height - margin))
+  fieldHint.style.top = `${top}px`
+  fieldHint.style.left = `${left}px`
+}
+const hideFieldHint = () => { fieldHint.hidden = true }
+document.addEventListener("pointerover", (event) => {
+  const button = event.target.closest?.(".field-help")
+  if (button) showFieldHint(button)
+})
+document.addEventListener("pointerout", (event) => {
+  if (event.target.closest?.(".field-help")) hideFieldHint()
+})
+document.addEventListener("focusin", (event) => {
+  const button = event.target.closest?.(".field-help")
+  if (button) showFieldHint(button)
+})
+document.addEventListener("focusout", (event) => {
+  if (event.target.closest?.(".field-help")) hideFieldHint()
+})
+window.addEventListener("scroll", hideFieldHint, true)
+window.addEventListener("resize", hideFieldHint)
 
 let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" }, appSettings: { theme: "dark", autoUpdate: false, autoRestart: false, autostart: false } }
 let token = localStorage.getItem("pp_token") ?? ""
@@ -2006,8 +2074,7 @@ function renderSettings() {
   $("s-check-update").disabled = !desktop
   $("s-check-update-wrap").classList.toggle("is-disabled", !desktop)
   $("s-check-update-help").textContent = desktop ? "Проверяет последний GitHub Release." : "доступно в desktop-версии"
-  $("s-rollback-version").disabled = !desktop
-  $("s-rollback").disabled = !desktop
+  $("s-rollback-open").disabled = !desktop
   $("s-rollback-wrap").classList.toggle("is-disabled", !desktop)
   $("s-autostart").checked = settings.autostart
   $("s-autostart").disabled = !desktop
@@ -2367,35 +2434,75 @@ $("s-auto-update").onchange = (e) => {
   if (e.target.checked) checkForDesktopUpdate()
 }
 $("s-check-update").onclick = () => checkForDesktopUpdate(true)
-let rollbackLoaded = false
+const dlgRollback = $("dlg-rollback")
+let rollbackVersions = null
+let rollbackQuery = ""
+let rollbackFilter = "older" // older | current | all
+const renderRollbackList = () => {
+  const list = $("rollback-list")
+  if (!rollbackVersions) return
+  const query = rollbackQuery.trim().toLowerCase()
+  const rows = rollbackVersions.filter((v) => {
+    if (rollbackFilter === "older" && v.current) return false
+    if (rollbackFilter === "current" && !v.current) return false
+    return !query || v.version.toLowerCase().includes(query)
+  })
+  $("rollback-count").textContent = rows.length ? `${rows.length} из ${rollbackVersions.length}` : "ничего не найдено"
+  list.innerHTML = rows.length
+    ? rows.map((v) => {
+        const when = v.published ? new Date(v.published).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" }) : ""
+        const label = v.current ? '<span class="rollback-tag">текущая</span>' : ""
+        return `<button type="button" class="rollback-row${v.current ? " is-current" : ""}" data-version="${esc(v.version)}"${v.current ? " disabled" : ""}><span class="rollback-version">${esc(v.version)}${label}</span><span class="rollback-date">${esc(when)}</span></button>`
+      }).join("")
+    : `<p class="muted" style="margin:6px 0">Версий не найдено.</p>`
+  list.querySelectorAll("[data-version]").forEach((button) => {
+    button.onclick = () => {
+      const version = button.dataset.version
+      dlgRollback.close()
+      startRollback(version)
+    }
+  })
+}
 async function loadRollbackVersions() {
-  if (!isDesktopApp() || rollbackLoaded) return
-  const select = $("s-rollback-version")
+  if (rollbackVersions) return renderRollbackList()
+  $("rollback-list").innerHTML = '<p class="muted" style="margin:6px 0">Загружаю список…</p>'
+  $("rollback-count").textContent = ""
   try {
-    const versions = await tauriInvoke("list_versions")
-    rollbackLoaded = true
-    select.innerHTML = versions.length
-      ? versions.map((v) => `<option value="${esc(v.version)}"${v.current ? " selected" : ""}>${esc(v.version)}${v.current ? " (текущая)" : ""}</option>`).join("")
-      : '<option value="">нет доступных версий</option>'
+    rollbackVersions = await tauriInvoke("list_versions")
+    renderRollbackList()
   } catch (error) {
-    select.innerHTML = `<option value="">${esc(error.message ?? error)}</option>`
+    $("rollback-list").innerHTML = `<p class="muted" style="margin:6px 0">Не удалось получить список: ${esc(error.message ?? error)}</p>`
   }
 }
-$("s-rollback-version").onfocus = loadRollbackVersions
-$("s-rollback-version").onpointerdown = loadRollbackVersions
-$("s-rollback").onclick = async () => {
-  const version = $("s-rollback-version").value
+async function startRollback(version) {
   if (!version || updateBusy) return
   updateBusy = true
   setUpdateBanner(`<strong>Откатываю на ${esc(version)}…</strong>`)
   try {
     if (!(await tauriInvoke("rollback_to", { version }))) setUpdateBanner("")
   } catch (error) {
-    setUpdateBanner(`Не удалось откатить: ${esc(error.message ?? error)}`, "Повторить", () => $("s-rollback").click())
+    setUpdateBanner(`Не удалось откатить: ${esc(error.message ?? error)}`, "Повторить", () => startRollback(version))
   } finally {
     updateBusy = false
   }
 }
+$("s-rollback-open").onclick = () => {
+  rollbackQuery = ""
+  rollbackFilter = "older"
+  $("rollback-search").value = ""
+  $("rollback-filter").value = rollbackFilter
+  dlgRollback.showModal()
+  loadRollbackVersions()
+}
+$("rollback-search").oninput = (event) => {
+  rollbackQuery = event.target.value
+  renderRollbackList()
+}
+$("rollback-filter").onchange = (event) => {
+  rollbackFilter = event.target.value
+  renderRollbackList()
+}
+$("rollback-cancel").onclick = () => dlgRollback.close()
 $("s-auto-restart").onchange = (e) => {
   appSettings().autoRestart = e.target.checked
   save()

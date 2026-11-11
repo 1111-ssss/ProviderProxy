@@ -375,10 +375,22 @@
           "markdownDescription": "Enables the install_update command without any pre-configured scope."
         },
         {
+          "description": "Enables the list_versions command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-list-versions",
+          "markdownDescription": "Enables the list_versions command without any pre-configured scope."
+        },
+        {
           "description": "Enables the restart_app command without any pre-configured scope.",
           "type": "string",
           "const": "allow-restart-app",
           "markdownDescription": "Enables the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the rollback_to command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-rollback-to",
+          "markdownDescription": "Enables the rollback_to command without any pre-configured scope."
         },
         {
           "description": "Enables the set_autostart command without any pre-configured scope.",
@@ -417,10 +429,22 @@
           "markdownDescription": "Denies the install_update command without any pre-configured scope."
         },
         {
+          "description": "Denies the list_versions command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-list-versions",
+          "markdownDescription": "Denies the list_versions command without any pre-configured scope."
+        },
+        {
           "description": "Denies the restart_app command without any pre-configured scope.",
           "type": "string",
           "const": "deny-restart-app",
           "markdownDescription": "Denies the restart_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the rollback_to command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-rollback-to",
+          "markdownDescription": "Denies the rollback_to command without any pre-configured scope."
         },
         {
           "description": "Denies the set_autostart command without any pre-configured scope.",

@@ -68,7 +68,7 @@ pub(super) async fn chat_completions(
     // and try the chain again. A run then ends only when an upstream answers.
     // shortcut: a client that already gave up is not detected here, so the cap
     // below stops the loop; raise it if long unattended runs need more.
-    const RETRY_WINDOW: Duration = Duration::from_secs(2 * 60 * 60);
+    const RETRY_WINDOW: Duration = Duration::from_secs(60 * 60);
     let started = Instant::now();
     loop {
         for upstream in chain.iter() {
