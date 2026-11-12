@@ -20,6 +20,10 @@ struct SseNormalizer {
     /// calls in one answer collide on one id and the client rejects the stream
     /// with "Duplicate tool input start".
     tool_ids: HashMap<(usize, usize), String>,
+    /// Which slot owns each id handed to the client. A gateway that repeats one
+    /// id for two different calls (or reuses the response id) makes the client
+    /// reject the whole answer with "Duplicate tool input start".
+    assigned_ids: HashMap<String, (usize, usize)>,
     finish_reasons: HashMap<usize, String>,
     tool_choices: BTreeSet<usize>,
     choice_indexes: BTreeSet<usize>,
@@ -187,6 +191,11 @@ impl SseNormalizer {
             let tool_calls = tool_calls
                 .as_array_mut()
                 .ok_or_else(|| "SSE delta tool_calls is not an array".to_string())?;
+            // A gateway may reuse one index for two calls in the same frame.
+            // Only argument fragments are allowed to share a slot: they continue
+            // the call that is already open.
+            let mut frame_slots: std::collections::HashSet<usize> =
+                std::collections::HashSet::new();
             for (call_position, call) in tool_calls.iter_mut().enumerate() {
                 let call = call
                     .as_object_mut()
@@ -194,7 +203,8 @@ impl SseNormalizer {
                 let call_id = call.get("id").and_then(Value::as_str).unwrap_or_default();
                 let call_key = format!("{choice_index}:{call_id}");
                 let declared = call.get("index").and_then(Value::as_u64).map(|i| i as usize);
-                let call_index = match (declared, call_id.is_empty()) {
+                let starts_call = declared.is_some() || !call_id.is_empty();
+                let mut call_index = match (declared, call_id.is_empty()) {
                     (Some(index), _) => index,
                     // A well-formed first fragment opens a call by id.
                     (None, false) => {
@@ -211,18 +221,46 @@ impl SseNormalizer {
                         .copied()
                         .unwrap_or(call_position),
                 };
+                if starts_call && !frame_slots.insert(call_index) {
+                    call_index = self.next_tool_index(choice_index);
+                    while !frame_slots.insert(call_index) {
+                        call_index += 1;
+                    }
+                }
                 self.open_tool_index.insert(choice_index, call_index);
                 let slot = (choice_index, call_index);
-                let id = if call_id.is_empty() {
-                    self.tool_ids
-                        .entry(slot)
-                        .or_insert_with(|| format!("call_{choice_index}_{call_index}"))
-                        .clone()
+                let response_id = self
+                    .last_meta
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let mut id = if call_id.is_empty() {
+                    self.tool_ids.get(&slot).cloned().unwrap_or_default()
                 } else {
-                    let id = call_id.to_string();
-                    self.tool_ids.insert(slot, id.clone());
-                    id
+                    call_id.to_string()
                 };
+                // Reuse is fine only for the slot that already owns the id.
+                let taken = !id.is_empty()
+                    && (id == response_id
+                        || self
+                            .assigned_ids
+                            .get(&id)
+                            .is_some_and(|owner| *owner != slot));
+                if id.is_empty() || taken {
+                    let base = format!("call_{choice_index}_{call_index}");
+                    id = base.clone();
+                    let mut suffix = 1;
+                    while self
+                        .assigned_ids
+                        .get(&id)
+                        .is_some_and(|owner| *owner != slot)
+                    {
+                        id = format!("{base}_{suffix}");
+                        suffix += 1;
+                    }
+                }
+                self.assigned_ids.insert(id.clone(), slot);
+                self.tool_ids.insert(slot, id.clone());
                 call.insert("id".into(), Value::String(id));
                 call.insert("index".into(), serde_json::json!(call_index));
                 if !call.get("type").is_some_and(Value::is_string)
@@ -277,6 +315,7 @@ fn completion_to_sse(bytes: &[u8], upstream_model: &str) -> Option<String> {
     } else {
         raw_choices.clone()
     };
+    let response_id = object.get("id").and_then(Value::as_str).unwrap_or_default();
     let mut first_choices = Vec::with_capacity(choices.len());
     let mut terminal_choices = Vec::with_capacity(choices.len());
     for (position, choice) in choices.iter().enumerate() {
@@ -295,18 +334,25 @@ fn completion_to_sse(bytes: &[u8], upstream_model: &str) -> Option<String> {
                 delta.insert(key.into(), value.clone());
             }
         }
-        // Same rule as the streaming path: a tool call without an id would make
-        // the client fall back to the response id, and two calls would collide.
+        // Same rule as the streaming path: an id the client cannot tell apart
+        // from another call (missing, repeated, or the response id) makes it
+        // reject the answer with "Duplicate tool input start".
         if let Some(calls) = delta.get_mut("tool_calls").and_then(Value::as_array_mut) {
+            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
             for (position, call) in calls.iter_mut().enumerate() {
                 let Some(call) = call.as_object_mut() else { continue };
-                let missing = call
+                let given = call
                     .get("id")
                     .and_then(Value::as_str)
                     .unwrap_or_default()
-                    .is_empty();
-                if missing {
-                    call.insert("id".into(), Value::String(format!("call_{index}_{position}")));
+                    .to_string();
+                let clashes = given.is_empty()
+                    || given == response_id
+                    || !seen.insert(given.clone());
+                if clashes {
+                    let id = format!("call_{index}_{position}");
+                    seen.insert(id.clone());
+                    call.insert("id".into(), Value::String(id));
                 }
                 call.entry("index")
                     .or_insert_with(|| serde_json::json!(position));
@@ -842,6 +888,44 @@ mod tests {
         keep_tail(&mut tail, 8192);
         assert!(tail.len() <= 8192);
         assert!(tail.chars().all(|c| c == '€'), "tail must stay valid UTF-8");
+    }
+
+    /// Two tool calls in one answer must reach the client under distinct ids.
+    /// A gateway that repeats one id (or reuses the response id) made the client
+    /// abort the whole session with "Duplicate tool input start".
+    #[test]
+    fn repeated_tool_call_ids_are_made_unique() {
+        let mut normalizer = SseNormalizer::default();
+        let first = normalizer
+            .normalize_event(
+                r#"data: {"id":"chatcmpl-1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"chatcmpl-1","type":"function","function":{"name":"read","arguments":"{}"}}]}}]}"#,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(first.contains(r#""id":"call_0_0""#), "{first}");
+
+        let second = normalizer
+            .normalize_event(
+                r#"data: {"id":"chatcmpl-1","choices":[{"index":0,"delta":{"tool_calls":[{"id":"chatcmpl-1","type":"function","function":{"name":"write","arguments":"{}"}},{"id":"same","type":"function","function":{"name":"a","arguments":"{}"}},{"id":"same","type":"function","function":{"name":"b","arguments":"{}"}}]}}]}"#,
+            )
+            .unwrap()
+            .unwrap();
+        let ids: Vec<&str> = second
+            .match_indices(r#""id":""#)
+            .map(|(at, _)| {
+                let rest = &second[at + 6..];
+                &rest[..rest.find('"').unwrap()]
+            })
+            .collect();
+        let call_ids: Vec<&str> = ids
+            .iter()
+            .copied()
+            .filter(|id| *id != "chatcmpl-1")
+            .collect();
+        assert_eq!(call_ids.len(), 3, "three calls in the second frame: {second}");
+        let unique: std::collections::HashSet<&&str> = call_ids.iter().collect();
+        assert_eq!(unique.len(), 3, "ids must differ: {second}");
+        assert!(!call_ids.contains(&"chatcmpl-1"), "response id is not a call id");
     }
 
     #[test]
