@@ -1,6 +1,6 @@
 [package]
 name = "provider-proxy-desktop"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 description = "Cross-platform Rust desktop app for provider_proxy"
 license = "MIT"
