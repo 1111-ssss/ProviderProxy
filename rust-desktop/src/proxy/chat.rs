@@ -60,6 +60,22 @@ fn record_failure(state: &AppState, upstream: &Upstream, key: &str, session: &Op
     }
 }
 
+/// Undo the provisional "ok" counted when the upstream answered with headers:
+/// the body turned out empty, so the attempt is a failure after all.
+fn revert_provisional_ok(state: &AppState, upstream: &Upstream, session: &Option<String>) {
+    let mut usage = state.usage.lock().unwrap();
+    usage.ok = usage.ok.saturating_sub(1);
+    let hour = hour_stat(&mut usage);
+    hour.ok = hour.ok.saturating_sub(1);
+    let provider = provider_stat(&mut usage, &upstream.name);
+    provider.ok = provider.ok.saturating_sub(1);
+    let model = model_stat(&mut usage, &upstream.name, &upstream.model);
+    model.ok = model.ok.saturating_sub(1);
+    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+        row.ok = row.ok.saturating_sub(1);
+    }
+}
+
 pub(super) async fn chat_completions(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -146,39 +162,9 @@ pub(super) async fn chat_completions(
             let response = match send_with_header_timeout(request, header_timeout_sec).await {
                 Ok(response) => response,
                 Err(err) => {
-                    let cooldown = Duration::from_secs(
-                        state
-                            .config
-                            .read()
-                            .unwrap()
-                            .get("errorCooldownSec")
-                            .and_then(Value::as_u64)
-                            .unwrap_or(30),
-                    );
-                    state
-                        .cooldowns
-                        .lock()
-                        .unwrap()
-                        .insert(key, Instant::now() + cooldown);
-                    let mut usage = state.usage.lock().unwrap();
-                    // The HTTP status was 200, so the provisional success
-                    // counters above must be moved to the error bucket now
-                    // that the body proved empty.
-                    usage.ok = usage.ok.saturating_sub(1);
-                    let hour = hour_stat(&mut usage);
-                    hour.ok = hour.ok.saturating_sub(1);
-                    let provider = provider_stat(&mut usage, &upstream.name);
-                    provider.ok = provider.ok.saturating_sub(1);
-                    provider.errors += 1;
-                    let model = model_stat(&mut usage, &upstream.name, &upstream.model);
-                    model.ok = model.ok.saturating_sub(1);
-                    model.errors += 1;
-                    usage.failovers += 1;
-                    model_stat(&mut usage, &upstream.name, &upstream.model).failovers += 1;
-                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
-                        row.ok = row.ok.saturating_sub(1);
-                        row.errors += 1;
-                    }
+                    // Nothing was counted as ok yet: this attempt failed before
+                    // headers, so only the error bucket moves.
+                    record_failure(&state, upstream, &key, &session);
                     last_error = format!("{}: {err}", upstream.name);
                     push_log(
                         &state,
@@ -254,27 +240,7 @@ pub(super) async fn chat_completions(
                 if text.to_ascii_lowercase().contains("unsupported")
                     || text.to_ascii_lowercase().contains("not support")
                 {
-                    let seconds = state
-                        .config
-                        .read()
-                        .unwrap()
-                        .get("errorCooldownSec")
-                        .and_then(Value::as_u64)
-                        .unwrap_or(30);
-                    state
-                        .cooldowns
-                        .lock()
-                        .unwrap()
-                        .insert(key, Instant::now() + Duration::from_secs(seconds));
-                    let mut usage = state.usage.lock().unwrap();
-                    provider_stat(&mut usage, &upstream.name).errors += 1;
-                    usage.failovers += 1;
-                    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
-                    stat.failovers += 1;
-                    stat.errors += 1;
-                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
-                        row.errors += 1;
-                    }
+                    record_failure(&state, upstream, &key, &session);
                     last_error = format!("{}: HTTP 400, unsupported content", upstream.name);
                     push_log(
                         &state,
@@ -387,19 +353,7 @@ pub(super) async fn chat_completions(
                 Err(err) => {
                     // The 200 status already counted a provisional "ok"; the
                     // empty body moves it to errors through record_failure.
-                    {
-                        let mut usage = state.usage.lock().unwrap();
-                        usage.ok = usage.ok.saturating_sub(1);
-                        let hour = hour_stat(&mut usage);
-                        hour.ok = hour.ok.saturating_sub(1);
-                        let provider = provider_stat(&mut usage, &upstream.name);
-                        provider.ok = provider.ok.saturating_sub(1);
-                        let model = model_stat(&mut usage, &upstream.name, &upstream.model);
-                        model.ok = model.ok.saturating_sub(1);
-                        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
-                            row.ok = row.ok.saturating_sub(1);
-                        }
-                    }
+                    revert_provisional_ok(&state, upstream, &session);
                     record_failure(&state, &upstream, &key, &session);
                     last_error = format!("{}: {err}", upstream.name);
                     push_log(

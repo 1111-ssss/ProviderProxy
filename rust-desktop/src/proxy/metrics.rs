@@ -130,10 +130,32 @@ pub(crate) fn persist_usage(state: &AppState) {
     roll_usage_day(state);
     let today = state.usage_day.lock().unwrap().clone();
     let current = state.usage.lock().unwrap().clone();
-    let mut history = state.usage_history.lock().unwrap();
-    history.insert(today.clone(), current);
-    let keep: std::collections::HashSet<_> = usage_day_keys(&today).into_iter().collect();
-    history.retain(|date, _| keep.contains(date));
+    // Serialize under the history lock, write outside it: a busy SQLite file
+    // must not block the GUI poll and the session-title lookup behind it.
+    let payloads = {
+        let mut history = state.usage_history.lock().unwrap();
+        history.insert(today.clone(), current);
+        let keep: std::collections::HashSet<_> = usage_day_keys(&today).into_iter().collect();
+        history.retain(|date, _| keep.contains(date));
+        let mut payloads = HashMap::with_capacity(history.len());
+        for (date, snapshot) in history.iter() {
+            match serde_json::to_string(snapshot) {
+                Ok(text) => {
+                    payloads.insert(date.clone(), text);
+                }
+                Err(err) => {
+                    push_log(state, format!("usage: не удалось сериализовать {date}: {err}"));
+                    return;
+                }
+            }
+        }
+        payloads
+    };
+    // The writer ticks every second and most ticks carry no new traffic. Skip
+    // the transaction when the snapshots are byte-identical to the last write.
+    if *state.usage_persisted.lock().unwrap() == payloads {
+        return;
+    }
     let Ok(mut connection) = state.storage.connection.lock() else {
         push_log(state, "usage: SQLite storage lock poisoned");
         return;
@@ -145,8 +167,8 @@ pub(crate) fn persist_usage(state: &AppState) {
     let result = (|| {
         {
             let mut insert = transaction.prepare("INSERT INTO usage_days(day, payload) VALUES(?1, ?2) ON CONFLICT(day) DO UPDATE SET payload = excluded.payload")?;
-            for (date, snapshot) in history.iter() {
-                insert.execute(params![date, serde_json::to_string(snapshot)?])?;
+            for (date, payload) in payloads.iter() {
+                insert.execute(params![date, payload])?;
             }
         }
         {
@@ -157,7 +179,7 @@ pub(crate) fn persist_usage(state: &AppState) {
             drop(rows);
             let mut remove = transaction.prepare("DELETE FROM usage_days WHERE day = ?1")?;
             for date in existing {
-                if !history.contains_key(&date) {
+                if !payloads.contains_key(&date) {
                     remove.execute(params![date])?;
                 }
             }
@@ -179,7 +201,9 @@ pub(crate) fn persist_usage(state: &AppState) {
             state,
             format!("usage: не удалось завершить транзакцию SQLite: {err}"),
         );
+        return;
     }
+    *state.usage_persisted.lock().unwrap() = payloads;
 }
 
 pub(crate) fn usage_history_view(state: &AppState) -> Vec<Value> {
@@ -222,14 +246,26 @@ pub(crate) fn persist_lifetime(state: &AppState) {
     let Ok(serialized) = serde_json::to_string(&totals) else {
         return;
     };
+    if state
+        .lifetime_persisted
+        .lock()
+        .unwrap()
+        .as_deref()
+        .is_some_and(|last| last == serialized.as_str())
+    {
+        return;
+    }
     let Ok(connection) = state.storage.connection.lock() else {
         return;
     };
-    let _ = connection.execute(
+    let written = connection.execute(
         "INSERT INTO settings(key, value) VALUES('lifetimeTokens', ?1) \
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![serialized],
     );
+    if written.is_ok() {
+        *state.lifetime_persisted.lock().unwrap() = Some(serialized);
+    }
 }
 
 pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
@@ -336,12 +372,12 @@ pub(crate) fn tally_usage(
 }
 pub(crate) fn cooldown_snapshot(state: &AppState) -> Vec<Value> {
     let now = std::time::Instant::now();
-    state
-        .cooldowns
-        .lock()
-        .unwrap()
+    let mut cooldowns = state.cooldowns.lock().unwrap();
+    // Drop entries that expired or whose chain was removed: they were only
+    // filtered here and would otherwise stay in the map for the process lifetime.
+    cooldowns.retain(|_, until| *until > now);
+    cooldowns
         .iter()
-        .filter(|(_, until)| **until > now)
         .map(|(key, until)| {
             let mut parts = key.split('|');
             json!({

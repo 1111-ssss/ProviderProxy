@@ -588,7 +588,13 @@ pub(super) async fn stream_upstream_response(
                         }
                         // A non-streaming body is decided at the end: it is
                         // small, so buffering it costs nothing and lets an
-                        // empty 200 be caught instead of passed through.
+                        // empty 200 be caught instead of passed through. The
+                        // cap keeps a broken upstream from eating memory.
+                        if regular_body.len() + chunk.len() > 64 * 1024 * 1024 {
+                            upstream_error =
+                                Some("response body exceeds 64 MiB".to_string());
+                            break;
+                        }
                         regular_body.extend_from_slice(&chunk);
                         continue;
                     }

@@ -196,11 +196,20 @@ pub(crate) struct AppState {
     pub(crate) logs: Arc<Mutex<VecDeque<String>>>,
     pub(crate) usage: Arc<Mutex<Usage>>,
     pub(crate) usage_history: Arc<Mutex<HashMap<String, Usage>>>,
+    /// Serialized snapshots of the last successful write, so the one-second
+    /// writer can skip SQLite when no traffic changed the counters.
+    pub(crate) usage_persisted: Arc<Mutex<HashMap<String, String>>>,
     pub(crate) usage_day: Arc<Mutex<String>>,
     /// Totals that never reset: the seven-day history is pruned, so summing it
     /// cannot answer "how much have I spent in total".
     pub(crate) lifetime: Arc<Mutex<LifetimeTokens>>,
-    pub(crate) image_tasks: Arc<Mutex<HashMap<String, String>>>,
+    /// Last lifetime blob written, so an idle process does not commit the same
+    /// row to SQLite every second.
+    pub(crate) lifetime_persisted: Arc<Mutex<Option<String>>>,
+    /// `provider/task_id` -> image key and creation time. Entries leave when a
+    /// terminal poll arrives; the timestamp lets new tasks prune the ones whose
+    /// tab was closed before that.
+    pub(crate) image_tasks: Arc<Mutex<HashMap<String, (String, Instant)>>>,
     pub(crate) client: reqwest::Client,
     pub(crate) port: u16,
     pub(crate) log_max: usize,

@@ -461,9 +461,14 @@ pub(crate) async fn install_update(restart: bool) -> Result<bool, String> {
     if restart {
         schedule_update(staged)?;
     } else {
-        *pending_update()
+        let mut pending = pending_update()
             .lock()
-            .map_err(|_| "не удалось сохранить ожидающее обновление".to_string())? = Some(staged);
+            .map_err(|_| "не удалось сохранить ожидающее обновление".to_string())?;
+        // Replacing a staged update must not leave its temp directory behind.
+        if let Some(previous) = pending.take() {
+            let _ = fs::remove_dir_all(previous.root);
+        }
+        *pending = Some(staged);
     }
     Ok(true)
 }

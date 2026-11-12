@@ -187,8 +187,10 @@ fn hourly_buckets_survive_the_day_rollover() {
         logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
         lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        lifetime_persisted: std::sync::Arc::new(std::sync::Mutex::new(None)),
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
@@ -260,8 +262,10 @@ fn lifetime_totals_outlive_the_seven_day_window() {
         logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
         lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        lifetime_persisted: std::sync::Arc::new(std::sync::Mutex::new(None)),
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
@@ -820,6 +824,113 @@ async fn serves_the_desktop_api_from_a_local_port() {
         .await
         .unwrap();
     assert_eq!(models["data"][0]["id"], "one");
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
+/// Image task ids are only dropped when the GUI polls a terminal status. A tab
+/// closed mid-task used to leak its entry for the whole process lifetime.
+#[test]
+fn prunes_image_tasks_that_were_never_polled() {
+    use super::handlers::{prune_image_tasks, IMAGE_TASK_MAX};
+    use std::collections::HashMap;
+    use std::time::{Duration, Instant};
+
+    let now = Instant::now();
+    let mut tasks: HashMap<String, (String, Instant)> = HashMap::new();
+    tasks.insert("p/fresh".into(), ("p/fresh-model".into(), now));
+    tasks.insert(
+        "p/stale".into(),
+        ("p/stale-model".into(), now - Duration::from_secs(7 * 60 * 60)),
+    );
+    prune_image_tasks(&mut tasks, now);
+    assert!(tasks.contains_key("p/fresh"), "a fresh task must survive");
+    assert!(!tasks.contains_key("p/stale"), "an unpolled task must expire");
+
+    let mut many: HashMap<String, (String, Instant)> = HashMap::new();
+    for index in 0..(IMAGE_TASK_MAX + 20) {
+        let created = now - Duration::from_secs((IMAGE_TASK_MAX + 20 - index) as u64);
+        many.insert(format!("p/{index}"), (format!("p/model-{index}"), created));
+    }
+    prune_image_tasks(&mut many, now);
+    assert_eq!(many.len(), IMAGE_TASK_MAX, "the map must stay bounded");
+    assert!(
+        !many.contains_key("p/0"),
+        "the oldest entries are the ones dropped"
+    );
+}
+
+/// A request that never reached an upstream used to subtract one "ok" from the
+/// day, stealing the success of an earlier request.
+#[tokio::test]
+async fn a_network_error_does_not_steal_an_earlier_ok() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|| async {
+                axum::Json(json!({
+                    "id": "chatcmpl-test",
+                    "choices": [{ "index": 0, "message": { "role": "assistant", "content": "готово" }, "finish_reason": "stop" }]
+                }))
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-net-error-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": {
+                "good": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" },
+                // Nothing listens here: the send fails before any response.
+                "dead": { "baseURL": "http://127.0.0.1:1/v1", "apiKey": "k" }
+            },
+            "models": {
+                "good-chain": { "upstreams": [{ "provider": "good", "model": "m" }] },
+                "dead-chain": { "upstreams": [{ "provider": "dead", "model": "m" }] }
+            }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let client = Client::new();
+    let good = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "good-chain", "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    assert!(good.status().is_success());
+    let dead = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "dead-chain", "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(dead.status(), reqwest::StatusCode::BAD_GATEWAY);
+
+    let usage: Value = client
+        .get(format!("http://127.0.0.1:{}/api/usage", server.port))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(usage["days"][0]["ok"], 1, "the successful request stays ok: {usage}");
+    assert_eq!(usage["days"][0]["providers"]["dead"]["errors"], 1, "the failed send is an error: {usage}");
+
     let database = database_path(&path);
     let _ = fs::remove_file(&path);
     let _ = fs::remove_file(database);

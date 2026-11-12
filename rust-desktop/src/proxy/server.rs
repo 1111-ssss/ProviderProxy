@@ -130,8 +130,10 @@ pub fn start_server(
         ))),
         usage: Arc::new(Mutex::new(usage)),
         usage_history: Arc::new(Mutex::new(usage_history)),
+        usage_persisted: Arc::new(Mutex::new(HashMap::new())),
         usage_day: Arc::new(Mutex::new(usage_day)),
         lifetime: Arc::new(Mutex::new(lifetime)),
+        lifetime_persisted: Arc::new(Mutex::new(None)),
         image_tasks: Arc::new(Mutex::new(HashMap::new())),
         // Streaming responses must not have a total request timeout: the
         // upstream may spend a long time producing the first token and then

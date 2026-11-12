@@ -1828,8 +1828,12 @@ function cleanupModelMetadata() {
   }
 }
 let configDirty = false
+let saveSeq = 0
 function save(silent = false) {
   configDirty = true
+  // Only the newest save may clear the dirty flag: an older response must not
+  // mark a change made while it was in flight as saved.
+  const seq = ++saveSeq
   for (const [provider, definition] of Object.entries(cfg.opencodeModels ?? {})) {
     if (definition?.all === true) definition.models = directModelIds(provider, definition)
   }
@@ -1843,7 +1847,7 @@ function save(silent = false) {
       debugLog("save-failed", { status: r.status })
       return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
     }
-    configDirty = false
+    if (seq === saveSeq) configDirty = false
     const j = await r.json().catch(() => ({}))
     debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
     if (j.opencodeSynced === false) return flash(false, "сохранено, но интеграция не обновлена — проверь путь и вкладку «Логи»")

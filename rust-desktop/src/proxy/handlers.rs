@@ -8,7 +8,12 @@ use axum::{
 use chrono::Local;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
-use std::{fs, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use super::{
     auth::authorized,
@@ -396,6 +401,29 @@ pub(crate) async fn provider_models(
     Json(json!({ "models": models, "details": details })).into_response()
 }
 
+/// Task ids only leave the map when the GUI polls a terminal status. A tab that
+/// closes mid-task would keep its entry forever, so a new task prunes entries
+/// older than the TTL and the map is capped by dropping the oldest ones.
+const IMAGE_TASK_TTL: Duration = Duration::from_secs(6 * 60 * 60);
+pub(super) const IMAGE_TASK_MAX: usize = 256;
+
+pub(super) fn prune_image_tasks(
+    tasks: &mut HashMap<String, (String, Instant)>,
+    now: Instant,
+) {
+    tasks.retain(|_, (_, created)| now.duration_since(*created) < IMAGE_TASK_TTL);
+    while tasks.len() > IMAGE_TASK_MAX {
+        let oldest = tasks
+            .iter()
+            .min_by_key(|(_, (_, created))| *created)
+            .map(|(key, _)| key.clone());
+        match oldest {
+            Some(key) => tasks.remove(&key),
+            None => break,
+        };
+    }
+}
+
 pub(crate) async fn image_task_create(State(state): State<AppState>, request: Request) -> Response {
     let headers = request.headers().clone();
     if !authorized(&state, &headers) {
@@ -618,14 +646,15 @@ pub(crate) async fn image_task_create(State(state): State<AppState>, request: Re
         }
         {
             let mut usage = state.usage.lock().unwrap();
-            let stat = usage
-                .images
-                .get_mut(&image_key)
-                .expect("image stat created");
-            stat.last_status = status.as_u16();
-            if selected_endpoint == "images/generations" {
-                stat.ok += 1;
-                usage.images_generated += 1;
+            // The stat is created above, but the day can roll over while the
+            // upstream request is in flight, which drops it. A missing row must
+            // not panic the handler.
+            if let Some(stat) = usage.images.get_mut(&image_key) {
+                stat.last_status = status.as_u16();
+                if selected_endpoint == "images/generations" {
+                    stat.ok += 1;
+                    usage.images_generated += 1;
+                }
             }
         }
         if let Some(item) = state
@@ -647,11 +676,12 @@ pub(crate) async fn image_task_create(State(state): State<AppState>, request: Re
             }
         }
         if let Some(task_id) = task_id {
-            state
-                .image_tasks
-                .lock()
-                .unwrap()
-                .insert(format!("{provider_name}/{task_id}"), image_key.clone());
+            let mut tasks = state.image_tasks.lock().unwrap();
+            prune_image_tasks(&mut tasks, Instant::now());
+            tasks.insert(
+                format!("{provider_name}/{task_id}"),
+                (image_key.clone(), Instant::now()),
+            );
         }
         push_log(
             &state,
@@ -807,7 +837,7 @@ pub(crate) async fn image_task_get(
         .lock()
         .unwrap()
         .get(&format!("{provider_name}/{task_id}"))
-        .cloned();
+        .map(|(image_key, _)| image_key.clone());
     let task_status = data
         .get("status")
         .or_else(|| data.get("result").and_then(|value| value.get("status")))
@@ -923,6 +953,9 @@ pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap)
     if !authorized(&state, &headers) {
         return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
     }
+    // Refresh the stored snapshot so `days[0]` matches the live counters even in
+    // tests and during the first second of traffic; the writer itself skips the
+    // SQLite transaction when nothing changed.
     persist_usage(&state);
     let mut value =
         serde_json::to_value(state.usage.lock().unwrap().clone()).unwrap_or_else(|_| json!({}));

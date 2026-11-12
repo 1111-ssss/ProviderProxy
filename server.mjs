@@ -488,18 +488,25 @@ function pruneUsageHistory() {
   const keep = new Set(usageDayKeys())
   for (const date of usageHistory.keys()) if (!keep.has(date)) usageHistory.delete(date)
 }
+let lastUsageWrite = ""
 function persistUsage() {
   rollUsageDay()
   usageHistory.set(usageDay, usageSnapshot())
   pruneUsageHistory()
-  try {
-    const insert = database.prepare("INSERT INTO usage_days(day, payload) VALUES(?, ?) ON CONFLICT(day) DO UPDATE SET payload = excluded.payload")
-    const remove = database.prepare("DELETE FROM usage_days WHERE day = ?")
-    const keep = new Set(usageHistory.keys())
-    for (const [date, snapshot] of usageHistory) insert.run(date, JSON.stringify(snapshot))
-    for (const row of database.prepare("SELECT day FROM usage_days").all()) if (!keep.has(row.day)) remove.run(row.day)
-  } catch (err) {
-    log(`usage: не удалось сохранить историю SQLite ${dbPath}: ${err.message}`)
+  // The writer ticks every second; skip SQLite when no traffic changed it.
+  const payloads = [...usageHistory].map(([date, snapshot]) => [date, JSON.stringify(snapshot)])
+  const signature = payloads.map(([date, payload]) => `${date}\u0000${payload}`).join("\u0001")
+  if (signature !== lastUsageWrite) {
+    try {
+      const insert = database.prepare("INSERT INTO usage_days(day, payload) VALUES(?, ?) ON CONFLICT(day) DO UPDATE SET payload = excluded.payload")
+      const remove = database.prepare("DELETE FROM usage_days WHERE day = ?")
+      const keep = new Set(payloads.map(([date]) => date))
+      for (const [date, payload] of payloads) insert.run(date, payload)
+      for (const row of database.prepare("SELECT day FROM usage_days").all()) if (!keep.has(row.day)) remove.run(row.day)
+      lastUsageWrite = signature
+    } catch (err) {
+      log(`usage: не удалось сохранить историю SQLite ${dbPath}: ${err.message}`)
+    }
   }
   persistLifetime()
 }
@@ -1322,7 +1329,12 @@ const server = http.createServer(async (req, res) => {
         }
         if (response.ok && endpoint === "images/tasks") {
           const taskId = data?.task_id ?? data?.taskId ?? data?.id ?? data?.data?.task_id ?? data?.data?.taskId ?? data?.data?.id
-          if (taskId) imageTasks.set(`${body.provider}/${taskId}`, { ...imageRef, imageKey: `${body.provider}/${body.model}` })
+          if (taskId) {
+            imageTasks.set(`${body.provider}/${taskId}`, { ...imageRef, imageKey: `${body.provider}/${body.model}` })
+            // A task whose tab closes before the terminal poll would stay in
+            // the map forever; keep only the newest few hundred.
+            if (imageTasks.size > 256) imageTasks.delete(imageTasks.keys().next().value)
+          }
           else finishImageRequest(imageRef, "succeeded", endpoint)
         }
         res.writeHead(resultStatus, { "content-type": "application/json" })
