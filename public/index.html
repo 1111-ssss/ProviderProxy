@@ -108,6 +108,16 @@
   td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
   /* Column separators: without them a wide table reads as one blob of numbers. */
   table td + td, table th + th { border-left: 1px solid var(--border); padding-left: 12px; }
+  /* The provider table's only long field is baseURL: let it take the free
+     width and keep the count and actions at their content size, so no row has
+     a wide empty cell between a number and the next separator. */
+  #providers th:first-child, #providers td:first-child { width: 1%; white-space: nowrap; }
+  #providers th:nth-child(2), #providers td:nth-child(2) { width: 100%; overflow-wrap: anywhere; }
+  #providers th:nth-child(3), #providers td:nth-child(3) { width: 1%; white-space: nowrap; }
+  /* No width on the actions column: `1%` collapsed it to the flex items'
+     min-content (about 20px) and squeezed the buttons. Auto sizing gives it
+     exactly the icons' width while baseURL keeps the free space. */
+  #providers th:last-child, #providers td:last-child { white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   .muted { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -240,7 +250,7 @@
   /* The chain switch hides its real checkbox; keep that box out of the
      layout and the hit area now that checkboxes have their own size. */
   .chain-toggle input[type="checkbox"] { width: 1px; height: 1px; border: 0; border-radius: 0; background: none; }
-  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 16px; padding: 0; width: min(680px, calc(100vw - 28px)); max-height: calc(100vh - 28px); box-shadow: var(--shadow); }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 16px; padding: 0; width: min(680px, calc(100vw - 28px)); max-height: calc(100vh - 28px); overflow: hidden; box-shadow: var(--shadow); }
   dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
   .dialog-form { display: flex; flex-direction: column; max-height: calc(100vh - 28px); }
   .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
@@ -268,15 +278,22 @@
   .dialog-add-row { display: grid; grid-template-columns: minmax(130px, .75fr) minmax(170px, 1.25fr) auto; gap: 8px; }
   .dialog-add-row select, .dialog-add-row input { min-width: 0; width: 100%; }
   .manual-add { margin-top: 12px; }
-  .manual-add summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+  .manual-add summary { display: flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; font-size: 12px; list-style: none; }
+  .manual-add summary::-webkit-details-marker { display: none; }
+  .manual-add summary::before { content: ""; flex: 0 0 auto; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform .16s ease; }
+  .manual-add[open] summary::before { transform: rotate(90deg); }
+  .manual-add summary:hover { color: var(--text); }
   .manual-add .dialog-add-row { grid-template-columns: minmax(0, 1fr) auto; margin-top: 10px; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 22px; border-top: 1px solid var(--border); background: var(--panel); }
   /* `dialog label` adds 14px under every field, which also hit the search
      label inside a filter bar: a phantom gap above the provider list and a
      count that no longer lined up with the search field. */
   .dialog-section .filter-bar { margin-bottom: 0; }
+  /* The picker's own gap is the space under its search field; the bar's 14px
+     bottom margin stacked on top of it and left a 22px hole before the list. */
+  .provider-picker .filter-bar { margin-bottom: 0; }
   .provider-picker .filter-bar > label { margin-bottom: 0; }
-  .dialog-section .provider-picker { gap: 0; }
+  .dialog-section .provider-picker { gap: 8px; }
   .fetched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-height: 220px; overflow: auto; }
   .chip { display: inline-flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px 4px 3px 8px; }
   .chip button { min-height: 28px; padding: 2px 7px; }
@@ -326,7 +343,7 @@
   /* The filter is one control row: the select matches the search height and
    keeps its width, so switching options never shifts the layout. */
   .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
-  .log-controls input { height: 38px; }
+  .log-controls input, .log-controls select { height: 38px; }
   .log-controls input { min-width: 0; }
   .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
@@ -455,7 +472,7 @@
   .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
   .usage-days::-webkit-scrollbar { display: none; }
   .usage-days:not(.is-overflowing) { overflow-x: hidden; }
-  .usage-day { flex: 1 1 88px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 88px; min-height: 50px; padding: 8px 11px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+  .usage-day { flex: 1 1 120px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 120px; min-height: 52px; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
   .usage-day strong { color: inherit; font-size: 12px; }
   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
   .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
@@ -581,16 +598,14 @@
      instead of leaving two differently sized buttons. */
   .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
-  /* Two shortcut buttons sized to their own labels, so they looked uneven and
-     the longer one was clipped. Equal columns fix that; labels wrap when a
-     narrow card cannot fit them side by side, and below 620px they stack. */
-  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); align-items: stretch; gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  /* Two buttons of equal width that stack when the card cannot hold them.
+     Fixed 120px columns overflowed a 249px card at one window width; wrapping
+     flex never does, and a button always keeps its label inside. */
+  .settings-grid .setting-action .row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  .settings-grid .setting-action .row > button { flex: 1 1 140px; min-width: 0; }
   /* Same height as every other button (38px from the base control rule); the
      override to 32px made this row look stunted. */
   .settings-grid .setting-action button { min-width: 0; min-height: 38px; padding: 8px 10px; justify-content: center; white-space: normal; text-align: center; }
-  @media (max-width: 620px) {
-    .settings-grid .setting-action .row { grid-template-columns: minmax(0, 1fr); }
-  }
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
@@ -918,18 +933,11 @@
     </div>
     <div class="pm-filter-row">
       <input id="pm-filter" placeholder="фильтр по имени…">
-      <label class="pm-autoload" title="Снять выделение со всех моделей провайдера">
-        <input id="pm-clear-all" type="checkbox">
-        <span class="pm-autoload-body">
-          <strong>снять все</strong>
-          <small>выделение</small>
-        </span>
-      </label>
-      <label class="pm-autoload" title="При каждом запуске обновлять список моделей с /v1/models: новые появятся, исчезнувшие уберутся, добавленные вручную останутся">
+      <label class="pm-autoload" title="Все модели провайдера выбираются и обновляются автоматически. Галочки на моделях не ставятся.">
         <input id="pm-autoload" type="checkbox">
         <span class="pm-autoload-body">
-          <strong>обновлять при запуске</strong>
-          <small>список моделей с /v1/models</small>
+          <strong>выбирать все автоматически</strong>
+          <small>загружать список моделей</small>
         </span>
       </label>
     </div>
@@ -1269,7 +1277,7 @@
             <span>Стартовать свёрнутым в трей<small id="s-autostart-tray-help">Без окна — только значок в трее. Работает вместе с автозапуском.</small></span>
           </label>
           <div class="setting-option setting-action" id="s-shortcut-wrap">
-            <span>Ярлыки приложения<small id="s-shortcut-help">Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе.</small></span>
+            <span>Ярлыки приложения</span>
             <div class="row shortcut-actions">
               <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
               <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
@@ -1290,11 +1298,11 @@
             <span>Перезапускать после обновления автоматически<small>Без перезапуска обновлённая версия не активируется.</small></span>
           </label>
           <div class="setting-option setting-action" id="s-check-update-wrap">
-            <span>Проверить обновления<small id="s-check-update-help">Проверяет последний GitHub Release.</small></span>
+            <span>Проверить обновления</span>
             <button type="button" id="s-check-update">Проверить</button>
           </div>
           <div class="setting-option setting-action" id="s-rollback-wrap">
-            <span>Откатиться на прежнюю версию<small id="s-rollback-help">Откроет список опубликованных версий с поиском. Настройки и статистика сохраняются.</small></span>
+            <span>Откатиться на прежнюю версию</span>
             <button type="button" id="s-rollback-open">Выбрать версию</button>
           </div>
         </div>
@@ -1564,6 +1572,9 @@
 <script>
 const $ = (id) => document.getElementById(id)
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
+// Russian counts need three forms: 1 модель, 2 модели, 5 моделей.
+const plural = (n, one, few, many) =>
+  `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : n % 10 > 1 && n % 10 < 5 && (n % 100 < 10 || n % 100 > 20) ? few : many}`
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
 
 // The settings cards scroll, so the "?" hint is a fixed layer placed next to
@@ -1862,7 +1873,7 @@ function renderProviders() {
     }
   }
   $("p-checkins").style.display = anyCheckin ? "" : "none"
-  $("providers-filter-result").textContent = query ? `${entries.length} из ${allEntries.length}` : `${allEntries.length} ${allEntries.length === 1 ? "провайдер" : "провайдеров"}`
+  $("providers-filter-result").textContent = query ? `${entries.length} из ${allEntries.length}` : plural(allEntries.length, "провайдер", "провайдера", "провайдеров")
   if (!entries.length) {
     const tr = t.insertRow()
     tr.innerHTML = `<td colspan="4" class="muted">${allEntries.length ? "ничего не найдено — измени запрос" : "провайдеров пока нет — нажми «+ Добавить провайдера»"}</td>`
@@ -2059,7 +2070,7 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
       def?.enabled === false ? [] : directModelIds(provider, def).map((model) => [`${provider}/${model}`, ""]),
   )
   const entries = [...chains.map(([name, def]) => [name, `proxy, x${(def.upstreams ?? []).length}`]), ...direct]
-  const status = entries.length ? `${entries.length} ${entries.length === 1 ? "модель" : "моделей"}` : "пока пусто"
+  const status = entries.length ? plural(entries.length, "модель", "модели", "моделей") : "пока пусто"
   const enabled = cfg.integrations?.opencode?.enabled !== false
   $("oc-status").textContent = enabled ? status : "интеграция выключена"
   $("opencode-enabled").checked = enabled
@@ -2187,7 +2198,6 @@ function renderSettings() {
   $("s-auto-update-help").textContent = desktop ? "Проверка выполняется после запуска приложения." : "доступно в desktop-версии"
   $("s-check-update").disabled = !desktop
   $("s-check-update-wrap").classList.toggle("is-disabled", !desktop)
-  $("s-check-update-help").textContent = desktop ? "Проверяет последний GitHub Release." : "доступно в desktop-версии"
   $("s-rollback-open").disabled = !desktop
   $("s-rollback-wrap").classList.toggle("is-disabled", !desktop)
   $("s-autostart").checked = settings.autostart
@@ -2205,7 +2215,6 @@ function renderSettings() {
       ? "Без окна — только значок в трее."
       : "сначала включи автозапуск"
   $("s-shortcut-wrap").classList.toggle("is-disabled", !desktop)
-  $("s-shortcut-help").textContent = desktop ? "Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе." : "доступно в desktop-версии"
   $("s-base-url").textContent = `http://127.0.0.1:${cfg.port ?? 8787}/v1`
 }
 
@@ -2845,7 +2854,7 @@ function renderModelDialog() {
         .join("")
     : `<p class="muted" style="margin:4px 0">Цепочка пуста — выбери модель ниже или введи ID вручную.</p>`
 
-  $("dm-count").textContent = ups.length ? `${ups.length} ${ups.length === 1 ? "провайдер" : ups.length < 5 ? "провайдера" : "провайдеров"}` : "нет провайдеров"
+  $("dm-count").textContent = ups.length ? plural(ups.length, "провайдер", "провайдера", "провайдеров") : "нет провайдеров"
 
   $("dm-chain").querySelectorAll("select[data-i],input[data-i]").forEach((el) => {
     el.onchange = () => {
@@ -2890,12 +2899,12 @@ function renderModelDialog() {
   if (!pickProvider && prefer) pickProvider = prefer
   const providerQuery = chainProviderFilter.trim().toLowerCase()
   const shownProviders = providerQuery ? provNames.filter((pn) => pn.toLowerCase().includes(providerQuery)) : provNames
-  $("dm-provider-result").textContent = providerQuery ? `${shownProviders.length} из ${provNames.length}` : `${provNames.length} ${provNames.length === 1 ? "провайдер" : "провайдеров"}`
+  $("dm-provider-result").textContent = providerQuery ? `${shownProviders.length} из ${provNames.length}` : plural(provNames.length, "провайдер", "провайдера", "провайдеров")
   $("dm-provider-options").innerHTML = shownProviders.length
     ? shownProviders
         .map(
           (pn) => `<button type="button" class="provider-option ${pn === pickProvider ? "active" : ""}" data-provider="${esc(pn)}" role="option" aria-selected="${pn === pickProvider}">
-            <strong>${esc(pn)}</strong><small>${(cfg.providers[pn].models ?? []).length} моделей</small>
+            <strong>${esc(pn)}</strong><small>${plural((cfg.providers[pn].models ?? []).length, "модель", "модели", "моделей")}</small>
           </button>`,
         )
         .join("")
@@ -3001,7 +3010,7 @@ function renderOpenCodeModelDialog() {
     ? shownProviders
         .map(
           (name) => `<button type="button" class="provider-option ${name === directDraft.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === directDraft.provider}">
-            <strong>${esc(name)}</strong><small>${(cfg.providers[name].models ?? []).length} моделей</small>
+            <strong>${esc(name)}</strong><small>${plural((cfg.providers[name].models ?? []).length, "модель", "модели", "моделей")}</small>
           </button>`,
         )
         .join("")
@@ -3119,7 +3128,7 @@ function renderProviderModels() {
     ? names
         .map(
           (name) => `<button type="button" class="provider-option ${name === pmState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === pmState.provider}">
-            <strong>${esc(name)}</strong><small>${(cfg.providers[name].models ?? []).length} моделей</small>
+            <strong>${esc(name)}</strong><small>${plural((cfg.providers[name].models ?? []).length, "модель", "модели", "моделей")}</small>
           </button>`,
         )
         .join("")
@@ -3136,20 +3145,23 @@ function renderProviderModels() {
   })
   $("pm-filter").value = pmState.filter
   $("pm-autoload").checked = isAutoAllProvider(pmState.provider)
-  $("pm-clear-all").checked = false
   const saved = cfg.providers[pmState.provider].models ?? []
   $("pm-status").textContent = pmState.loading
     ? "загружаю /v1/models…"
     : pmState.error
       ? `не удалось загрузить (${pmState.error}) — показаны сохранённые`
-      : `выбрано ${saved.length} из ${pmState.ids.length}`
+      : isAutoAllProvider(pmState.provider)
+        ? `все модели провайдера выбираются автоматически (${pmState.ids.length})`
+        : `выбрано ${saved.length} из ${pmState.ids.length}`
   renderPmList()
 }
 
-// "Update at startup" bookmark for a provider: every start re-reads
-// /v1/models and refreshes the list — new models appear, models the provider no
-// longer serves leave (unless typed in by hand). The checkboxes are left as the
-// user set them; selecting everything is a separate, explicit action.
+// "Выбирать все автоматически": every start re-reads /v1/models and keeps the
+// whole list selected — new models appear, models the provider no longer serves
+// leave (unless typed in by hand). The per-model checkboxes stay as the user
+// left them: the flag is what selects everything, not a wall of ticks. The
+// Models tab entry for this provider follows the same list, so opening it shows
+// every model the provider has.
 const providerAutoAll = () => (cfg.providerAutoAll ??= {})
 const isAutoAllProvider = (name) => providerAutoAll()[name] === true
 async function syncAutoAllProvider(name) {
@@ -3159,19 +3171,21 @@ async function syncAutoAllProvider(name) {
   if (res.error) return
   const returned = new Set(res.ids)
   const manual = new Set((provider.manualModels ?? []).map(String))
-  provider.models = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
+  provider.models = [...new Set([...res.ids, ...manual])]
   provider.modelAvailability ??= {}
   const at = new Date().toISOString()
   for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
   for (const id of manual) provider.modelAvailability[id] ??= { available: returned.has(id), checkedAt: at }
   mergeProviderModelDetails(provider, res.details)
-  // A direct list that follows "all models" follows the refreshed list too.
-  const direct = cfg.opencodeModels?.[name]
-  if (direct?.all === true) direct.models = [...provider.models]
+  // The Models tab reads `all`, so keep that entry pointing at the fresh list.
+  const direct = (cfg.opencodeModels ?? {})[name] ??= {}
+  direct.all = true
+  direct.models = [...provider.models]
   cleanupModelMetadata()
   const chainsChanged = removeImageModelsFromChains()
   save()
   if (chainsChanged) renderModels()
+  renderOpencodeModels()
   renderOpenCode()
 }
 async function syncAutoAllProviders() {
@@ -3242,33 +3256,23 @@ $("pm-autoload").onchange = async (e) => {
     map[name] = true
     save()
     await syncAutoAllProvider(name)
-    flash(true, `«${esc(name)}»: список моделей будет обновляться при запуске`)
+    flash(true, `«${esc(name)}»: все модели выбираются автоматически`)
   } else {
+    // Turning it off freezes the list exactly as the user has it now.
     delete map[name]
+    const direct = cfg.opencodeModels?.[name]
+    if (direct?.all === true) {
+      direct.all = false
+      direct.models = [...(cfg.providers[name]?.models ?? [])]
+    }
     save()
-    flash(true, `«${esc(name)}»: список моделей больше не обновляется при запуске`)
+    flash(true, `«${esc(name)}»: автовыбор выключен, список остаётся текущим`)
   }
   renderProviderModels()
-}
-$("pm-clear-all").onchange = (e) => {
-  const name = pmState.provider
-  if (!name) return
-  const provider = cfg.providers[name]
-  if (!provider) return
-  const ids = [...(provider.models ?? [])]
-  provider.models = []
-  const chainsBefore = chainFillSnapshot()
-  for (const id of ids) removeModelReferences(name, id)
-  if (cfg.opencodeModels?.[name]) delete cfg.opencodeModels[name]
-  save()
-  renderProviders()
   renderModels()
   renderOpencodeModels()
   renderOpenCode()
   renderImageGenerator()
-  renderProviderModels()
-  flash(true, `«${esc(name)}»: выделение снято с ${ids.length} моделей`)
-  reportEmptiedChains(chainsBefore)
 }
 $("pm-filter").oninput = (e) => {
   pmState.filter = e.target.value
@@ -3381,6 +3385,7 @@ function renderPmList() {
   const p = pmState.provider ? cfg.providers[pmState.provider] : null
   if (!p) return ($("pm-list").innerHTML = "")
   const saved = p.models ?? []
+  const auto = isAutoAllProvider(pmState.provider)
   const ft = (pmState.filter ?? "").toLowerCase()
   const shown = pmState.ids.filter((id) => id.toLowerCase().includes(ft))
   $("pm-list").innerHTML = shown.length
@@ -3389,7 +3394,7 @@ function renderPmList() {
            (id) => `
         <div class="provider-model-card">
           <label class="provider-model-card-main">
-            <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}>
+            <input type="checkbox" data-id="${esc(id)}" ${auto ? "" : saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}>
             <span class="provider-model-card-body">
               <code>${esc(id)}</code>
               <span class="provider-model-card-meta">${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}</span>
@@ -3469,7 +3474,7 @@ function renderChips(containerId, provider, ids, onAdd, details = {}) {
   const shown = ids.filter((id) => id.toLowerCase().includes(ft.toLowerCase()))
   box.innerHTML = `
     <div class="row" style="width:100%">
-      <span class="muted">провайдер «${esc(provider)}» — ${shown.length} из ${ids.length} моделей</span>
+      <span class="muted">провайдер «${esc(provider)}» — ${shown.length} из ${plural(ids.length, "модели", "моделей", "моделей")}</span>
       <input data-role="filter" placeholder="фильтр по имени…" style="flex:1;min-width:120px" value="${esc(ft)}">
     </div>
     <div class="fetched" style="margin-top:6px">
@@ -3520,7 +3525,7 @@ function renderImageGenerator() {
   $("ig-provider-result").textContent = query ? `${shownNames.length} из ${allNames.length}` : `${allNames.length} ${allNames.length === 1 ? "провайдер" : "провайдеров"}`
   $("ig-provider-options").innerHTML = shownNames.length
     ? shownNames
-        .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong><small>${imageModelIds(name).length} image-моделей</small></button>`)
+        .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong><small>${plural(imageModelIds(name).length, "image-модель", "image-модели", "image-моделей")}</small></button>`)
         .join("")
     : `<span class="muted">${allNames.length ? "провайдер не найден — измени запрос" : "моделей изображений пока нет — обнови список на вкладке «Подключения» и отметь image-модель"}</span>`
   $("ig-provider-current").innerHTML = imageState.provider ? `<strong>${esc(imageState.provider)}</strong>` : "<strong>—</strong>"
@@ -3530,7 +3535,7 @@ function renderImageGenerator() {
   const preferredModel = ids.includes(selectedModel) ? selectedModel : ids.includes(settings.defaultModel) ? settings.defaultModel : ids[0]
   if (preferredModel) $("ig-model").value = preferredModel
   $("ig-model").disabled = !ids.length
-  $("ig-status").textContent = imageState.provider ? `${ids.length} image-моделей` : "нет доступных моделей"
+  $("ig-status").textContent = imageState.provider ? plural(ids.length, "image-модель", "image-модели", "image-моделей") : "нет доступных моделей"
   $("ig-provider-filter").value = imageProviderFilter
   $("ig-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
@@ -4187,7 +4192,11 @@ function renderUsageReport(report) {
     cooldowns: selected.date === today ? report.cooldowns ?? [] : [],
     uptimeMs: selected.date === today ? report.uptimeMs ?? 0 : 0,
   }
-  $("u-info").textContent = selected.date === today ? `запущено: ${fmtUptime(u.uptimeMs)}` : ""
+  $("u-info").textContent = selected.date === today
+    ? `запущено: ${fmtUptime(u.uptimeMs)}`
+    : (Number(selected.lastActivity) || 0) > (Number(selected.firstActivity) || 0)
+      ? `работало: ${fmtUptime(Number(selected.lastActivity) - Number(selected.firstActivity))}`
+      : ""
   const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
   $("u-tiles").innerHTML =
     tile("запросов", u.requests ?? 0) +
