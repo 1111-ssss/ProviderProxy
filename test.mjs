@@ -569,7 +569,7 @@ try {
   assert.ok(html.includes("removeModelFromChains") && html.includes("removeImageModelsFromChains"), "deselected and image models should be removed from chains")
   assert.ok(html.includes('id="dom-select-all"') && html.includes("выбрать все доступные модели"), "OpenCode model dialog should support select all")
   assert.ok(html.includes('id="u-images"') && html.includes('id="u-image-tiles"'), "usage should include image statistics")
-  assert.ok(html.includes('id="u-days"') && html.includes("сохранено между сессиями"), "usage should provide persisted daily history")
+  assert.ok(html.includes('id="u-days"') && html.includes("`запущено: ${fmtUptime(u.uptimeMs)}`"), "usage should provide persisted daily history")
 
   // 9. Logs ring: served to the GUI and capped (self-cleaning).
   const logRes = await (await fetch(`${base(PROXY)}/api/logs`)).json()

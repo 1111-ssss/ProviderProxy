@@ -244,7 +244,7 @@
   .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
   .dialog-header h3 { margin: 0; font-size: 18px; }
   .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-  .dialog-body { padding: 18px 24px 4px; overflow: auto; }
+  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 18px 24px 4px; overflow: auto; }
   dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
   dialog label.sr-only { display: block; margin: 0; }
   dialog label input, dialog label select { font-size: 14px; }
@@ -252,19 +252,29 @@
   .dialog-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
   .dialog-section-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .dialog-count { color: var(--accent); font-size: 11px; white-space: nowrap; }
-  .chain-editor { display: grid; gap: 8px; max-height: 250px; overflow: auto; padding-right: 2px; }
+  .chain-editor { display: grid; gap: 8px; padding-right: 2px; }
   .chain-editor:empty { display: block; }
   .chain-row { display: grid; grid-template-columns: 24px minmax(130px, .7fr) minmax(170px, 1.3fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .7); }
+  .chain-row[draggable="true"] .step-number { cursor: grab; }
+  .chain-row.is-dragging { opacity: .45; }
+  .chain-row.is-drop-target { border-color: var(--accent); }
   .chain-row select, .chain-row input { width: 100%; min-width: 0; }
   .step-number { color: var(--faint); font-variant-numeric: tabular-nums; text-align: center; }
   .row-controls { display: flex; gap: 4px; }
   .icon-button { min-width: 36px; padding: 6px 8px; }
+  .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
   .dialog-add-row { display: grid; grid-template-columns: minmax(130px, .75fr) minmax(170px, 1.25fr) auto; gap: 8px; }
   .dialog-add-row select, .dialog-add-row input { min-width: 0; width: 100%; }
   .manual-add { margin-top: 12px; }
   .manual-add summary { color: var(--muted); cursor: pointer; font-size: 12px; }
   .manual-add .dialog-add-row { grid-template-columns: minmax(0, 1fr) auto; margin-top: 10px; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 22px; border-top: 1px solid var(--border); background: var(--panel); }
+  /* `dialog label` adds 14px under every field, which also hit the search
+     label inside a filter bar: a phantom gap above the provider list and a
+     count that no longer lined up with the search field. */
+  .dialog-section .filter-bar { margin-bottom: 0; }
+  .provider-picker .filter-bar > label { margin-bottom: 0; }
+  .dialog-section .provider-picker { gap: 0; }
   .fetched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-height: 220px; overflow: auto; }
   .chip { display: inline-flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px 4px 3px 8px; }
   .chip button { min-height: 28px; padding: 2px 7px; }
@@ -311,7 +321,9 @@
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
   section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
-  section[data-tab="logs"] .section-sub { flex: 0 0 auto; }
+  .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, auto) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .log-controls input { min-width: 0; }
+  .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
   .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
   .log-card .t { display: flex; gap: 10px; align-items: baseline; }
@@ -436,7 +448,8 @@
      under the tabs looked like a second control row. */
   .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
   .usage-days::-webkit-scrollbar { display: none; }
-  .usage-day { flex: 0 0 auto; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+  .usage-days:not(.is-overflowing) { overflow-x: hidden; }
+  .usage-day { flex: 1 1 78px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
   .usage-day strong { color: inherit; font-size: 12px; }
   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
   .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
@@ -560,8 +573,10 @@
   .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
   /* One label wraps to two lines, so the pair must stretch to a shared height
      instead of leaving two differently sized buttons. */
-  .shortcut-actions { align-items: stretch; }
-  .shortcut-actions button { flex: 1 1 0; min-width: 0; min-height: 38px; white-space: normal; }
+  /* One label wraps to two lines, so the pair must stretch to a shared height
+     and split the available width evenly instead of clipping the card edge. */
+  .shortcut-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1 1 240px; min-width: 0; }
+  .shortcut-actions button { min-width: 0; min-height: 38px; padding-left: 6px; padding-right: 6px; white-space: normal; }
   .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
   /* Two shortcut buttons sized to their own labels, so they looked uneven and
@@ -1058,8 +1073,18 @@
         <h2>7&nbsp;·&nbsp;Логи</h2>
       <span class="muted" id="log-info"></span>
     </div>
-    <p class="section-sub">Живой хвост вывода прокси. Держится в памяти и чистится само — старые строки вытесняются новыми.</p>
+    <div class="log-controls">
+      <input id="log-search" type="search" placeholder="Поиск по логам…" aria-label="Поиск по логам">
+      <select id="log-filter" aria-label="Фильтр логов">
+        <option value="all">Все события</option>
+        <option value="answer">Ответы</option>
+        <option value="switch">Переключения</option>
+        <option value="error">Ошибки</option>
+      </select>
+      <span class="muted" id="log-count"></span>
+    </div>
     <div class="logbox" id="logbox">—</div>
+    <div class="log-pager" id="log-pager"></div>
   </section>
 
   <section data-tab="usage">
@@ -1115,7 +1140,7 @@
       <article class="chart-card">
         <div class="chart-head">
           <div>
-            <h3>Последние 24 часа</h3>
+            <h3 id="u-hour-title">Последние 24 часа</h3>
           </div>
           <div class="token-legend"><span class="token-key input">вход</span></div>
         </div>
@@ -1131,6 +1156,7 @@
         <label class="search-field" style="margin:0">
           <input id="u-session-search" type="search" placeholder="Поиск по сессии" aria-label="Поиск по сессии">
         </label>
+        <button type="button" id="u-session-all">За все дни</button>
         <span class="filter-result" id="u-session-count"></span>
       </div>
       <table id="u-sessions"></table>
@@ -1208,7 +1234,7 @@
           </label>
           <label class="setting-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
-            <span>Повторять, пока модель не ответит<small>Вместо ошибки 502 харнес ждёт окончания кулдауна и пробует цепочку снова — до 1 часа.</small></span>
+            <span>Повторять, пока модель не ответит<small>На любую ошибку — 400, 401, 429, 5xx, пустой ответ — прокси ждёт кулдаун и пробует цепочку снова, пока модель не ответит. До 1 часа.</small></span>
           </label>
         </div>
       </div>
@@ -1236,7 +1262,7 @@
           </label>
           <div class="setting-option setting-action" id="s-shortcut-wrap">
             <span>Ярлыки приложения<small id="s-shortcut-help">Menu — поиск приложений Windows и Linux; Desktop — значок на рабочем столе.</small></span>
-            <div class="row shortcut-actions" style="margin-left:auto">
+            <div class="row shortcut-actions">
               <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
               <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
             </div>
@@ -1321,19 +1347,19 @@
 <dialog id="dlg-model" aria-labelledby="dm-title" aria-describedby="dm-help">
   <form method="dialog" id="dm-form" class="dialog-form">
     <div class="dialog-header">
-      <h3 id="dm-title">Добавить модель</h3>
-      <p id="dm-help">Сначала задай внешний ID модели, затем добавь провайдеры в порядке приоритета.</p>
+      <h3 id="dm-title">Добавить цепочку</h3>
+      <p id="dm-help">Добавь модели провайдеров в нужном порядке — первая будет основной, остальные запасными.</p>
     </div>
     <div class="dialog-body">
-      <label>Имя модели
+      <label>Название цепочки
         <input id="dm-name" required placeholder="claude-sonnet" aria-describedby="dm-name-help">
       </label>
-      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">Модель будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
+      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">Цепочка будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
 
       <section class="dialog-section" aria-labelledby="dm-chain-title">
         <div class="dialog-section-head">
           <div>
-            <h4 id="dm-chain-title">1. Порядок переключения</h4>
+            <h4 id="dm-chain-title">1. Порядок цепочки</h4>
             <p>Первый провайдер — основной, остальные используются как запасные.</p>
           </div>
           <span id="dm-count" class="dialog-count"></span>
@@ -1349,13 +1375,13 @@
           </div>
         </div>
         <div class="provider-picker">
-          <div class="filter-bar">
+          <div class="filter-bar chain-provider-filter">
             <label class="search-field">
               <span class="sr-only">Поиск провайдеров в цепочке</span>
               <input id="dm-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
               <button id="dm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
             </label>
-            <span id="dm-provider-result" class="filter-result"></span>
+            <span id="dm-provider-result" class="filter-result provider-result-count"></span>
           </div>
           <div id="dm-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для цепочки"></div>
         </div>
@@ -1500,6 +1526,29 @@
 </dialog>
 
 <div class="field-hint-layer" id="field-hint" role="tooltip" hidden></div>
+
+<!-- Диалог: все сессии за 7 дней -->
+<dialog id="dlg-all-sessions" aria-labelledby="all-sessions-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="all-sessions-title">Все сессии</h3>
+      <p>Сессии за все сохранённые дни. Клик по названию копирует ID сессии.</p>
+    </div>
+    <div class="dialog-body">
+      <div class="filter-bar">
+        <label class="search-field" style="margin:0">
+          <input id="all-sessions-search" type="search" placeholder="Поиск по сессии" aria-label="Поиск по всем сессиям">
+        </label>
+        <span class="filter-result" id="all-sessions-count"></span>
+      </div>
+      <table id="all-sessions-table"></table>
+      <div class="usage-pager" id="all-sessions-pager"></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="all-sessions-close">Закрыть</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 const $ = (id) => document.getElementById(id)
@@ -2604,6 +2653,65 @@ $("u-session-search").oninput = (e) => {
   sessionPage = 0
   renderUsageReportKeepingScroll(usageReport)
 }
+
+// Every session across the stored days, merged by id: the per-day view only
+// sees one bucket, so a session that ran yesterday and today looked missing.
+function allSessions(days) {
+  const merged = {}
+  for (const day of days ?? []) {
+    for (const [id, stat] of Object.entries(day.sessions ?? {})) {
+      const row = (merged[id] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0, firstSeen: 0, lastSeen: 0 })
+      row.requests += Number(stat.requests) || 0
+      row.ok += Number(stat.ok) || 0
+      row.limits += Number(stat.limits) || 0
+      row.errors += Number(stat.errors) || 0
+      row.tokensIn += Number(stat.tokensIn) || 0
+      row.tokensOut += Number(stat.tokensOut) || 0
+      const first = Number(stat.firstSeen) || 0
+      const last = Number(stat.lastSeen) || 0
+      if (first && (!row.firstSeen || first < row.firstSeen)) row.firstSeen = first
+      if (last > row.lastSeen) row.lastSeen = last
+    }
+  }
+  return merged
+}
+
+let allSessionQuery = ""
+let allSessionPage = 0
+function renderAllSessions() {
+  const days = Array.isArray(usageReport?.days) ? usageReport.days : []
+  const rows = usageSessionRows(allSessions(days), usageReport?.sessionTitles)
+  const pages = Math.max(1, Math.ceil(rows.length / SESSION_PAGE_SIZE))
+  if (allSessionPage >= pages) allSessionPage = pages - 1
+  const slice = rows.slice(allSessionPage * SESSION_PAGE_SIZE, (allSessionPage + 1) * SESSION_PAGE_SIZE)
+  $("all-sessions-count").textContent = rows.length ? `${rows.length} сессий` : ""
+  $("all-sessions-pager").innerHTML = pages > 1
+    ? `<button type="button" data-page="${allSessionPage - 1}"${allSessionPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${allSessionPage + 1} / ${pages}</span><button type="button" data-page="${allSessionPage + 1}"${allSessionPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
+    : ""
+  $("all-sessions-pager").querySelectorAll("[data-page]").forEach((button) => {
+    button.onclick = () => {
+      allSessionPage = Number(button.dataset.page) || 0
+      renderAllSessions()
+    }
+  })
+  $("all-sessions-table").innerHTML = sessionTableHtml(slice)
+}
+$("u-session-all").onclick = () => {
+  allSessionPage = 0
+  $("all-sessions-search").value = sessionQuery
+  allSessionQuery = sessionQuery
+  renderAllSessions()
+  $("dlg-all-sessions").showModal()
+}
+$("all-sessions-search").oninput = (e) => {
+  allSessionQuery = e.target.value
+  allSessionPage = 0
+  const saved = sessionQuery
+  sessionQuery = allSessionQuery
+  renderAllSessions()
+  sessionQuery = saved
+}
+$("all-sessions-close").onclick = () => $("dlg-all-sessions").close()
 $("providers-filter").oninput = (e) => {
   providersFilter = e.target.value
   renderProviders()
@@ -2685,7 +2793,7 @@ function openModelDialog(name = null) {
   const src = name ? cfg.models[name] : null
   draft = { original: name, enabled: src?.enabled !== false, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [] }
   dlgModel.returnValue = ""
-  $("dm-title").textContent = name ? `Модель proxy/${name}` : "Добавить модель"
+  $("dm-title").textContent = name ? `Цепочка proxy/${name}` : "Добавить цепочку"
   $("dm-name").value = name ?? ""
   pickProvider = null
   chainProviderFilter = ""
@@ -2702,8 +2810,8 @@ function renderModelDialog() {
     ? ups
         .map(
           (u, i) => `
-        <div class="chain-row">
-          <span class="step-number" aria-hidden="true">${i + 1}</span>
+        <div class="chain-row" draggable="true" data-chain-index="${i}">
+          <span class="step-number" aria-hidden="true" title="Перетащить модель">${i + 1}</span>
           <label class="sr-only" for="dm-provider-${i}">Провайдер, шаг ${i + 1}</label>
           <select id="dm-provider-${i}" data-i="${i}" data-k="provider" aria-label="Провайдер, шаг ${i + 1}">
             ${provNames.map((pn) => `<option ${pn === u.provider ? "selected" : ""}>${esc(pn)}</option>`).join("")}
@@ -2712,9 +2820,9 @@ function renderModelDialog() {
           <label class="sr-only" for="dm-model-${i}">ID модели, шаг ${i + 1}</label>
           <input id="dm-model-${i}" data-i="${i}" data-k="model" value="${esc(u.model ?? "")}" placeholder="ID модели у провайдера" aria-label="ID модели, шаг ${i + 1}">
           <div class="row-controls">
-            <button class="icon-button" type="button" data-a="up" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} выше" title="Выше">↑</button>
-            <button class="icon-button" type="button" data-a="down" data-i="${i}" ${i === ups.length - 1 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} ниже" title="Ниже">↓</button>
-            <button class="icon-button danger" type="button" data-a="rm" data-i="${i}" aria-label="Удалить шаг ${i + 1}" title="Удалить">✕</button>
+            <button class="icon-button" type="button" data-a="up" data-i="${i}" ${i === 0 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} выше" title="Выше"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"></path></svg></button>
+            <button class="icon-button" type="button" data-a="down" data-i="${i}" ${i === ups.length - 1 ? "disabled" : ""} aria-label="Переместить шаг ${i + 1} ниже" title="Ниже"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <button class="icon-button danger" type="button" data-a="rm" data-i="${i}" aria-label="Удалить модель ${i + 1}" title="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
           </div>
         </div>`,
         )
@@ -2732,6 +2840,34 @@ function renderModelDialog() {
   on("up", (i) => { const u = draft.upstreams; [u[i - 1], u[i]] = [u[i], u[i - 1]]; renderModelDialog() })
   on("down", (i) => { const u = draft.upstreams; [u[i + 1], u[i]] = [u[i], u[i + 1]]; renderModelDialog() })
   on("rm", (i) => { draft.upstreams.splice(i, 1); renderModelDialog() })
+  let draggedIndex = null
+  const rows = [...$("dm-chain").querySelectorAll(".chain-row")]
+  rows.forEach((row) => {
+    row.ondragstart = (event) => {
+      draggedIndex = Number(row.dataset.chainIndex)
+      row.classList.add("is-dragging")
+      event.dataTransfer.effectAllowed = "move"
+      event.dataTransfer.setData("text/plain", String(draggedIndex))
+    }
+    row.ondragend = () => {
+      draggedIndex = null
+      rows.forEach((item) => item.classList.remove("is-dragging", "is-drop-target"))
+    }
+    row.ondragover = (event) => {
+      event.preventDefault()
+      row.classList.add("is-drop-target")
+    }
+    row.ondragleave = () => row.classList.remove("is-drop-target")
+    row.ondrop = (event) => {
+      event.preventDefault()
+      const from = draggedIndex ?? Number(event.dataTransfer.getData("text/plain"))
+      const to = Number(row.dataset.chainIndex)
+      if (!Number.isInteger(from) || from === to || !draft.upstreams[from]) return
+      const [item] = draft.upstreams.splice(from, 1)
+      draft.upstreams.splice(to, 0, item)
+      renderModelDialog()
+    }
+  })
 
   // Use the same searchable provider picker as the provider-models tab.
   const prefer = pickProvider ?? draft.upstreams.at(-1)?.provider ?? provNames[0]
@@ -3589,21 +3725,64 @@ document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = 
 
 // ---------- логи ----------
 
+const LOG_PAGE_SIZE = 50
+let logQuery = ""
+let logFilter = "all"
+let logPage = 0
+let logLines = []
+
+function logMatches(line) {
+  const text = String(line).toLowerCase()
+  if (logQuery && !text.includes(logQuery)) return false
+  if (logFilter === "answer") return text.includes("ответ")
+  if (logFilter === "switch") return text.includes("свитч") || text.includes("заблокирован")
+  if (logFilter === "error") return text.includes("ошибк") || text.includes("error") || text.includes("пропущен")
+  return true
+}
+
+function renderLogs() {
+  const box = $("logbox")
+  const matching = logLines.filter(logMatches)
+  const pages = Math.max(1, Math.ceil(matching.length / LOG_PAGE_SIZE))
+  if (logPage >= pages) logPage = pages - 1
+  const slice = matching.slice(logPage * LOG_PAGE_SIZE, (logPage + 1) * LOG_PAGE_SIZE)
+  const atTop = box.scrollTop <= 60
+  const previous = box.scrollTop
+  box.replaceChildren(...(slice.length ? slice.map(logCard) : [document.createTextNode("—")]))
+  box.scrollTop = atTop ? 0 : previous
+  $("log-count").textContent = matching.length === logLines.length ? `${matching.length}` : `${matching.length} из ${logLines.length}`
+  $("log-pager").innerHTML = pages > 1
+    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
+    : ""
+  $("log-pager").querySelectorAll("[data-page]").forEach((button) => {
+    button.onclick = () => {
+      logPage = Number(button.dataset.page) || 0
+      renderLogs()
+      box.scrollTop = 0
+    }
+  })
+}
+
 async function loadLogs() {
   try {
     const j = await (await api("/api/logs")).json()
-    const box = $("logbox")
-    const lines = (j.lines ?? []).slice().reverse()
-    const key = lines.join("\n")
-    if (box.dataset.k === key) return // nothing new — не перестраиваем DOM, чтобы не дёргать скролл
-    box.dataset.k = key
-    const atTop = box.scrollTop <= 60 // новые записи появляются сверху
-    box.replaceChildren(...(lines.length ? lines.map(logCard) : [document.createTextNode("—")]))
-    $("log-info").textContent = `последние ${lines.length} из ${j.max ?? "?"} · чистятся сами`
-    if (atTop) box.scrollTop = 0
+    logLines = (j.lines ?? []).slice().reverse()
+    $("log-info").textContent = `последние ${logLines.length} из ${j.max ?? "?"}`
+    renderLogs()
   } catch {
     /* прокси недоступен — следующий опрос повторит */
   }
+}
+
+$("log-search").oninput = (event) => {
+  logQuery = event.target.value.trim().toLowerCase()
+  logPage = 0
+  renderLogs()
+}
+$("log-filter").onchange = (event) => {
+  logFilter = event.target.value
+  logPage = 0
+  renderLogs()
 }
 
 // Разбираем строку вида "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ..." в карточку.
@@ -3662,20 +3841,17 @@ function renderUsageCharts(u) {
   const requests = Math.max(0, Number(u.requests) || 0)
   const ok = Math.max(0, Number(u.ok) || 0)
   const failed = Math.max(0, Number(u.failed) || 0)
-  // Requests that never reached an upstream (whole chain cooling down). They
-  // are failures globally but belong to no provider, so showing them as
-  // "ошибки" made the overall error rate look far worse than the per-provider
-  // rates below it.
-  const skipped = Math.min(Math.max(0, Number(u.skipped) || 0), failed)
-  const errors = failed - skipped
+  // Requests that never reached an upstream (whole chain cooling down) are
+  // failures, and with retry mode on they are near zero anyway. One "ошибки"
+  // bucket keeps the legend readable.
+  const errors = failed
   const other = Math.max(0, requests - ok - failed)
-  const chartTotal = Math.max(1, ok + errors + skipped + other)
+  const chartTotal = Math.max(1, ok + errors + other)
   const circumference = 2 * Math.PI * 43
   let offset = 0
   const segments = [
     ["u-donut-ok", ok],
     ["u-donut-failed", errors],
-    ["u-donut-skipped", skipped],
     ["u-donut-other", other],
   ]
   for (const [id, value] of segments) {
@@ -3686,12 +3862,12 @@ function renderUsageCharts(u) {
     circle.style.opacity = value > 0 ? "1" : "0"
     offset += length
   }
+  $("u-donut-skipped").style.opacity = "0"
   $("u-donut-total").textContent = fmtNum(requests)
-  $("u-outcome-note").textContent = `${fmtNum(u.failovers)} failover`
+  $("u-outcome-note").textContent = ""
   const outcomeRows = [
     ["ok", "Успешные", ok],
     ["failed", "Ошибки", errors],
-    ["skipped", "Пропущено (кулдаун)", skipped],
     ["other", "Другие", other],
   ]
   $("u-outcome-legend").innerHTML = outcomeRows
@@ -3731,7 +3907,7 @@ function renderProviderProblemChart(obj) {
           const problemRate = Math.round((bad / row.requests) * 100)
           const details = `${fmtNum(row.requests)} попыток: Ok ${fmtNum(row.ok)}, RateLimit ${fmtNum(row.limits)}, Err ${fmtNum(row.errors)}${row.other ? `, переключено ${fmtNum(row.other)}` : ""}`
           return `<div class="token-row" title="${esc(`${row.name} — ${details}`)}">
-            <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate" style="color:${problemColor(problemRate)}">${problemRate}% проблемности</span></div>
+            <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate"><b style="color:${problemColor(problemRate)}">${problemRate}%</b> проблем</span></div>
             <div class="token-track"><span class="token-fill success" style="width:${width(row, row.ok)}%"></span><span class="token-fill limit" style="width:${width(row, row.limits)}%"></span><span class="token-fill error" style="width:${width(row, row.errors)}%"></span><span class="token-fill other" style="width:${width(row, row.other)}%"></span></div>
             <div class="token-row-foot"><span>Ok: ${fmtNum(row.ok)}</span><span>RateLimit: ${fmtNum(row.limits)}</span><span>Err: ${fmtNum(row.errors)}</span></div>
           </div>`
@@ -3755,14 +3931,22 @@ function problemColor(rate) {
 // A rolling 24 hours: the rightmost column is always the hour we are in, so the
 // chart answers "what happened lately" instead of "what happened today by 03:00".
 // Bars show input tokens only; everything else is spelled out in the hover hint.
-function renderUsageHourChart(u, report) {
+function renderUsageHourChart(u, report, today) {
   const buckets = new Map(
     (Array.isArray(report?.days) ? report.days : []).map((day) => [day.date, day.hours ?? {}]),
   )
   if (u?.date) buckets.set(u.date, u.hours ?? {})
+  // Today is the rolling last 24 hours, so the chart answers "what happened
+  // lately" instead of "what happened today by 03:00". Any other day shows its
+  // own 00:00–23:00, matching the provider table next to it.
+  const selected = u?.date ?? ""
+  const isToday = !selected || selected === today
   const now = new Date()
   const values = Array.from({ length: 24 }, (_, i) => {
-    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - (23 - i))
+    const at = isToday
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() - (23 - i))
+      : new Date(`${selected}T00:00:00`)
+    if (!isToday) at.setHours(i)
     const key = String(at.getHours()).padStart(2, "0")
     const date = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`
     const s = buckets.get(date)?.[key] ?? {}
@@ -3776,6 +3960,7 @@ function renderUsageHourChart(u, report) {
     }
   })
   const maxTokens = Math.max(1, ...values.map((v) => v.tin))
+  $("u-hour-title").textContent = isToday ? "Последние 24 часа" : "Часы этого дня"
   const label = (at) => (at.getHours() === 0 ? `${String(at.getDate()).padStart(2, "0")}.${String(at.getMonth() + 1).padStart(2, "0")}` : String(at.getHours()).padStart(2, "0"))
   $("u-hour-chart").innerHTML = values
     .map((v, i) => {
@@ -3906,6 +4091,10 @@ function usageSessionTable(rows, titles) {
       renderUsageReportKeepingScroll(usageReport)
     }
   })
+  return sessionTableHtml(list)
+}
+
+function sessionTableHtml(list) {
   if (!list.length) return `<tr><td class="muted">${sessionQuery ? "ничего не найдено" : "сессий пока нет"}</td></tr>`
   const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
   const cell = ({ id, stat, title }) => `<tr>
@@ -3945,6 +4134,16 @@ function renderUsageReport(report) {
   $("u-days").innerHTML = days
     .map((day) => `<button type="button" class="usage-day${day.date === usageDay ? " active" : ""}${usageDayHasData(day) ? "" : " empty"}" data-date="${esc(day.date)}" role="tab" aria-selected="${day.date === usageDay}"><strong>${usageDayLabel(day.date, today)}</strong><small>${usageDayHasData(day) ? `${fmtNum(day.requests ?? 0)} запросов` : "нет запросов"}</small></button>`)
     .join("")
+  // Days stretch across the whole row while they fit; the strip only scrolls
+  // (by wheel too) once the window is narrow enough to clip them.
+  const strip = $("u-days")
+  strip.classList.toggle("is-overflowing", strip.scrollWidth > strip.clientWidth + 1)
+  // A vertical wheel does not scroll a horizontal-only container in Chrome.
+  strip.onwheel = (event) => {
+    if (strip.scrollWidth <= strip.clientWidth) return
+    event.preventDefault()
+    strip.scrollLeft += event.deltaY + event.deltaX
+  }
   $("u-days").querySelectorAll("[data-date]").forEach((button) => {
     button.onclick = () => {
       usageDay = button.dataset.date
@@ -3957,7 +4156,7 @@ function renderUsageReport(report) {
     cooldowns: selected.date === today ? report.cooldowns ?? [] : [],
     uptimeMs: selected.date === today ? report.uptimeMs ?? 0 : 0,
   }
-  $("u-info").textContent = selected.date === today ? `${usageDayLabel(selected.date, today)} · сессия ${fmtUptime(u.uptimeMs)} · хранится 7 дней` : `${usageDayLabel(selected.date, today)} · сохранено между сессиями`
+  $("u-info").textContent = selected.date === today ? `запущено: ${fmtUptime(u.uptimeMs)}` : ""
   const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
   $("u-tiles").innerHTML =
     tile("запросов", u.requests ?? 0) +
@@ -3971,7 +4170,7 @@ function renderUsageReport(report) {
     ? `за всё время: ${fmtTok(lifetime.tokensIn)} вход · ${fmtTok(lifetime.tokensOut)} выход · ${fmtNum(lifetime.requests)} запросов`
     : "за всё время: пока нет данных"
   renderUsageCharts(u)
-  renderUsageHourChart(u, report)
+  renderUsageHourChart(u, report, today)
   renderUsageGroups()
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
     button.onclick = () => {
