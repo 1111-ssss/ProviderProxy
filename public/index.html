@@ -148,7 +148,9 @@
   code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
   /* Name first, its tags beside it; when the pair does not fit the tags drop to
      the next line inside the same group, never under the buttons. */
-  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+  /* Same separator the integration card uses: the header and its models are
+     two groups, not one run of text. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
   .model-head-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; flex: 1 1 auto; }
   .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
   .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -160,6 +162,12 @@
   .model-actions { display: flex; flex-direction: row; gap: 8px; }
   /* Provider rows use the same borderless icon actions as the model cards, so
      the two lists read as one app instead of a table with boxy buttons. */
+/* Optional homepage/checkin links sit by the name: as actions-cell buttons
+     they reserved a four-icon column and left a hole on every row without them. */
+  .provider-links { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+  .provider-links .icon-action { width: 26px; height: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  .provider-links .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .provider-links .icon-action svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .provider-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
   .provider-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
   .provider-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
@@ -343,7 +351,10 @@
   /* The filter is one control row: the select matches the search height and
    keeps its width, so switching options never shifts the layout. */
   .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
-  .log-controls input, .log-controls select { height: 38px; }
+  .log-controls input, .log-controls select { height: 38px; min-height: 38px; line-height: 20px; padding-top: 0; padding-bottom: 0; }
+  /* WebKitGTK drew its own select chrome taller than the search field. One
+     drawn control keeps both the same height in the desktop app. */
+  .log-controls select { appearance: none; -webkit-appearance: none; padding: 0 32px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23808f9f' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px; }
   .log-controls input { min-width: 0; }
   .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
@@ -929,7 +940,7 @@
       <span class="muted">выбран:</span>
       <span id="pm-provider-current" class="provider-current"><strong>—</strong></span>
       <select id="pm-provider" class="sr-only" tabindex="-1" aria-hidden="true"></select>
-      <button type="button" id="pm-refresh">обновить с /v1/models</button>
+      <button type="button" id="pm-refresh">обновить список</button>
     </div>
     <div class="pm-filter-row">
       <input id="pm-filter" placeholder="фильтр по имени…">
@@ -1816,7 +1827,9 @@ function cleanupModelMetadata() {
     }
   }
 }
-function save() {
+let configDirty = false
+function save(silent = false) {
+  configDirty = true
   for (const [provider, definition] of Object.entries(cfg.opencodeModels ?? {})) {
     if (definition?.all === true) definition.models = directModelIds(provider, definition)
   }
@@ -1830,10 +1843,11 @@ function save() {
       debugLog("save-failed", { status: r.status })
       return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
     }
+    configDirty = false
     const j = await r.json().catch(() => ({}))
     debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
     if (j.opencodeSynced === false) return flash(false, "сохранено, но интеграция не обновлена — проверь путь и вкладку «Логи»")
-    flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
+    if (!silent) flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
   }, 300)
 }
 
@@ -1851,12 +1865,10 @@ function renderProviders() {
     if (p.checkin) anyCheckin = true
     const tr = t.insertRow()
     tr.innerHTML = `
-      <td><b>${esc(name)}</b></td>
+      <td><b>${esc(name)}</b>${p.homepage || p.checkin ? `<span class="provider-links">${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" title="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" title="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}</span>` : ""}</td>
       <td class="muted">${esc(p.baseURL ?? "")}</td>
       <td class="muted">${models.length}</td>
       <td class="provider-actions">
-        ${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" title="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}
-        ${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" title="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}
         <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
         <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
       </td>`
@@ -3253,6 +3265,9 @@ $("pm-autoload").onchange = async (e) => {
   if (!name) return
   const map = providerAutoAll()
   if (e.target.checked) {
+    // Remember the manual selection so switching auto off brings the ticks back
+    // exactly as they were; the sync below only replaces the effective list.
+    cfg.providers[name].autoSelectedModels ??= [...(cfg.providers[name].models ?? [])]
     map[name] = true
     save()
     await syncAutoAllProvider(name)
@@ -3260,10 +3275,13 @@ $("pm-autoload").onchange = async (e) => {
   } else {
     // Turning it off freezes the list exactly as the user has it now.
     delete map[name]
+    const provider = cfg.providers[name]
+    if (Array.isArray(provider.autoSelectedModels)) provider.models = [...provider.autoSelectedModels]
+    delete provider.autoSelectedModels
     const direct = cfg.opencodeModels?.[name]
     if (direct?.all === true) {
       direct.all = false
-      direct.models = [...(cfg.providers[name]?.models ?? [])]
+      direct.models = [...(provider.models ?? [])]
     }
     save()
     flash(true, `«${esc(name)}»: автовыбор выключен, список остаётся текущим`)
@@ -3384,8 +3402,10 @@ function removeImageModelsFromChains() {
 function renderPmList() {
   const p = pmState.provider ? cfg.providers[pmState.provider] : null
   if (!p) return ($("pm-list").innerHTML = "")
-  const saved = p.models ?? []
   const auto = isAutoAllProvider(pmState.provider)
+  // Ticks show the user's own selection. The auto flag manages the effective
+  // list in the background and must not move them.
+  const saved = auto ? (p.autoSelectedModels ?? p.models ?? []) : (p.models ?? [])
   const ft = (pmState.filter ?? "").toLowerCase()
   const shown = pmState.ids.filter((id) => id.toLowerCase().includes(ft))
   $("pm-list").innerHTML = shown.length
@@ -3394,7 +3414,7 @@ function renderPmList() {
            (id) => `
         <div class="provider-model-card">
           <label class="provider-model-card-main">
-            <input type="checkbox" data-id="${esc(id)}" ${auto ? "" : saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}>
+            <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}>
             <span class="provider-model-card-body">
               <code>${esc(id)}</code>
               <span class="provider-model-card-meta">${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}</span>
@@ -3404,7 +3424,7 @@ function renderPmList() {
         </div>`,
          )
         .join("")
-    : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить с /v1/models» или добавь вручную"}</span>`
+    : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить список» или добавь вручную"}</span>`
   // перерисовки на каждый клик нет — только счётчики, иначе скролл списка прыгает наверх
   $("pm-list").querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.onchange = () => {
@@ -4281,6 +4301,15 @@ async function load() {
 
 // держим сервер живым, пока открыта вкладка GUI; закрыл вкладку — сервер сам выключится
 setInterval(() => fetch("/api/ping").catch(() => {}), 5000)
+
+// Страховка раз в 5 минут: молча дописываем несохранённые правки.
+setInterval(() => {
+  if (configDirty) save(true)
+}, 5 * 60 * 1000)
+// Раз в час: обновления приложения и списки моделей тех провайдеров, у которых
+// включён автовыбор. Провайдеры обновляются по очереди, чтобы не забить сеть.
+setInterval(() => checkForDesktopUpdate(), 60 * 60 * 1000)
+setInterval(() => syncAutoAllProviders(), 60 * 60 * 1000)
 
 // логи и usage обновляем каждые 3 с, но только если вкладка страницы видна (не свёрнута в фон)
 setInterval(() => {
