@@ -368,6 +368,76 @@ fn take_sse_events(buffer: &mut String, flush: bool) -> Vec<String> {
     events
 }
 
+/// True when an SSE frame carries something the client can show: text,
+/// reasoning, a tool call or a function call. Keep-alives, role-only deltas and
+/// usage frames are not an answer.
+fn has_payload(event: &str) -> bool {
+    let Some(rest) = event.trim_start().strip_prefix("data:") else {
+        return false;
+    };
+    let rest = rest.trim();
+    if rest.is_empty() || rest == "[DONE]" {
+        return false;
+    }
+    let Ok(value) = serde_json::from_str::<Value>(rest) else {
+        return false;
+    };
+    let Some(choices) = value.get("choices").and_then(Value::as_array) else {
+        return false;
+    };
+    choices.iter().any(|choice| {
+        let Some(delta) = choice.get("delta") else {
+            return false;
+        };
+        let text = |key: &str| {
+            delta
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.is_empty())
+        };
+        text("content")
+            || text("reasoning_content")
+            || text("reasoning")
+            || delta
+                .get("tool_calls")
+                .and_then(Value::as_array)
+                .is_some_and(|calls| !calls.is_empty())
+            || delta.get("function_call").is_some_and(Value::is_object)
+    })
+}
+
+/// Same question for a non-streaming OpenAI body.
+fn completion_has_content(bytes: &[u8]) -> bool {
+    let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
+        return false;
+    };
+    let Some(choices) = value.get("choices").and_then(Value::as_array) else {
+        return false;
+    };
+    choices.iter().any(|choice| {
+        let Some(message) = choice.get("message") else {
+            return false;
+        };
+        let text = |key: &str| {
+            message
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.is_empty())
+        };
+        text("content")
+            || text("reasoning_content")
+            || text("reasoning")
+            || message
+                .get("tool_calls")
+                .and_then(Value::as_array)
+                .is_some_and(|calls| !calls.is_empty())
+            || message.get("function_call").is_some_and(Value::is_object)
+    })
+}
+
+/// How much of an answer may be held back while waiting for its first token.
+const PENDING_LIMIT: usize = 64 * 1024;
+
 pub(super) async fn stream_upstream_response(
     response: reqwest::Response,
     state: AppState,
@@ -376,7 +446,7 @@ pub(super) async fn stream_upstream_response(
     upstream_model: String,
     stream_requested: bool,
     session: Option<String>,
-) -> Response {
+) -> Result<Response, String> {
     let status = response.status();
     let mut headers = response.headers().clone();
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
@@ -394,6 +464,7 @@ pub(super) async fn stream_upstream_response(
             ),
         );
     }
+    let (signal_tx, signal_rx) = tokio::sync::oneshot::channel::<bool>();
     let mut upstream_stream = response.bytes_stream();
     tokio::spawn(async move {
         let mut tail = String::new();
@@ -401,6 +472,56 @@ pub(super) async fn stream_upstream_response(
         let mut regular_body = Vec::new();
         let mut upstream_error = None;
         let mut normalizer = SseNormalizer::default();
+        // A 200 that carries only keep-alives, a role delta or a usage frame is
+        // not an answer: forwarding it left the client with an empty reply and
+        // the dialogue dead, while the log said "ответ". Hold frames back until
+        // one holds real text, reasoning or a tool call; if the stream ends
+        // without one, tell the caller so it can fail over to the next upstream.
+        let mut queue: Vec<bytes::Bytes> = Vec::new();
+        let mut queued = 0usize;
+        let mut has_answer = !status.is_success();
+        let mut released = !status.is_success();
+        let mut signal = Some(signal_tx);
+        if released {
+            if let Some(sender) = signal.take() {
+                let _ = sender.send(true);
+            }
+        }
+        macro_rules! emit {
+            ($data:expr, $visible:expr) => {{
+                let visible: bool = $visible;
+                let data = bytes::Bytes::from($data);
+                if visible {
+                    has_answer = true;
+                }
+                if released {
+                    if tx.send(Ok(data)).await.is_err() {
+                        return;
+                    }
+                } else {
+                    queued += data.len();
+                    queue.push(data);
+                    if has_answer {
+                        released = true;
+                        if let Some(sender) = signal.take() {
+                            let _ = sender.send(true);
+                        }
+                        for item in queue.drain(..) {
+                            if tx.send(Ok(item)).await.is_err() {
+                                return;
+                            }
+                        }
+                        queued = 0;
+                    } else if queued > PENDING_LIMIT {
+                        if let Some(sender) = signal.take() {
+                            let _ = sender.send(false);
+                        }
+                        queue.clear();
+                        return;
+                    }
+                }
+            }};
+        }
         // A panic anywhere below used to kill this task silently: the response
         // body just ended mid-answer, the client saw a clean end of stream and
         // the agent stopped without any error. Catch it and report a stream
@@ -413,20 +534,24 @@ pub(super) async fn stream_upstream_response(
                     tail.push_str(&text);
                     keep_tail(&mut tail, 8192);
                     if !is_sse {
-                        if stream_requested {
-                            regular_body.extend_from_slice(&chunk);
-                        } else if tx.send(Ok(chunk)).await.is_err() {
-                            return;
+                        if !status.is_success() {
+                            if tx.send(Ok(chunk)).await.is_err() {
+                                return;
+                            }
+                            continue;
                         }
+                        // A non-streaming body is decided at the end: it is
+                        // small, so buffering it costs nothing and lets an
+                        // empty 200 be caught instead of passed through.
+                        regular_body.extend_from_slice(&chunk);
                         continue;
                     }
                     buffer.push_str(&text);
                     for event in take_sse_events(&mut buffer, false) {
                         match normalizer.normalize_event(&event) {
                             Ok(Some(normalized)) => {
-                                if tx.send(Ok(bytes::Bytes::from(normalized))).await.is_err() {
-                                    return;
-                                }
+                                let visible = has_payload(&normalized);
+                                emit!(normalized, visible);
                             }
                             Ok(None) => {}
                             Err(reason) => push_log(
@@ -444,10 +569,14 @@ pub(super) async fn stream_upstream_response(
                 }
             }
         }
-        if upstream_error.is_none() && !is_sse && stream_requested {
-            if let Some(normalized) = completion_to_sse(&regular_body, &upstream_model) {
-                if tx.send(Ok(bytes::Bytes::from(normalized))).await.is_err() {
-                    return;
+        if upstream_error.is_none() && !is_sse && status.is_success() {
+            if completion_has_content(&regular_body) {
+                if stream_requested {
+                    if let Some(normalized) = completion_to_sse(&regular_body, &upstream_model) {
+                        emit!(normalized, true);
+                    }
+                } else {
+                    emit!(regular_body, true);
                 }
             }
         }
@@ -455,9 +584,8 @@ pub(super) async fn stream_upstream_response(
             for event in take_sse_events(&mut buffer, true) {
                 match normalizer.normalize_event(&event) {
                     Ok(Some(normalized)) => {
-                        if tx.send(Ok(bytes::Bytes::from(normalized))).await.is_err() {
-                            return;
-                        }
+                        let visible = has_payload(&normalized);
+                        emit!(normalized, visible);
                     }
                     Ok(None) => {}
                     Err(reason) => push_log(
@@ -475,11 +603,11 @@ pub(super) async fn stream_upstream_response(
                 &state,
                 format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
             );
-            if stream_requested {
+            if released && stream_requested {
                 let _ = tx
                     .send(Ok(bytes::Bytes::from(stream_error_event(&message))))
                     .await;
-            } else {
+            } else if released {
                 let _ = tx.send(Err(std::io::Error::other(message))).await;
             }
         } else if is_sse && !normalizer.done_seen {
@@ -489,17 +617,28 @@ pub(super) async fn stream_upstream_response(
                     &state,
                     format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
                 );
-                if stream_requested {
+                if released && stream_requested {
                     let _ = tx
                         .send(Ok(bytes::Bytes::from(stream_error_event(message))))
                         .await;
                 }
             } else if let Some(final_event) = normalizer.finish_at_end() {
-                let _ = tx.send(Ok(bytes::Bytes::from(final_event))).await;
+                emit!(final_event, false);
             }
         } else if is_sse {
             if let Some(final_event) = normalizer.finish_at_end() {
-                let _ = tx.send(Ok(bytes::Bytes::from(final_event))).await;
+                emit!(final_event, false);
+            }
+        }
+        if !has_answer {
+            push_log(
+                &state,
+                format!(
+                    "{exposed} → пустой успешный ответ {provider}/{upstream_model}, пробую следующего"
+                ),
+            );
+            if let Some(sender) = signal.take() {
+                let _ = sender.send(false);
             }
         }
         };
@@ -514,11 +653,11 @@ pub(super) async fn stream_upstream_response(
             );
             // The task that owned `tx` is gone, so report through the sender we
             // kept. Without this the client simply sees the body end.
-            if stream_requested {
+            if released && stream_requested {
                 let _ = tx
                     .send(Ok(bytes::Bytes::from(stream_error_event(message))))
                     .await;
-            } else {
+            } else if released {
                 let _ = tx.send(Err(std::io::Error::other(message))).await;
             }
         }
@@ -567,9 +706,13 @@ pub(super) async fn stream_upstream_response(
             builder = builder.header(key, value);
         }
     }
-    builder
+    let response = builder
         .body(Body::from_stream(ReceiverStream::new(rx)))
-        .unwrap_or_else(|_| Response::new(Body::empty()))
+        .unwrap_or_else(|_| Response::new(Body::empty()));
+    match signal_rx.await {
+        Ok(true) => Ok(response),
+        _ => Err("upstream returned an empty answer".into()),
+    }
 }
 
 #[cfg(test)]
@@ -701,5 +844,24 @@ mod tests {
         keep_tail(&mut tail, 8192);
         assert!(tail.len() <= 8192);
         assert!(tail.chars().all(|c| c == '€'), "tail must stay valid UTF-8");
+    }
+
+    #[test]
+    fn only_content_or_tool_calls_count_as_an_answer() {
+        for event in [
+            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1}}\n\n",
+        ] {
+            assert!(!has_payload(event), "not answer payload: {event}");
+        }
+        for event in [
+            "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0}]}}]}\n\n",
+        ] {
+            assert!(has_payload(event), "answer payload: {event}");
+        }
+        assert!(!completion_has_content(br#"{"choices":[{"message":{"content":""}}]}"#));
+        assert!(completion_has_content(br#"{"choices":[{"message":{"content":"hi"}}]}"#));
     }
 }

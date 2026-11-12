@@ -14,7 +14,7 @@ use super::{
     metrics::{hour_stat, model_stat, provider_stat, push_log, session_stat},
     routing::{failover_status, with_model},
     stream::stream_upstream_response,
-    types::AppState,
+    types::{AppState, Upstream},
 };
 
 async fn send_with_header_timeout(
@@ -29,6 +29,35 @@ async fn send_with_header_timeout(
         .await
         .map_err(|_| "header timeout".to_string())?
         .map_err(|err| err.to_string())
+}
+
+/// Counts one failed attempt: cooldown for that exact model, error counters and
+/// the log line. Every failure path uses it, so a 400, a dead key and an empty
+/// answer are counted the same way.
+fn record_failure(state: &AppState, upstream: &Upstream, key: &str, session: &Option<String>) {
+    let cooldown = Duration::from_secs(
+        state
+            .config
+            .read()
+            .unwrap()
+            .get("errorCooldownSec")
+            .and_then(Value::as_u64)
+            .unwrap_or(30),
+    );
+    state
+        .cooldowns
+        .lock()
+        .unwrap()
+        .insert(key.to_string(), Instant::now() + cooldown);
+    let mut usage = state.usage.lock().unwrap();
+    provider_stat(&mut usage, &upstream.name).errors += 1;
+    usage.failovers += 1;
+    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+    stat.failovers += 1;
+    stat.errors += 1;
+    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+        row.errors += 1;
+    }
 }
 
 pub(super) async fn chat_completions(
@@ -66,10 +95,19 @@ pub(super) async fn chat_completions(
     let mut attempted = false;
     // Harness mode: instead of handing the client a 502, wait out the cooldowns
     // and try the chain again. A run then ends only when an upstream answers.
+    // Any non-2xx counts as a failed attempt here, not only quota/timeout/server
+    // errors: a plain 400 or a dead key must not end the run either.
     // shortcut: a client that already gave up is not detected here, so the cap
     // below stops the loop; raise it if long unattended runs need more.
     const RETRY_WINDOW: Duration = Duration::from_secs(60 * 60);
     let started = Instant::now();
+    let retry_forever = state
+        .config
+        .read()
+        .unwrap()
+        .get("retryForever")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     loop {
         for upstream in chain.iter() {
             let key = format!("{exposed}|{}|{}", upstream.name, upstream.model);
@@ -123,12 +161,22 @@ pub(super) async fn chat_completions(
                         .unwrap()
                         .insert(key, Instant::now() + cooldown);
                     let mut usage = state.usage.lock().unwrap();
-                    provider_stat(&mut usage, &upstream.name).errors += 1;
+                    // The HTTP status was 200, so the provisional success
+                    // counters above must be moved to the error bucket now
+                    // that the body proved empty.
+                    usage.ok = usage.ok.saturating_sub(1);
+                    let hour = hour_stat(&mut usage);
+                    hour.ok = hour.ok.saturating_sub(1);
+                    let provider = provider_stat(&mut usage, &upstream.name);
+                    provider.ok = provider.ok.saturating_sub(1);
+                    provider.errors += 1;
+                    let model = model_stat(&mut usage, &upstream.name, &upstream.model);
+                    model.ok = model.ok.saturating_sub(1);
+                    model.errors += 1;
                     usage.failovers += 1;
-                    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
-                    stat.failovers += 1;
-                    stat.errors += 1;
+                    model_stat(&mut usage, &upstream.name, &upstream.model).failovers += 1;
                     if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                        row.ok = row.ok.saturating_sub(1);
                         row.errors += 1;
                     }
                     last_error = format!("{}: {err}", upstream.name);
@@ -237,28 +285,51 @@ pub(super) async fn chat_completions(
                 // A plain 400 is passed through as-is, but it is still an
                 // outcome: without this the provider showed one request and no
                 // ok/err at all, because the counters sat after the return.
-                {
-                    let mut usage = state.usage.lock().unwrap();
-                    provider_stat(&mut usage, &upstream.name).errors += 1;
-                    let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
-                    stat.errors += 1;
-                    if let Some(row) = session_stat(&mut usage, session.as_deref()) {
-                        row.errors += 1;
+                // In retry mode it is just another failed attempt: the run must
+                // not end on a client-shaped error either.
+                if !retry_forever {
+                    {
+                        let mut usage = state.usage.lock().unwrap();
+                        provider_stat(&mut usage, &upstream.name).errors += 1;
+                        let stat = model_stat(&mut usage, &upstream.name, &upstream.model);
+                        stat.errors += 1;
+                        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                            row.errors += 1;
+                        }
                     }
+                    push_log(
+                        &state,
+                        format!(
+                            "{exposed} → ошибка: {}/{} (HTTP 400)",
+                            upstream.name, upstream.model
+                        ),
+                    );
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        [("content-type", "application/json")],
+                        text,
+                    )
+                        .into_response();
                 }
+                record_failure(&state, &upstream, &key, &session);
+                last_error = format!("{}: HTTP 400 {text}", upstream.name);
                 push_log(
                     &state,
-                    format!(
-                        "{exposed} → ошибка: {}/{} (HTTP 400)",
-                        upstream.name, upstream.model
-                    ),
+                    format!("{exposed} → свитч: {last_error}, пробую следующего"),
                 );
-                return (
-                    StatusCode::BAD_REQUEST,
-                    [("content-type", "application/json")],
-                    text,
-                )
-                    .into_response();
+                continue;
+            }
+
+            // Retry mode treats every non-2xx as a failed attempt, including
+            // statuses that are not eligible for ordinary failover (401, 404).
+            if retry_forever && !status.is_success() {
+                record_failure(&state, &upstream, &key, &session);
+                last_error = format!("{}: HTTP {status}", upstream.name);
+                push_log(
+                    &state,
+                    format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                );
+                continue;
             }
 
             {
@@ -301,52 +372,71 @@ pub(super) async fn chat_completions(
                 ),
             );
             let stream_requested = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
-            return stream_upstream_response(
+            match stream_upstream_response(
                 response,
                 state.clone(),
-                exposed,
+                exposed.clone(),
                 upstream.name.clone(),
                 upstream.model.clone(),
                 stream_requested,
                 session.clone(),
             )
-            .await;
+            .await
+            {
+                Ok(response) => return response,
+                Err(err) => {
+                    // The 200 status already counted a provisional "ok"; the
+                    // empty body moves it to errors through record_failure.
+                    {
+                        let mut usage = state.usage.lock().unwrap();
+                        usage.ok = usage.ok.saturating_sub(1);
+                        let hour = hour_stat(&mut usage);
+                        hour.ok = hour.ok.saturating_sub(1);
+                        let provider = provider_stat(&mut usage, &upstream.name);
+                        provider.ok = provider.ok.saturating_sub(1);
+                        let model = model_stat(&mut usage, &upstream.name, &upstream.model);
+                        model.ok = model.ok.saturating_sub(1);
+                        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+                            row.ok = row.ok.saturating_sub(1);
+                        }
+                    }
+                    record_failure(&state, &upstream, &key, &session);
+                    last_error = format!("{}: {err}", upstream.name);
+                    push_log(
+                        &state,
+                        format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                    );
+                }
+            }
         }
-    let retry_forever = state
-        .config
-        .read()
-        .unwrap()
-        .get("retryForever")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    if !retry_forever || started.elapsed() > RETRY_WINDOW {
-        break;
-    }
-    // Sleep until the nearest upstream leaves its cooldown instead of polling:
-    // a 5-minute limit cooldown would otherwise log a retry every two seconds.
-    let now = Instant::now();
-    let wait = chain
-        .iter()
-        .filter_map(|upstream| {
-            state
-                .cooldowns
-                .lock()
-                .unwrap()
-                .get(&format!("{exposed}|{}|{}", upstream.name, upstream.model))
-                .copied()
-        })
-        .map(|until| until.saturating_duration_since(now))
-        .min()
-        .unwrap_or(Duration::from_secs(2))
-        .clamp(Duration::from_secs(1), Duration::from_secs(60));
-    push_log(
-        &state,
-        format!(
-            "{exposed} → все апстримы недоступны, повторяю через {} с (режим ретрая)",
-            wait.as_secs()
-        ),
-    );
-    tokio::time::sleep(wait).await;
+        if !retry_forever || started.elapsed() > RETRY_WINDOW {
+            break;
+        }
+        // Sleep until the nearest upstream leaves its cooldown instead of polling:
+        // a 5-minute limit cooldown would otherwise log a retry every two seconds.
+        let now = Instant::now();
+        let wait = chain
+            .iter()
+            .filter_map(|upstream| {
+                state
+                    .cooldowns
+                    .lock()
+                    .unwrap()
+                    .get(&format!("{exposed}|{}|{}", upstream.name, upstream.model))
+                    .copied()
+            })
+            .map(|until| until.saturating_duration_since(now))
+            .min()
+            .unwrap_or(Duration::from_secs(2))
+            .clamp(Duration::from_secs(1), Duration::from_secs(60));
+        push_log(
+            &state,
+            format!(
+                "{exposed} → все апстримы недоступны, повторяю через {} с (режим ретрая)",
+                wait.as_secs()
+            ),
+        );
+        tokio::time::sleep(wait).await;
     } // end retry loop
     let mut usage = state.usage.lock().unwrap();
     usage.failed += 1;

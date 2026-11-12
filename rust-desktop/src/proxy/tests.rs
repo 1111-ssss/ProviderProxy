@@ -5,7 +5,7 @@ use super::config::{
 use super::metrics::{hour_stat, load_usage, model_stat, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::routing::{build_chains, with_model};
 use super::server::{shutdown_running_instance, start_server};
-use super::types::{AppState, ModelUsage, ProviderUsage, Usage};
+use super::types::{AppState, ProviderUsage, Usage};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::{
@@ -384,6 +384,86 @@ async fn streams_a_long_russian_answer_without_cutting_it_off() {
         body.contains("\"prompt_tokens\":7"),
         "the usage chunk still reaches the client, which some clients rely on"
     );
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
+/// An upstream can return HTTP 200 and a syntactically valid SSE stream, but
+/// no actual content (just role/finish/usage frames). That is not an answer:
+/// fail over to the next model even when retry mode is disabled.
+#[tokio::test]
+async fn fails_over_when_upstream_returns_an_empty_success_stream() {
+    use axum::extract::Json as AxumJson;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|AxumJson(body): AxumJson<Value>| async move {
+                if body["model"] == "empty" {
+                    return axum::response::Response::builder()
+                        .header("content-type", "text/event-stream")
+                        .body(axum::body::Body::from(
+                            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":1}}\n\ndata: [DONE]\n\n",
+                        ))
+                        .unwrap();
+                }
+                axum::response::Response::builder()
+                    .header("content-type", "text/event-stream")
+                    .body(axum::body::Body::from(
+                        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"готово\"},\"finish_reason\":null}]}\n\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
+                    ))
+                    .unwrap()
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-empty-stream-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [
+                { "provider": "p", "model": "empty" },
+                { "provider": "p", "model": "answer" }
+            ] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let client = Client::new();
+    let response = client
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "chain", "stream": true, "messages": [{ "role": "user", "content": "test" }] }))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let body = response.text().await.unwrap();
+    assert!(body.contains("готово"), "must return the second upstream's answer: {body}");
+    assert!(!body.contains("proxy_stream_error"), "empty first stream must not reach client: {body}");
+
+    let usage: Value = client
+        .get(format!("http://127.0.0.1:{}/api/usage", server.port))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let models = &usage["days"][0]["models"];
+    assert_eq!(models["p/empty"]["errors"], 1, "empty response is counted as an error: {usage}");
+    assert_eq!(models["p/answer"]["ok"], 1, "fallback answered: {usage}");
 
     let database = database_path(&path);
     let _ = fs::remove_file(&path);
