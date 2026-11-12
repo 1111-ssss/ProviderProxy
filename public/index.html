@@ -106,6 +106,8 @@
   button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
+  /* Column separators: without them a wide table reads as one blob of numbers. */
+  table td + td, table th + th { border-left: 1px solid var(--border); padding-left: 12px; }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   .muted { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -244,7 +246,7 @@
   .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
   .dialog-header h3 { margin: 0; font-size: 18px; }
   .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 18px 24px 4px; overflow: auto; }
+  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 22px 24px 14px; overflow: auto; }
   dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
   dialog label.sr-only { display: block; margin: 0; }
   dialog label input, dialog label select { font-size: 14px; }
@@ -321,7 +323,10 @@
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
   section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
-  .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, auto) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+  /* The filter is one control row: the select matches the search height and
+   keeps its width, so switching options never shifts the layout. */
+  .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .log-controls input { height: 38px; }
   .log-controls input { min-width: 0; }
   .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
@@ -449,7 +454,7 @@
   .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
   .usage-days::-webkit-scrollbar { display: none; }
   .usage-days:not(.is-overflowing) { overflow-x: hidden; }
-  .usage-day { flex: 1 1 78px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+  .usage-day { flex: 1 1 88px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 88px; min-height: 50px; padding: 8px 11px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
   .usage-day strong { color: inherit; font-size: 12px; }
   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
   .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
@@ -573,16 +578,12 @@
   .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
   /* One label wraps to two lines, so the pair must stretch to a shared height
      instead of leaving two differently sized buttons. */
-  /* One label wraps to two lines, so the pair must stretch to a shared height
-     and split the available width evenly instead of clipping the card edge. */
-  .shortcut-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1 1 240px; min-width: 0; }
-  .shortcut-actions button { min-width: 0; min-height: 38px; padding-left: 6px; padding-right: 6px; white-space: normal; }
   .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
   .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
   /* Two shortcut buttons sized to their own labels, so they looked uneven and
      the longer one was clipped. Equal columns fix that; labels wrap when a
      narrow card cannot fit them side by side, and below 620px they stack. */
-  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); align-items: stretch; gap: 8px; margin-left: auto; flex: 1 1 100%; }
   /* Same height as every other button (38px from the base control rule); the
      override to 32px made this row look stunted. */
   .settings-grid .setting-action button { min-width: 0; min-height: 38px; padding: 8px 10px; justify-content: center; white-space: normal; text-align: center; }
@@ -592,14 +593,14 @@
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
-  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; max-height: 184px; overflow: auto; padding: 1px 2px 2px; }
+  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; padding: 1px 2px 2px; }
   .provider-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 38px; text-align: left; }
   .provider-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .provider-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .provider-option.active { border-color: var(--accent-strong); background: rgba(111, 153, 237, .16); color: #dbe7ff; }
   .provider-current { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(34, 45, 57, .55); }
   .provider-current strong { color: var(--text); }
-  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid rgba(111, 153, 237, .35); border-radius: 12px; background: linear-gradient(135deg, rgba(111, 153, 237, .1), rgba(28, 37, 48, .68)); }
+  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .7); }
   .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
@@ -879,7 +880,7 @@
         <button class="primary" id="p-add">+ Добавить провайдера</button>
       </div>
     </div>
-    <p class="section-sub">Ключ и адрес API (OpenAI-совместимый). «Чекин» — открыть checkin-страницу, если она задана. Модели провайдера выбираются в шаге&nbsp;2.</p>
+    <p class="section-sub">Подключение внешних провайдеров.</p>
     <div class="filter-bar">
       <label class="search-field">
         <span class="sr-only">Поиск провайдеров</span>
@@ -896,7 +897,7 @@
       <h2>2&nbsp;·&nbsp;Модели провайдеров</h2>
       <span class="muted" id="pm-status"></span>
     </div>
-    <p class="section-sub">Отметь галочками модели, которые есть у провайдера, — они сохраняются локально, и из них собираются цепочки в шаге&nbsp;3. Список берётся с его <code>/v1/models</code> и из сохранённых; отсутствующую модель можно вписать вручную.</p>
+    <p class="section-sub">Включение моделей провайдера. Только включенные модели могут быть использованы в дальнейшем.</p>
     <div class="provider-picker">
       <div class="filter-bar">
         <label class="search-field">
@@ -916,11 +917,18 @@
     </div>
     <div class="pm-filter-row">
       <input id="pm-filter" placeholder="фильтр по имени…">
-      <label class="pm-autoload" title="При каждом запуске обновлять список моделей с /v1/models, убирать исчезнувшие (добавленные вручную останутся) и включать все модели провайдера">
+      <label class="pm-autoload" title="Снять выделение со всех моделей провайдера">
+        <input id="pm-clear-all" type="checkbox">
+        <span class="pm-autoload-body">
+          <strong>снять все</strong>
+          <small>выделение</small>
+        </span>
+      </label>
+      <label class="pm-autoload" title="При каждом запуске обновлять список моделей с /v1/models: новые появятся, исчезнувшие уберутся, добавленные вручную останутся">
         <input id="pm-autoload" type="checkbox">
         <span class="pm-autoload-body">
-          <strong>добавлять все модели</strong>
-          <small>обновлять с /v1/models при запуске</small>
+          <strong>обновлять при запуске</strong>
+          <small>список моделей с /v1/models</small>
         </span>
       </label>
     </div>
@@ -935,7 +943,7 @@
     <div class="section-head">
       <h2>3&nbsp;·&nbsp;Интеграции</h2>
     </div>
-    <p class="section-sub">Подключения к внешним инструментам. Отключённая интеграция не публикует модели и цепочки в своём конфиге.</p>
+    <p class="section-sub">Подключения к внешним инструментам.</p>
     <div class="opencode-panel integration-card">
       <div class="opencode-panel-head">
         <div>
@@ -985,7 +993,7 @@
       <h2>4&nbsp;·&nbsp;Цепочки</h2>
       <button class="primary" id="m-add">+ Добавить цепочку</button>
     </div>
-    <p class="section-sub">Цепочка — это список моделей, которые прокси пробует по очереди: если первая не ответила, берётся следующая. Кнопка «Изменить» задаёт этот список, а переключатель «Активна» временно скрывает цепочку из публикации, не удаляя её.</p>
+    <p class="section-sub">Цепочка пробует модели по очереди: если первая не ответила, берётся следующая.</p>
     <div id="models"></div>
   </section>
 
@@ -994,7 +1002,7 @@
       <h2>5&nbsp;·&nbsp;Модели</h2>
       <button class="primary" id="om-add">+ Добавить модель</button>
     </div>
-    <p class="section-sub">Выбери провайдера и модели, которые нужно использовать без цепочки. В подключённой интеграции они будут доступны как <code>provider/model</code>.</p>
+    <p class="section-sub">Выбор провайдера и его моделей, которые нужно использовать без цепочки</p>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
@@ -1008,7 +1016,7 @@
         </button>
       </div>
     </div>
-    <p class="section-sub">Здесь доступны модели изображений, отмеченные на вкладке «Подключения». Этот же выбор используется в skill. Прокси сам выберет <code>images/generations</code> или <code>images/tasks</code> по metadata модели.</p>
+    <p class="section-sub">Использование image моделей для генерации изображений.</p>
     <div class="provider-picker">
       <div class="filter-bar">
         <label class="search-field">
@@ -1081,7 +1089,6 @@
         <option value="switch">Переключения</option>
         <option value="error">Ошибки</option>
       </select>
-      <span class="muted" id="log-count"></span>
     </div>
     <div class="logbox" id="logbox">—</div>
     <div class="log-pager" id="log-pager"></div>
@@ -1234,7 +1241,7 @@
           </label>
           <label class="setting-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
-            <span>Повторять, пока модель не ответит<small>На любую ошибку — 400, 401, 429, 5xx, пустой ответ — прокси ждёт кулдаун и пробует цепочку снова, пока модель не ответит. До 1 часа.</small></span>
+            <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>
           </label>
         </div>
       </div>
@@ -1332,7 +1339,10 @@
       <label>apiKey <span class="muted">сохраняется в зашифрованном виде</span>
         <input id="dp-key" type="password" placeholder="sk-...">
       </label>
-      <label>Ссылка для чекина — необязательно; если задана, у провайдера появится кнопка «Чекин»
+      <label>Домашняя страница — необязательно; если задана, появится кнопка перехода
+        <input id="dp-homepage" placeholder="https://provider.example">
+      </label>
+      <label>Ссылка для чекина — необязательно; если задана, появится кнопка с подарком
         <input id="dp-checkin" placeholder="https://provider.example/checkin">
       </label>
     </div>
@@ -1811,7 +1821,7 @@ function save() {
     const j = await r.json().catch(() => ({}))
     debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
     if (j.opencodeSynced === false) return flash(false, "сохранено, но интеграция не обновлена — проверь путь и вкладку «Логи»")
-    flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено ✓")
+    flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
   }, 300)
 }
 
@@ -1822,7 +1832,7 @@ function renderProviders() {
   const allEntries = Object.entries(cfg.providers)
   const query = providersFilter.trim().toLowerCase()
   const entries = query ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query)) : allEntries
-  t.innerHTML = entries.length ? "<tr><th>имя</th><th>baseURL</th><th>ключ</th><th>модели</th><th></th></tr>" : ""
+  t.innerHTML = entries.length ? "<tr><th>имя</th><th>baseURL</th><th>модели</th><th></th></tr>" : ""
   let anyCheckin = false
   for (const [name, p] of entries) {
     const models = p.models ?? []
@@ -1831,13 +1841,14 @@ function renderProviders() {
     tr.innerHTML = `
       <td><b>${esc(name)}</b></td>
       <td class="muted">${esc(p.baseURL ?? "")}</td>
-      <td class="muted">${p.apiKeyConfigured ? "••••••" : "—"}</td>
-      <td class="muted">${models.length || "—"}</td>
+      <td class="muted">${models.length}</td>
       <td class="provider-actions">
-        ${p.checkin ? `<button data-a="checkin">Чекин</button>` : ""}
+        ${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" title="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}
+        ${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" title="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}
         <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
         <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
       </td>`
+    if (p.homepage) tr.querySelector('[data-a="homepage"]').onclick = () => openUrl(p.homepage)
     if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
     tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
     tr.querySelector('[data-a="del"]').onclick = () => {
@@ -1853,7 +1864,7 @@ function renderProviders() {
   $("providers-filter-result").textContent = query ? `${entries.length} из ${allEntries.length}` : `${allEntries.length} ${allEntries.length === 1 ? "провайдер" : "провайдеров"}`
   if (!entries.length) {
     const tr = t.insertRow()
-    tr.innerHTML = `<td colspan="5" class="muted">${allEntries.length ? "ничего не найдено — измени запрос" : "провайдеров пока нет — нажми «+ Добавить провайдера»"}</td>`
+    tr.innerHTML = `<td colspan="4" class="muted">${allEntries.length ? "ничего не найдено — измени запрос" : "провайдеров пока нет — нажми «+ Добавить провайдера»"}</td>`
   }
 }
 
@@ -2747,6 +2758,7 @@ function openProviderDialog(name = null) {
   $("dp-key").value = ""
   $("dp-key").placeholder = name && cfg.providers[name]?.apiKeyConfigured ? "оставить текущий ключ" : "sk-..."
   $("dp-checkin").value = name ? cfg.providers[name]?.checkin ?? "" : ""
+  $("dp-homepage").value = name ? cfg.providers[name]?.homepage ?? "" : ""
   dlgProvider.showModal()
 }
 
@@ -2769,6 +2781,9 @@ dlgProvider.addEventListener("close", () => {
   const checkin = $("dp-checkin").value.trim()
   if (checkin) rec.checkin = checkin
   else delete rec.checkin
+  const homepage = $("dp-homepage").value.trim()
+  if (homepage) rec.homepage = homepage
+  else delete rec.homepage
   cfg.providers[name] = rec
   if (editingProvider && editingProvider !== name) {
     delete cfg.providers[editingProvider]
@@ -3120,6 +3135,7 @@ function renderProviderModels() {
   })
   $("pm-filter").value = pmState.filter
   $("pm-autoload").checked = isAutoAllProvider(pmState.provider)
+  $("pm-clear-all").checked = false
   const saved = cfg.providers[pmState.provider].models ?? []
   $("pm-status").textContent = pmState.loading
     ? "загружаю /v1/models…"
@@ -3129,10 +3145,10 @@ function renderProviderModels() {
   renderPmList()
 }
 
-// "Add all models" bookmark for a provider: every start re-reads /v1/models,
-// drops models the provider no longer serves (unless the user typed them in by
-// hand), keeps the selection at "all", and re-syncs the direct-models list on
-// the Models tab so both stay in step.
+// "Update at startup" bookmark for a provider: every start re-reads
+// /v1/models and refreshes the list — new models appear, models the provider no
+// longer serves leave (unless typed in by hand). The checkboxes are left as the
+// user set them; selecting everything is a separate, explicit action.
 const providerAutoAll = () => (cfg.providerAutoAll ??= {})
 const isAutoAllProvider = (name) => providerAutoAll()[name] === true
 async function syncAutoAllProvider(name) {
@@ -3142,20 +3158,15 @@ async function syncAutoAllProvider(name) {
   if (res.error) return
   const returned = new Set(res.ids)
   const manual = new Set((provider.manualModels ?? []).map(String))
-  const kept = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
-  const merged = [...new Set([...kept, ...res.ids])]
-  provider.models = merged
+  provider.models = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
   provider.modelAvailability ??= {}
   const at = new Date().toISOString()
-  for (const id of merged) provider.modelAvailability[id] = { available: returned.has(id), checkedAt: at }
+  for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
+  for (const id of manual) provider.modelAvailability[id] ??= { available: returned.has(id), checkedAt: at }
   mergeProviderModelDetails(provider, res.details)
-  // Every model of this provider is selected by definition, and the Models tab
-  // reads `all`, so it widens together with the Connections list.
-  const direct = (cfg.opencodeModels ??= {})[name]
-  if (direct) {
-    direct.all = true
-    direct.models = [...merged]
-  }
+  // A direct list that follows "all models" follows the refreshed list too.
+  const direct = cfg.opencodeModels?.[name]
+  if (direct?.all === true) direct.models = [...provider.models]
   cleanupModelMetadata()
   const chainsChanged = removeImageModelsFromChains()
   save()
@@ -3228,27 +3239,35 @@ $("pm-autoload").onchange = async (e) => {
   const map = providerAutoAll()
   if (e.target.checked) {
     map[name] = true
-    cfg.opencodeModels ??= {}
-    const direct = (cfg.opencodeModels[name] ??= {})
-    direct.all = true
-    direct.models = directModelIds(name, { ...direct, all: true })
+    save()
     await syncAutoAllProvider(name)
-    flash(true, `«${esc(name)}»: все модели будут обновляться при запуске`)
+    flash(true, `«${esc(name)}»: список моделей будет обновляться при запуске`)
   } else {
     delete map[name]
-    cfg.opencodeModels ??= {}
-    const direct = cfg.opencodeModels[name]
-    if (direct?.all === true) {
-      direct.all = false
-      direct.models = [...(cfg.providers[name]?.models ?? [])]
-    }
     save()
-    flash(true, `«${esc(name)}»: только выбранные модели`)
+    flash(true, `«${esc(name)}»: список моделей больше не обновляется при запуске`)
   }
-  save()
   renderProviderModels()
+}
+$("pm-clear-all").onchange = (e) => {
+  const name = pmState.provider
+  if (!name) return
+  const provider = cfg.providers[name]
+  if (!provider) return
+  const ids = [...(provider.models ?? [])]
+  provider.models = []
+  const chainsBefore = chainFillSnapshot()
+  for (const id of ids) removeModelReferences(name, id)
+  if (cfg.opencodeModels?.[name]) delete cfg.opencodeModels[name]
+  save()
+  renderProviders()
+  renderModels()
   renderOpencodeModels()
   renderOpenCode()
+  renderImageGenerator()
+  renderProviderModels()
+  flash(true, `«${esc(name)}»: выделение снято с ${ids.length} моделей`)
+  reportEmptiedChains(chainsBefore)
 }
 $("pm-filter").oninput = (e) => {
   pmState.filter = e.target.value
@@ -3748,9 +3767,8 @@ function renderLogs() {
   const slice = matching.slice(logPage * LOG_PAGE_SIZE, (logPage + 1) * LOG_PAGE_SIZE)
   const atTop = box.scrollTop <= 60
   const previous = box.scrollTop
-  box.replaceChildren(...(slice.length ? slice.map(logCard) : [document.createTextNode("—")]))
+  box.replaceChildren(...(slice.length ? slice.map(logCard) : [logEmpty()]))
   box.scrollTop = atTop ? 0 : previous
-  $("log-count").textContent = matching.length === logLines.length ? `${matching.length}` : `${matching.length} из ${logLines.length}`
   $("log-pager").innerHTML = pages > 1
     ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
     : ""
@@ -3802,7 +3820,12 @@ const logCard = (line) => {
   tm.textContent = ts
   const badge = document.createElement("span")
   badge.className = "b"
-  badge.textContent = detail ? tail[0].replace(/[:：].*$/, "") : cls === "err" ? "ошибка" : cls === "warn" ? "блок" : "инфо"
+  // The badge is a short tag, not the whole message: a detail without a colon
+  // used to become a one-line uppercase paragraph that overlapped the card.
+  const tag = detail ? tail[0].replace(/[:：].*$/, "").trim() : ""
+  const fallback = cls === "err" ? "ошибка" : cls === "warn" ? "блок" : "инфо"
+  badge.textContent = tag && tag.length <= 24 ? tag : fallback
+  badge.title = tag
   top.append(tm, badge)
   const msg = document.createElement("div")
   msg.className = "m"
@@ -3812,6 +3835,13 @@ const logCard = (line) => {
   if (detail) msg.append(` ${detail}`)
   card.append(top, msg)
   return card
+}
+
+const logEmpty = () => {
+  const p = document.createElement("div")
+  p.className = "log-empty muted"
+  p.textContent = "Ничего не найдено."
+  return p
 }
 
 // ---------- usage ----------

@@ -633,9 +633,7 @@ pub(super) async fn stream_upstream_response(
         if !has_answer {
             push_log(
                 &state,
-                format!(
-                    "{exposed} → пустой успешный ответ {provider}/{upstream_model}, пробую следующего"
-                ),
+                format!("{exposed} → свитч: {provider}/{upstream_model} ответил пусто"),
             );
             if let Some(sender) = signal.take() {
                 let _ = sender.send(false);

@@ -84,6 +84,8 @@
   button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
+  /* Column separators: without them a wide table reads as one blob of numbers. */
+  table td + td, table th + th { border-left: 1px solid var(--border); padding-left: 12px; }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   .muted { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -222,7 +224,7 @@
   .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
   .dialog-header h3 { margin: 0; font-size: 18px; }
   .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
-  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 18px 24px 4px; overflow: auto; }
+  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 22px 24px 14px; overflow: auto; }
   dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
   dialog label.sr-only { display: block; margin: 0; }
   dialog label input, dialog label select { font-size: 14px; }
@@ -299,7 +301,10 @@
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
   section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
-   .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(140px, auto) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+   /* The filter is one control row: the select matches the search height and
+   keeps its width, so switching options never shifts the layout. */
+  .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .log-controls input { height: 38px; }
    .log-controls input { min-width: 0; }
    .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
   .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
@@ -429,7 +434,7 @@
     .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
     .usage-days:not(.is-overflowing) { overflow-x: hidden; }
    .usage-days::-webkit-scrollbar { display: none; }
-   .usage-day { flex: 1 1 78px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 78px; min-height: 46px; padding: 7px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+   .usage-day { flex: 1 1 88px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 88px; min-height: 50px; padding: 8px 11px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
    .usage-day strong { color: inherit; font-size: 12px; }
    .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
    .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
@@ -554,10 +559,6 @@
   .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
   .settings-grid .setting-option.is-disabled { opacity: .6; }
   .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
-  /* One label wraps to two lines, so the pair must stretch to a shared height
-     and split the available width evenly instead of clipping the card edge. */
-  .shortcut-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1 1 240px; min-width: 0; }
-  .shortcut-actions button { min-width: 0; min-height: 38px; padding-left: 6px; padding-right: 6px; white-space: normal; }
   /* A saved shortcut path is one long unbreakable string on Windows; let it
      wrap inside the card instead of pushing the button out of view. Below
      roughly 300px of column the button drops under the text instead of
@@ -567,7 +568,7 @@
   /* Two shortcut buttons sized to their own labels, so they looked uneven and
      the longer one was clipped. Equal columns fix that; labels wrap when a
      narrow card cannot fit them side by side, and below 620px they stack. */
-  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  .settings-grid .setting-action .row { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); align-items: stretch; gap: 8px; margin-left: auto; flex: 1 1 100%; }
   /* Same height as every other button (38px from the base control rule); the
      override to 32px made this row look stunted. */
   .settings-grid .setting-action button { min-width: 0; min-height: 38px; padding: 8px 10px; justify-content: center; white-space: normal; text-align: center; }
@@ -577,14 +578,14 @@
   .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .settings-exit { margin-right: auto; }
   .provider-picker { display: grid; gap: 8px; }
-  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; max-height: 184px; overflow: auto; padding: 1px 2px 2px; }
+  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; padding: 1px 2px 2px; }
   .provider-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 38px; text-align: left; }
   .provider-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .provider-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .provider-option.active { border-color: var(--accent-strong); background: rgba(111, 153, 237, .16); color: #dbe7ff; }
   .provider-current { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(34, 45, 57, .55); }
   .provider-current strong { color: var(--text); }
-  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid rgba(111, 153, 237, .35); border-radius: 12px; background: linear-gradient(135deg, rgba(111, 153, 237, .1), rgba(28, 37, 48, .68)); }
+  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .7); }
   .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
   .opencode-panel-head h3 { margin: 0; font-size: 14px; }
   .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
@@ -3107,6 +3108,7 @@ function renderProviderModels() {
   })
   $("pm-filter").value = pmState.filter
   $("pm-autoload").checked = isAutoAllProvider(pmState.provider)
+  $("pm-clear-all").checked = false
   const saved = cfg.providers[pmState.provider].models ?? []
   $("pm-status").textContent = pmState.loading
     ? "загружаю /v1/models…"
@@ -3116,10 +3118,10 @@ function renderProviderModels() {
   renderPmList()
 }
 
-// "Add all models" bookmark for a provider: every start re-reads /v1/models,
-// drops models the provider no longer serves (unless the user typed them in by
-// hand), keeps the selection at "all", and re-syncs the direct-models list on
-// the Models tab so both stay in step.
+// "Update at startup" bookmark for a provider: every start re-reads
+// /v1/models and refreshes the list — new models appear, models the provider no
+// longer serves leave (unless typed in by hand). The checkboxes are left as the
+// user set them; selecting everything is a separate, explicit action.
 const providerAutoAll = () => (cfg.providerAutoAll ??= {})
 const isAutoAllProvider = (name) => providerAutoAll()[name] === true
 async function syncAutoAllProvider(name) {
@@ -3129,20 +3131,15 @@ async function syncAutoAllProvider(name) {
   if (res.error) return
   const returned = new Set(res.ids)
   const manual = new Set((provider.manualModels ?? []).map(String))
-  const kept = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
-  const merged = [...new Set([...kept, ...res.ids])]
-  provider.models = merged
+  provider.models = (provider.models ?? []).filter((id) => returned.has(id) || manual.has(id))
   provider.modelAvailability ??= {}
   const at = new Date().toISOString()
-  for (const id of merged) provider.modelAvailability[id] = { available: returned.has(id), checkedAt: at }
+  for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
+  for (const id of manual) provider.modelAvailability[id] ??= { available: returned.has(id), checkedAt: at }
   mergeProviderModelDetails(provider, res.details)
-  // Every model of this provider is selected by definition, and the Models tab
-  // reads `all`, so it widens together with the Connections list.
-  const direct = (cfg.opencodeModels ??= {})[name]
-  if (direct) {
-    direct.all = true
-    direct.models = [...merged]
-  }
+  // A direct list that follows "all models" follows the refreshed list too.
+  const direct = cfg.opencodeModels?.[name]
+  if (direct?.all === true) direct.models = [...provider.models]
   cleanupModelMetadata()
   const chainsChanged = removeImageModelsFromChains()
   save()
@@ -3215,27 +3212,38 @@ $("pm-autoload").onchange = async (e) => {
   const map = providerAutoAll()
   if (e.target.checked) {
     map[name] = true
-    cfg.opencodeModels ??= {}
-    const direct = (cfg.opencodeModels[name] ??= {})
-    direct.all = true
-    direct.models = directModelIds(name, { ...direct, all: true })
+    save()
     await syncAutoAllProvider(name)
-    flash(true, `«${esc(name)}»: все модели будут обновляться при запуске`)
+    flash(true, `«${esc(name)}»: список моделей будет обновляться при запуске`)
   } else {
     delete map[name]
-    cfg.opencodeModels ??= {}
-    const direct = cfg.opencodeModels[name]
-    if (direct?.all === true) {
-      direct.all = false
-      direct.models = [...(cfg.providers[name]?.models ?? [])]
-    }
     save()
-    flash(true, `«${esc(name)}»: только выбранные модели`)
+    flash(true, `«${esc(name)}»: список моделей больше не обновляется при запуске`)
+  }
+  renderProviderModels()
+}
+$("pm-clear-all").onchange = (e) => {
+  const name = pmState.provider
+  if (!name) return
+  const provider = cfg.providers[name]
+  if (!provider) return
+  const ids = [...(provider.models ?? [])]
+  provider.models = []
+  const chainsBefore = chainFillSnapshot()
+  for (const id of ids) removeModelReferences(name, id)
+  const direct = cfg.opencodeModels?.[name]
+  if (direct) {
+    delete cfg.opencodeModels[name]
   }
   save()
-  renderProviderModels()
+  renderProviders()
+  renderModels()
   renderOpencodeModels()
   renderOpenCode()
+  renderImageGenerator()
+  renderProviderModels()
+  flash(true, `«${esc(name)}»: выделение снято с ${ids.length} моделей`)
+  reportEmptiedChains(chainsBefore)
 }
 $("pm-filter").oninput = (e) => {
   pmState.filter = e.target.value
@@ -3778,7 +3786,7 @@ const logCard = (line) => {
   const rest = m?.[2] ?? line
   const [head, ...tail] = rest.split(" → ")
   const detail = tail.join(" → ")
-  const cls = /пустой успешный ответ/.test(line) ? "warn" : /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
+  const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
   const card = document.createElement("div")
   card.className = "log-card" + (cls ? ` ${cls}` : "")
   const top = document.createElement("div")
