@@ -312,7 +312,7 @@
   .log-card .t { display: flex; gap: 10px; align-items: baseline; }
   .log-card .tm { color: #7d8796; font-size: 11px; font-variant-numeric: tabular-nums; }
   .log-card .b { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 10px; background: var(--surface); color: var(--muted); }
-  .log-card .m { margin-top: 3px; font-size: 12.5px; word-break: break-word; }
+  .log-card .m { margin-top: 3px; font-size: 12.5px; color: var(--text); word-break: break-word; }
   .log-card .m b { color: #d8e4f1; font-weight: 650; }
   .log-card.ok { border-left-color: var(--success); } .log-card.ok .b { background: rgba(105, 215, 160, .12); color: #b7e2c6; }
   .log-card.warn { border-left-color: #e5bd61; } .log-card.warn .b { background: rgba(229, 189, 97, .12); color: #edd9a0; }
@@ -376,10 +376,11 @@
   .token-row-foot { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
   .sep { opacity: .4; padding: 0 1px; }
   /* Table text stays readable but quieter than the chart fills: the numbers are
-     the point, the colour is only a hint. */
-  .warn { color: #d3b183; }
-  .bad { color: #d99a9a; }
-  .ok-cell { color: #86c7a7; }
+     the point, the colour is only a hint. Scoped to tables: an unscoped `.warn`
+     also matched `.log-card.warn` and turned the whole log message yellow. */
+  table .warn { color: #d3b183; }
+  table .bad { color: #d99a9a; }
+  table .ok-cell { color: #86c7a7; }
   table .problem-rate { margin-left: 6px; color: var(--muted); font-size: 10px; }
   /* Statistics is split into groups so one long page does not bury the table a
      reader came for. The tabs reuse the day-selector look for consistency. */
