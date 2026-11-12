@@ -108,7 +108,16 @@ pub(crate) const MODEL_ROWS_VERSION: u32 = 2;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct Usage {
+    /// When this day's counters started. For the current day it is reset on
+    /// load, so the statistics page can show the uptime of the current run.
     pub(crate) since: u128,
+    /// Epoch millis of the first and last counted request of the day. A past
+    /// day has no live process, so its "worked for" span is the window between
+    /// them, not the uptime of whichever run happened to write the snapshot.
+    #[serde(rename = "firstActivity")]
+    pub(crate) first_activity: u128,
+    #[serde(rename = "lastActivity")]
+    pub(crate) last_activity: u128,
     pub(crate) requests: u64,
     pub(crate) ok: u64,
     pub(crate) failed: u64,
@@ -146,6 +155,8 @@ impl Default for Usage {
     fn default() -> Self {
         Self {
             since: super::metrics::now_ms(),
+            first_activity: 0,
+            last_activity: 0,
             requests: 0,
             ok: 0,
             failed: 0,

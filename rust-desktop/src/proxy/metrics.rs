@@ -256,6 +256,11 @@ pub(crate) fn hour_key() -> String {
 /// hourly chart and the day totals cannot drift apart.
 pub(crate) fn hour_stat<'a>(usage: &'a mut Usage) -> &'a mut HourUsage {
     let key = hour_key();
+    let now = now_ms();
+    if usage.first_activity == 0 {
+        usage.first_activity = now;
+    }
+    usage.last_activity = now;
     usage.hours.entry(key).or_default()
 }
 

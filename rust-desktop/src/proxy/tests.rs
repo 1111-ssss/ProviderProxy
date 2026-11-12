@@ -168,6 +168,62 @@ fn models_are_keyed_by_provider_and_upstream_model() {
     assert_eq!(usage.models["aquadevs/deepseek-v4.1"].errors, 1);
 }
 
+/// Yesterday's hourly chart must survive the day rollover: the snapshot is
+/// written to SQLite every second, so the buckets a past day accumulated are
+/// read back instead of being rebuilt from live traffic (which is gone).
+#[test]
+fn hourly_buckets_survive_the_day_rollover() {
+    let path = std::env::temp_dir().join(format!(
+        "provider-proxy-hour-history-test-{}.db",
+        now_ms()
+    ));
+    let storage = super::config::open_storage(&path).unwrap();
+    let state = AppState {
+        config_path: std::sync::Arc::new(path.clone()),
+        storage: std::sync::Arc::new(storage),
+        config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
+        chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
+        cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
+        usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
+        lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        client: reqwest::Client::new(),
+        port: 0,
+        log_max: 10,
+    };
+    // The running process knows which day it is; an empty key would look like
+    // a rollover and swap the counters for the (still empty) stored snapshot.
+    let today_key = chrono::Local::now().format("%Y-%m-%d").to_string();
+    *state.usage_day.lock().unwrap() = today_key.clone();
+    {
+        let mut usage = state.usage.lock().unwrap();
+        let hour = hour_stat(&mut usage);
+        hour.tokens_in = 4321;
+        hour.requests = 3;
+        usage.first_activity = 1_700_000_000_000;
+        usage.last_activity = 1_700_003_600_000;
+    }
+    super::metrics::persist_usage(&state);
+
+    // A fresh process loads the same storage: the buckets are still there.
+    let storage = super::config::open_storage(&path).unwrap();
+    let (usage, history, today) = load_usage(&storage, &path.with_extension("json"));
+    assert_eq!(today, today_key);
+    let snapshot = history.get(&today).expect("today's snapshot is stored");
+    assert_eq!(snapshot.hours.len(), 1, "one hour bucket round-trips");
+    assert_eq!(
+        snapshot.hours.values().next().unwrap().tokens_in,
+        4321,
+        "hourly tokens are not lost on reload"
+    );
+    assert_eq!(snapshot.last_activity, 1_700_003_600_000);
+    assert_eq!(usage.first_activity, 1_700_000_000_000);
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn hourly_buckets_keep_tokens_and_outcomes_apart() {
     let mut usage = Usage::default();
