@@ -936,3 +936,96 @@ async fn a_network_error_does_not_steal_an_earlier_ok() {
     let _ = fs::remove_file(database);
     let _ = fs::remove_file(&opencode);
 }
+
+/// A model that thinks and then stops with no answer used to reach the client
+/// as a successful empty reply: the chat ended silently mid-run. Reasoning must
+/// not count as an answer, so the proxy fails over to the next upstream.
+#[tokio::test]
+async fn fails_over_when_a_stream_carries_only_reasoning() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let upstream_port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        let app = axum::Router::new().route(
+            "/v1/chat/completions",
+            axum::routing::post(|axum::Json(body): axum::Json<Value>| async move {
+                let model = body.get("model").and_then(Value::as_str).unwrap_or("");
+                // The "thinking" model answers with reasoning only, then stops.
+                let (reasoning, content) = if model == "thinking" {
+                    ("размышляю вслух", "")
+                } else {
+                    ("", "готово")
+                };
+                let frame = |text: &str, field: &str, finish: Value| {
+                    let mut delta = serde_json::Map::new();
+                    if !text.is_empty() {
+                        delta.insert(field.into(), Value::String(text.into()));
+                    }
+                    format!(
+                        "data: {}\n\n",
+                        json!({
+                            "id": "chatcmpl-test",
+                            "object": "chat.completion.chunk",
+                            "choices": [{ "index": 0, "delta": delta, "finish_reason": finish }]
+                        })
+                    )
+                };
+                let field = if reasoning.is_empty() { "content" } else { "reasoning_content" };
+                let text = if reasoning.is_empty() { content } else { reasoning };
+                let body = format!(
+                    "{}{}data: [DONE]\n\n",
+                    frame(text, field, Value::Null),
+                    frame("", "content", json!("stop"))
+                );
+                (
+                    [
+                        ("content-type", "text/event-stream"),
+                        ("x-accel-buffering", "no"),
+                    ],
+                    body,
+                )
+            }),
+        );
+        let _ = axum::serve(listener, app).await;
+    });
+
+    let path = std::env::temp_dir().join(format!("provider-proxy-reasoning-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 0,
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
+            "models": { "chain": { "upstreams": [
+                { "provider": "p", "model": "thinking" },
+                { "provider": "p", "model": "answering" }
+            ] } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let server = start_server(path.clone()).unwrap();
+    let response = Client::new()
+        .post(format!("http://127.0.0.1:{}/v1/chat/completions", server.port))
+        .json(&json!({ "model": "chain", "stream": true, "messages": [] }))
+        .send()
+        .await
+        .unwrap();
+    assert!(response.status().is_success());
+    let body = response.text().await.unwrap();
+    assert!(
+        body.contains("готово"),
+        "the real answer from the second upstream must reach the client: {body}"
+    );
+    assert!(
+        !body.contains("proxy_stream_error"),
+        "a silent empty answer must fail over, not surface as an error: {body}"
+    );
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}

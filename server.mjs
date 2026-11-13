@@ -280,7 +280,7 @@ try {
   database.close()
   throw err
 }
-let PORT, AUTH, LIMIT_COOLDOWN_MS, ERROR_COOLDOWN_MS, HEADER_TIMEOUT_MS
+let PORT, AUTH, LIMIT_COOLDOWN_MS, ERROR_COOLDOWN_MS, HEADER_TIMEOUT_MS, PENDING_BUFFER_BYTES
 let chains = new Map()
 
 const indexPath = join(here, "public", "index.html")
@@ -389,6 +389,10 @@ function applyConfig(c) {
   // upstream body is streamed without a wall-clock/read timeout: large
   // contexts can spend a minute or more in inference before their first byte.
   HEADER_TIMEOUT_MS = (c.headerTimeoutSec ?? 120) * 1000 // abort only if no response headers arrive in time
+  // How much reasoning-only output may be held while waiting for the answer.
+  // A model that thinks long before answering must not be dropped as empty;
+  // the cap only stops a stream that never answers from eating memory.
+  PENDING_BUFFER_BYTES = Math.min(Math.max(Number(c.pendingBufferBytes) || 8 * 1024 * 1024, 16 * 1024), 16 * 1024 * 1024)
   for (const [name, chain] of chains)
     for (const up of chain)
       if (!up.apiKey && !up.headers.authorization) log(`warn: upstream ${up.name} (model "${name}") has no apiKey`)
@@ -838,6 +842,34 @@ function completionToSse(text, upstream) {
 // Never fail over ordinary client errors (400/401/404/etc.). A chain may
 // switch only for these known quota/access/timeout/server failures.
 const FAILOVER = (status) => status === 402 || status === 403 || status === 408 || status === 429 || (status >= 500 && status <= 599)
+
+// True when a normalized SSE frame carries the actual answer. Reasoning alone
+// is not an answer: a model that thinks and then stops with finish_reason
+// "stop" and no text used to be forwarded as a successful empty reply, so the
+// chat ended silently with no error and no failover. Mirrors has_payload() in
+// rust-desktop/src/proxy/stream.rs.
+function frameHasAnswer(frame) {
+  for (const line of frame.split("\n")) {
+    if (!line.startsWith("data:")) continue
+    const payload = line.slice(5).trim()
+    if (!payload || payload === "[DONE]") continue
+    let parsed
+    try {
+      parsed = JSON.parse(payload)
+    } catch {
+      continue
+    }
+    if (!Array.isArray(parsed?.choices)) continue
+    for (const choice of parsed.choices) {
+      const delta = choice?.delta
+      if (!delta || typeof delta !== "object") continue
+      if (typeof delta.content === "string" && delta.content) return true
+      if (Array.isArray(delta.tool_calls) && delta.tool_calls.length) return true
+      if (delta.function_call && typeof delta.function_call === "object") return true
+    }
+  }
+  return false
+}
 
 // opencode не умеет сам брать список моделей у кастомного провайдера (GET /v1/models он не зовёт),
 // поэтому карта моделей должна лежать в его конфиге. Синхронизируем её отсюда: провайдер — источник истины.
@@ -1539,8 +1571,6 @@ async function proxyChat(body, res, session = null) {
         return res.end(t)
       }
 
-      // Success, or a client error that would repeat on every upstream (401, 404...): pass through untouched.
-      log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
       const isSse = (resp.headers.get("content-type") ?? "").includes("text/event-stream")
       const streamRequested = body.stream === true
       const headers = Object.fromEntries(resp.headers)
@@ -1554,44 +1584,111 @@ async function proxyChat(body, res, session = null) {
         headers["cache-control"] = "no-cache"
         log(`${exposed} → ${up.name}/${up.model}: upstream вернул обычный JSON вместо SSE, адаптирую поток`)
       }
-      res.writeHead(resp.status, headers)
       // "ok" means the upstream answered successfully. A 401/404 passed straight
       // through is a failed attempt, not a success.
-      if (resp.ok) {
-        usage.ok++
-        hourStat().ok++
-        pStat.ok++
-        mStat.ok++
-        if (sStat) sStat.ok++
-      } else {
-        usage.failed++
-        hourStat().failed++
+      const countOutcome = (ok) => {
+        if (ok) {
+          usage.ok++
+          hourStat().ok++
+          pStat.ok++
+          mStat.ok++
+          if (sStat) sStat.ok++
+        } else {
+          usage.failed++
+          hourStat().failed++
+          pStat.errors++
+          mStat.errors++
+          if (sStat) sStat.errors++
+        }
+      }
+      // A 200 that never carried an answer is a failed attempt, not a success:
+      // the client got nothing useful, so the chain must move on.
+      const failEmpty = () => {
+        cool(key, ERROR_COOLDOWN_MS)
+        usage.failovers++
         pStat.errors++
+        mStat.failovers++
         mStat.errors++
         if (sStat) sStat.errors++
+        lastError = `${up.name}: пустой ответ`
+        log(`${exposed} → свитч: ${up.name}/${up.model} ответил пусто, пробую следующего`)
       }
-      if (!resp.body) return res.end()
 
-      // Stream the body through untouched, watching for a usage report on the way (see tally()).
+      if (!resp.body) {
+        if (resp.ok) {
+          failEmpty()
+          continue
+        }
+        res.writeHead(resp.status, headers)
+        countOutcome(false)
+        return res.end()
+      }
+      // Stream the body through, watching for a usage report on the way (see
+      // tally()). Frames are held until one proves the stream is an answer, so
+      // reasoning-only output cannot pass as a successful empty reply.
       let tail = ""
       try {
         if (isSse) {
+          let committed = false
+          let answered = false
+          let held = []
+          let heldBytes = 0
+          const flushHeld = async () => {
+            for (const frame of held) if (!res.write(frame)) await once(res, "drain")
+            held = []
+            heldBytes = 0
+          }
+          const commit = async (force) => {
+            if (committed || (!force && !answered)) return
+            res.writeHead(resp.status, headers)
+            countOutcome(resp.ok)
+            committed = true
+            // Only now is it known that the stream carried a real answer.
+            log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
+            await flushHeld()
+          }
           for await (const event of normalizeSse(resp.body, exposed, up)) {
             tail = (tail + event).slice(-8192) // usage arrives in the final chunk
-            if (!res.write(event)) await once(res, "drain")
+            if (frameHasAnswer(event)) answered = true
+            if (committed) {
+              if (!res.write(event)) await once(res, "drain")
+              continue
+            }
+            if (!resp.ok) {
+              // 401/404 and friends are passed through untouched.
+              await commit(true)
+              if (!res.write(event)) await once(res, "drain")
+              continue
+            }
+            held.push(event)
+            heldBytes += Buffer.byteLength(event)
+            if (answered) await commit(false)
+            else if (heldBytes > PENDING_BUFFER_BYTES) {
+              // Never answered: drop the upstream and fail over.
+              await resp.body.cancel().catch(() => {})
+              break
+            }
+          }
+          if (!committed) {
+            // Nothing was written yet, so this attempt can still fail over.
+            failEmpty()
+            tally(tail, pStat, mStat, sStat)
+            continue
           }
           res.end()
-          // tally happens in finally, also on an interrupted stream
         } else {
           const chunks = []
           for await (const chunk of Readable.fromWeb(resp.body)) chunks.push(chunk)
           const text = Buffer.concat(chunks).toString("utf8")
+          res.writeHead(resp.status, headers)
+          countOutcome(resp.ok)
+          log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
           const normalized = streamRequested ? completionToSse(text, up) : null
           res.end(normalized ?? text)
           tally(text, pStat, mStat, sStat)
         }
       } catch (err) {
-        if (!res.destroyed && !res.writableEnded) {
+        if (!res.destroyed && !res.writableEnded && res.headersSent) {
           const message = `upstream stream ended unexpectedly: ${err.message ?? String(err)}`
           log(`${exposed} → ошибка потока ${up.name}/${up.model}: ${message}`)
           if (streamRequested) {
@@ -1600,6 +1697,10 @@ async function proxyChat(body, res, session = null) {
           } else {
             res.destroy()
           }
+        } else if (!res.destroyed) {
+          // Headers were never sent, so this attempt can fail over cleanly.
+          failEmpty()
+          continue
         }
       } finally {
         if (isSse) tally(tail, pStat, mStat, sStat)

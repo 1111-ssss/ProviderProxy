@@ -324,19 +324,17 @@ pub(super) async fn chat_completions(
                     }
                 }
             }
-            push_log(
-                &state,
-                format!(
-                    "{exposed} → {}: {}/{} (HTTP {status})",
-                    if status.is_success() {
-                        "ответ"
-                    } else {
-                        "ошибка"
-                    },
-                    upstream.name,
-                    upstream.model
-                ),
-            );
+            if !status.is_success() {
+                // A non-2xx that is passed straight through was already logged
+                // above, because its body is forwarded unchanged.
+                push_log(
+                    &state,
+                    format!(
+                        "{exposed} → ошибка: {}/{} (HTTP {status})",
+                        upstream.name, upstream.model
+                    ),
+                );
+            }
             let stream_requested = body.get("stream").and_then(Value::as_bool).unwrap_or(false);
             match stream_upstream_response(
                 response,
@@ -349,7 +347,21 @@ pub(super) async fn chat_completions(
             )
             .await
             {
-                Ok(response) => return response,
+                Ok(response) => {
+                    // Only now is it known that the stream carried a real
+                    // answer: a 200 that held nothing but reasoning used to be
+                    // logged as "ответ" and then fail silently on the client.
+                    if status.is_success() {
+                        push_log(
+                            &state,
+                            format!(
+                                "{exposed} → ответ: {}/{} (HTTP {status})",
+                                upstream.name, upstream.model
+                            ),
+                        );
+                    }
+                    return response;
+                }
                 Err(err) => {
                     // The 200 status already counted a provisional "ok"; the
                     // empty body moves it to errors through record_failure.

@@ -414,45 +414,46 @@ fn take_sse_events(buffer: &mut String, flush: bool) -> Vec<String> {
     events
 }
 
-/// True when an SSE frame carries something the client can show: text,
-/// reasoning, a tool call or a function call. Keep-alives, role-only deltas and
-/// usage frames are not an answer.
+/// True when an SSE frame carries the actual answer. Reasoning alone is not an
+/// answer: `deepseek-v4.1-flash` can spend its whole budget thinking and then
+/// stop with `finish_reason: "stop"` and no text, which used to be forwarded as
+/// a successful empty reply — the client saw a clean end and the dialogue died
+/// with no error and no failover. Reasoning frames are still buffered and reach
+/// the client as soon as the first real token arrives, so nothing is lost on a
+/// normal answer.
 fn has_payload(event: &str) -> bool {
-    let Some(rest) = event.trim_start().strip_prefix("data:") else {
-        return false;
-    };
-    let rest = rest.trim();
-    if rest.is_empty() || rest == "[DONE]" {
-        return false;
-    }
-    let Ok(value) = serde_json::from_str::<Value>(rest) else {
-        return false;
-    };
-    let Some(choices) = value.get("choices").and_then(Value::as_array) else {
-        return false;
-    };
-    choices.iter().any(|choice| {
-        let Some(delta) = choice.get("delta") else {
-            return false;
-        };
-        let text = |key: &str| {
-            delta
-                .get(key)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.is_empty())
-        };
-        text("content")
-            || text("reasoning_content")
-            || text("reasoning")
-            || delta
-                .get("tool_calls")
-                .and_then(Value::as_array)
-                .is_some_and(|calls| !calls.is_empty())
-            || delta.get("function_call").is_some_and(Value::is_object)
-    })
+    event_delta(event).is_some_and(|delta| has_content(&delta))
 }
 
-/// Same question for a non-streaming OpenAI body.
+fn has_content(delta: &serde_json::Map<String, Value>) -> bool {
+    delta
+        .get("content")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty())
+        || delta
+            .get("tool_calls")
+            .and_then(Value::as_array)
+            .is_some_and(|calls| !calls.is_empty())
+        || delta.get("function_call").is_some_and(Value::is_object)
+}
+
+/// The first choice's `delta` of an SSE frame, when the frame is a JSON object
+/// with choices. Everything else (keep-alives, `[DONE]`, malformed frames) is
+/// not a delta.
+fn event_delta(event: &str) -> Option<serde_json::Map<String, Value>> {
+    let rest = event.trim_start().strip_prefix("data:")?.trim();
+    if rest.is_empty() || rest == "[DONE]" {
+        return None;
+    }
+    let value = serde_json::from_str::<Value>(rest).ok()?;
+    value
+        .get("choices")?
+        .as_array()?
+        .iter()
+        .find_map(|choice| choice.get("delta")?.as_object().cloned())
+}
+
+/// Same question as `has_payload` for a non-streaming OpenAI body.
 fn completion_has_content(bytes: &[u8]) -> bool {
     let Ok(value) = serde_json::from_slice::<Value>(bytes) else {
         return false;
@@ -461,28 +462,33 @@ fn completion_has_content(bytes: &[u8]) -> bool {
         return false;
     };
     choices.iter().any(|choice| {
-        let Some(message) = choice.get("message") else {
-            return false;
-        };
-        let text = |key: &str| {
-            message
-                .get(key)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.is_empty())
-        };
-        text("content")
-            || text("reasoning_content")
-            || text("reasoning")
-            || message
-                .get("tool_calls")
-                .and_then(Value::as_array)
-                .is_some_and(|calls| !calls.is_empty())
-            || message.get("function_call").is_some_and(Value::is_object)
+        choice
+            .get("message")
+            .and_then(Value::as_object)
+            .is_some_and(has_content)
     })
 }
 
-/// How much of an answer may be held back while waiting for its first token.
-const PENDING_LIMIT: usize = 64 * 1024;
+/// How much of a stream may be held back while it has produced reasoning but no
+/// answer yet. A model that thinks for a long time before answering would
+/// otherwise be dropped as empty; the cap only stops a stream that never
+/// answers from eating memory. Configurable (`pendingBufferBytes`), because
+/// long-reasoning models emit far more than the old 64 KiB.
+const PENDING_LIMIT_DEFAULT: usize = 8 * 1024 * 1024;
+const PENDING_LIMIT_MIN: usize = 16 * 1024;
+const PENDING_LIMIT_MAX: usize = 16 * 1024 * 1024;
+
+fn pending_limit(state: &AppState) -> usize {
+    state
+        .config
+        .read()
+        .unwrap()
+        .get("pendingBufferBytes")
+        .and_then(Value::as_u64)
+        .map(|value| value as usize)
+        .unwrap_or(PENDING_LIMIT_DEFAULT)
+        .clamp(PENDING_LIMIT_MIN, PENDING_LIMIT_MAX)
+}
 
 pub(super) async fn stream_upstream_response(
     response: reqwest::Response,
@@ -493,6 +499,7 @@ pub(super) async fn stream_upstream_response(
     stream_requested: bool,
     session: Option<String>,
 ) -> Result<Response, String> {
+    let pending_limit = pending_limit(&state);
     let status = response.status();
     let mut headers = response.headers().clone();
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
@@ -558,7 +565,7 @@ pub(super) async fn stream_upstream_response(
                             }
                         }
                         queued = 0;
-                    } else if queued > PENDING_LIMIT {
+                    } else if queued > pending_limit {
                         if let Some(sender) = signal.take() {
                             let _ = sender.send(false);
                         }
@@ -940,6 +947,10 @@ mod tests {
             "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\n",
             "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
             "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":1}}\n\n",
+            // Reasoning alone is not an answer: a model that thinks and then
+            // stops leaves the client with an empty reply and a dead dialogue.
+            "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"reasoning\":\"thinking\"}}]}\n\n",
         ] {
             assert!(!has_payload(event), "not answer payload: {event}");
         }
@@ -950,6 +961,9 @@ mod tests {
             assert!(has_payload(event), "answer payload: {event}");
         }
         assert!(!completion_has_content(br#"{"choices":[{"message":{"content":""}}]}"#));
+        assert!(!completion_has_content(
+            br#"{"choices":[{"message":{"reasoning_content":"thought"}}]}"#
+        ));
         assert!(completion_has_content(br#"{"choices":[{"message":{"content":"hi"}}]}"#));
     }
 }

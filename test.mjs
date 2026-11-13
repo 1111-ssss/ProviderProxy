@@ -29,6 +29,21 @@ const upstreamA = createServer((_req, res) => {
   _req.on("data", (c) => (raw += c))
   _req.on("end", () => {
     aHits++
+    let body = {}
+    try {
+      body = JSON.parse(raw)
+    } catch {
+      /* not JSON: fall through to the quota error below */
+    }
+    // "reasoning-only": a stream whose only output is thinking, then a stop
+    // with no text. That is the silent empty answer that used to end the chat
+    // with no error and no failover. Only A behaves this way, so a chain that
+    // starts with A must reach its next upstream.
+    if (body.stream && body.messages?.[0]?.content === "reasoning-only") {
+      res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" })
+      res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ index: 0, delta: { reasoning_content: "thinking hard" }, finish_reason: null }] })}\n\n`)
+      return res.end(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\r\n\r\n`)
+    }
     // A "не умеет" картинки: такой запрос отвечает 400 unsupported (как hyperfusion на image_url)
     if (raw.includes("image_url")) {
       res.writeHead(400, { "content-type": "application/json" })
@@ -84,7 +99,18 @@ const upstreamB = createServer((req, res) => {
         res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" })
         res.write(": keepalive\r\n\r\n")
         res.write("event: message\r\ndata: null\r\n\r\n")
-        if (body.messages?.[0]?.content === "no-finish") return res.end("data: {\"id\":\"chatcmpl-test\",\"choices\":[]}\n\ndata: [DONE]\r\n\r\n")
+        if (body.messages?.[0]?.content === "no-finish") {
+          // A content frame, then [DONE] with no terminal choice: the proxy
+          // must synthesize finish_reason.
+          res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ index: 0, delta: { content: "partial" }, finish_reason: null }] })}\n\n`)
+          return res.end("data: [DONE]\r\n\r\n")
+        }
+        if (body.messages?.[0]?.content === "reasoning-only" && body.model === "model-b") {
+          // Defensive: if the chain ever reaches B with the thinking prompt, B
+          // answers normally. A is the one that only thinks.
+          res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ index: 0, delta: { content: "ok" }, finish_reason: null }] })}\n\n`)
+          return res.end("data: [DONE]\r\n\r\n")
+        }
         if (body.messages?.[0]?.content === "broken-stream") {
           res.write(`data: ${JSON.stringify({ id: "chatcmpl-test", choices: [{ delta: { content: "partial" } }] })}\n\n`)
           return setTimeout(() => res.destroy(), 10)
@@ -143,6 +169,14 @@ writeFileSync(
       },
       // для 2b: у "img" свой ключ кулдауна, A на нём не охлаждён после шага 1
       img: {
+        upstreams: [
+          { name: "A", baseURL: `${base(A)}/v1`, apiKey: "key-a", model: "model-a" },
+          { name: "B", baseURL: `${base(B)}/v1`, apiKey: "key-b", model: "model-b" },
+        ],
+      },
+      // Своя цепочка: у неё свой ключ кулдауна, поэтому A здесь ещё не
+      // охлаждён шагом 1 и «думающая» модель действительно идёт первой.
+      smart: {
         upstreams: [
           { name: "A", baseURL: `${base(A)}/v1`, apiKey: "key-a", model: "model-a" },
           { name: "B", baseURL: `${base(B)}/v1`, apiKey: "key-b", model: "model-b" },
@@ -235,6 +269,21 @@ try {
   assert.equal((await r2.json()).ok, true)
   assert.equal(aHits, 1)
 
+  // A stream whose only output is reasoning used to reach the client as a
+  // successful empty reply: the chat ended with no error and no failover.
+  // The chain must move on to the next upstream instead. "smart" is its own
+  // chain, so A is not yet cooling down here.
+  const reasoningStream = await postStream("smart", "reasoning-only")
+  assert.equal(reasoningStream.status, 200)
+  const reasoningText = await reasoningStream.text()
+  assert.match(reasoningText, /"content":"ok"/, "a reasoning-only attempt must fail over to the next upstream")
+  assert.ok(!reasoningText.includes('"reasoning_content"'), "the dropped attempt must not leak its thinking")
+  const reasoningLogs = await (await fetch(`${base(PROXY)}/api/logs`)).json()
+  assert.ok(
+    reasoningLogs.lines.some((line) => line.includes("ответил пусто")),
+    "a silent empty answer must be logged as an empty attempt",
+  )
+
   // Gateways commonly require tool-call arguments to be a JSON string. The
   // client can send a parsed object after a previous tool result; normalize it
   // before forwarding so the request is accepted by strict upstreams.
@@ -269,7 +318,7 @@ try {
   const models = await (await fetch(`${base(PROXY)}/v1/models`)).json()
   assert.deepEqual(
     models.data.map((m) => m.id),
-    ["test", "img"],
+    ["test", "img", "smart"],
   )
   assert.equal((await post("nope")).status, 404)
 
@@ -580,34 +629,33 @@ try {
 
   // 10. Usage dashboard: requests, failover, per-provider 429 and token tallies.
   const u = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(u.requests, 10) // r1, stream, incomplete stream, broken stream, r2, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
-  assert.equal(u.ok, 10)
-  assert.equal(u.failovers, 2) // r1 (429 off A) and 2b (400 off A)
+  assert.equal(u.requests, 11) // r1, stream, incomplete stream, broken stream, r2, reasoning-only, tool request, ri, r7, direct, paused — not the /v1/models GET nor the unknown model
+  assert.equal(u.ok, 11)
+  assert.equal(u.failovers, 3) // r1 (429 off A), 2b (400 off A) and the empty reasoning-only answer off A
   assert.equal(u.failed, 0)
   assert.equal(u.skipped, 0, "a request that reached an upstream is never counted as skipped")
-  assert.equal(u.providers.A.requests, 2)
+  assert.equal(u.providers.A.requests, 3) // r1 (429), 2b (400) and the empty reasoning-only stream
   assert.equal(u.providers.A.limits, 1)
-  assert.equal(u.providers.A.errors, 1) // 400 unsupported on the img chain
-  assert.equal(u.providers.B.ok, 10)
+  assert.equal(u.providers.A.errors, 2) // 400 unsupported on the img chain + the empty stream
+  assert.equal(u.providers.B.ok, 11)
   // A chain is an alias, not a model: rows are the real upstream models, so
   // two chains on one provider model share a single row instead of splitting it.
   assert.ok(!u.models.test && !u.models.img && !u.models.fresh && !u.models.paused, "chain names must not become model rows")
-  assert.equal(u.models["A/model-a"].requests, 2) // r1 (429) and 2b (400)
+  assert.equal(u.models["A/model-a"].requests, 3) // r1 (429), 2b (400) and the empty stream
   assert.equal(u.models["A/model-a"].limits, 1)
-  assert.equal(u.models["A/model-a"].errors, 1)
+  assert.equal(u.models["A/model-a"].errors, 2)
   assert.equal(u.models["B/model-b2"].requests, 2) // fresh chain + direct call
   const modelAttempts = Object.values(u.models).reduce((n, m) => n + (m.requests || 0), 0)
   const providerAttempts = Object.values(u.providers).reduce((n, p) => n + (p.requests || 0), 0)
   assert.equal(modelAttempts, providerAttempts, "model rows must add up to the attempts providers saw")
-  assert.equal(u.tokensIn, 77) // 7 successful chats x 11 prompt tokens from B
+  assert.equal(u.tokensIn, 77) // 7 non-streamed successful chats x 11 prompt tokens from B
   assert.equal(u.tokensOut, 154)
-  assert.equal(u.tokensIn, 77)
   assert.equal(u.lifetimeTokens?.tokensIn, 77, "lifetime totals must be exposed to the GUI")
   assert.equal(u.lifetimeTokens?.tokensOut, 154)
   assert.equal(u.retentionDays, 7)
   assert.equal(u.days.length, 7)
   assert.equal(u.days[0].date, dayKey(0))
-  assert.equal(u.days[0].requests, 10)
+  assert.equal(u.days[0].requests, 11)
   assert.equal(u.days.find((day) => day.date === dayKey(-1)).requests, 3, "yesterday should remain a separate persisted day")
   assert.equal(u.days.find((day) => day.date === dayKey(-8)), undefined, "history older than seven days must be pruned")
   assert.ok(u.cooldowns.length >= 1 && u.cooldowns.every((c) => c.upstream === "A")) // A cooling after 429/400
@@ -647,7 +695,7 @@ try {
   }
   assert.equal(restartedReady, true, `proxy did not restart:\n${restartedOut}`)
   const afterRestart = await (await fetch(`${base(PROXY)}/api/usage`)).json()
-  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 10, "today stats should survive restart")
+  assert.equal(afterRestart.days.find((day) => day.date === dayKey(0)).requests, 11, "today stats should survive restart")
   assert.equal(afterRestart.days.find((day) => day.date === dayKey(-1)).requests, 3, "previous day stats should survive restart")
 
   // 13. Sessions are counted from the harness header alone.
