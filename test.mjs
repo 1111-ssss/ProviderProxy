@@ -457,7 +457,7 @@ try {
   })
   assert.deepEqual((await r5b.json()).models, ["model-b", "model-b2", "model-b3"])
   const safeConfig = await (await fetch(`${base(PROXY)}/api/config`)).json()
-  assert.equal(safeConfig.appVersion, "0.1.7", "config should expose the application version")
+  assert.equal(safeConfig.appVersion, "0.1.8", "config should expose the application version")
   assert.equal(safeConfig.providers.B.apiKey, "", "GUI config must not receive the plaintext provider key")
   assert.equal(safeConfig.providers.B.apiKeyConfigured, true)
   assert.equal(safeConfig.models.paused.enabled, false, "disabled chain state should persist")
