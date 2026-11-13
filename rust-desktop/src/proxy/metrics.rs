@@ -282,6 +282,22 @@ pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
     }
 }
 
+/// Log lines that belong to one harness conversation carry its id as a trailing
+/// tag, so the GUI can show which chat a request came from. Non-chat lines have
+/// no session and no tag; the GUI strips the tag and renders it as a chip.
+pub(crate) fn session_tag(session: Option<&str>) -> String {
+    match session.filter(|id| !id.is_empty()) {
+        Some(id) => format!(" [ses:{id}]"),
+        None => String::new(),
+    }
+}
+
+/// `push_log` for a chat request: appends the session id tag when the client
+/// sent one, so the GUI can attribute the line to a conversation.
+pub(crate) fn push_chat_log(state: &AppState, session: Option<&str>, message: impl Into<String>) {
+    push_log(state, format!("{}{}", message.into(), session_tag(session)));
+}
+
 /// Bucket key for the current local hour, "HH".
 pub(crate) fn hour_key() -> String {
     Local::now().format("%H").to_string()

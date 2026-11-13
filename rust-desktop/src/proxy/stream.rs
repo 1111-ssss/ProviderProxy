@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
-    metrics::{hour_stat, push_log, session_stat, tally_usage},
+    metrics::{hour_stat, push_chat_log, session_stat, tally_usage},
     types::AppState,
 };
 
@@ -510,8 +510,9 @@ pub(super) async fn stream_upstream_response(
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.to_ascii_lowercase().contains("text/event-stream"));
     if stream_requested && !is_sse {
-        push_log(
+        push_chat_log(
             &state,
+            session.as_deref(),
             format!(
                 "{exposed} → {provider}/{upstream_model}: upstream вернул обычный JSON вместо SSE, адаптирую поток"
             ),
@@ -613,8 +614,9 @@ pub(super) async fn stream_upstream_response(
                                 emit!(normalized, visible);
                             }
                             Ok(None) => {}
-                            Err(reason) => push_log(
+                            Err(reason) => push_chat_log(
                                 &state,
+                                session.as_deref(),
                                 format!(
                                     "{exposed} → пропущен SSE кадр {provider}/{upstream_model}: {reason}"
                                 ),
@@ -647,8 +649,9 @@ pub(super) async fn stream_upstream_response(
                         emit!(normalized, visible);
                     }
                     Ok(None) => {}
-                    Err(reason) => push_log(
+                    Err(reason) => push_chat_log(
                         &state,
+                        session.as_deref(),
                         format!(
                             "{exposed} → пропущен SSE кадр {provider}/{upstream_model}: {reason}"
                         ),
@@ -658,8 +661,9 @@ pub(super) async fn stream_upstream_response(
         }
         if let Some(reason) = upstream_error {
             let message = format!("upstream stream ended unexpectedly: {reason}");
-            push_log(
+            push_chat_log(
                 &state,
+                session.as_deref(),
                 format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
             );
             if released && stream_requested {
@@ -672,8 +676,9 @@ pub(super) async fn stream_upstream_response(
         } else if is_sse && !normalizer.done_seen {
             if normalizer.is_incomplete() {
                 let message = "upstream SSE stream ended before [DONE]";
-                push_log(
+                push_chat_log(
                     &state,
+                    session.as_deref(),
                     format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
                 );
                 if released && stream_requested {
@@ -690,8 +695,9 @@ pub(super) async fn stream_upstream_response(
             }
         }
         if !has_answer {
-            push_log(
+            push_chat_log(
                 &state,
+                session.as_deref(),
                 format!("{exposed} → свитч: {provider}/{upstream_model} ответил пусто"),
             );
             if let Some(sender) = signal.take() {
@@ -704,8 +710,9 @@ pub(super) async fn stream_upstream_response(
             .is_err()
         {
             let message = "proxy stream task panicked; the answer was cut off";
-            push_log(
+            push_chat_log(
                 &state,
+                session.as_deref(),
                 format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
             );
             // The task that owned `tx` is gone, so report through the sender we

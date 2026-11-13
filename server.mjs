@@ -655,7 +655,7 @@ const tally = (text, ...stats) => {
 // keepalives. OpenCode's strict chat decoder expects only object JSON events
 // (plus [DONE]); passing those extra frames through causes an invalid stream
 // event and aborts an otherwise valid response.
-async function* normalizeSse(body, exposed, upstream) {
+async function* normalizeSse(body, exposed, upstream, session = null) {
   const decoder = new TextDecoder()
   let buffer = ""
   let tail = ""
@@ -700,7 +700,7 @@ async function* normalizeSse(body, exposed, upstream) {
     try {
       const parsed = JSON.parse(payload)
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен не-объектный SSE кадр`)
+        log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен не-объектный SSE кадр${sesTag(session)}`)
         return ""
       }
       if (!Array.isArray(parsed.choices)) {
@@ -709,7 +709,7 @@ async function* normalizeSse(body, exposed, upstream) {
         return ""
       }
       if (!parsed.choices.length && !parsed.usage) {
-        log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен пустой SSE кадр`)
+        log(`${exposed} → ${upstream.name}/${upstream.model}: пропущен пустой SSE кадр${sesTag(session)}`)
         return ""
       }
       lastMeta = {
@@ -787,7 +787,7 @@ async function* normalizeSse(body, exposed, upstream) {
     const incomplete = !choiceIndexes.size || [...choiceIndexes].some((index) => !finishReasons.has(index))
     if (incomplete) {
       const message = "upstream SSE stream ended before [DONE]"
-      log(`${exposed} → ошибка потока ${upstream.name}/${upstream.model}: ${message}`)
+      log(`${exposed} → ошибка потока ${upstream.name}/${upstream.model}: ${message}${sesTag(session)}`)
       yield streamErrorSse(message)
     } else {
       const final = terminal()
@@ -944,10 +944,15 @@ function syncOpencode() {
       directEntries.push(name)
     }
   }
+  const serialized = JSON.stringify(doc, null, 2) + "\n"
+  // The GUI saves on every edit and most edits do not touch the model map.
+  // Rewriting an unchanged file churns its mtime and opencode reloads the
+  // whole config for nothing, so an identical document is left alone.
+  if (serialized === raw) return true
   // Пишем НА МЕСТЕ (тот же inode): opencode следит за файлом и перечитывает его только так.
   // rename() менял inode — opencode не подхватывал новые модели. Бэкап рядом, чтобы откатить руками.
   writeFileSync(path + ".bak", raw)
-  writeFileSync(path, JSON.stringify(doc, null, 2) + "\n")
+  writeFileSync(path, serialized)
   log(`opencode: ${enabled ? enabledEntries.length + directEntries.length : 0} моделей провайдера «${id}» записаны в ${path}${enabled ? "" : " (интеграция выключена)"}`)
   return true
 }
@@ -1154,9 +1159,12 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: "config must be an object with a models object" }))
       }
       const nextConfig = mergeConfigSecrets(body, config)
+      const prevConfig = config
       applyConfig(nextConfig)
       saveStoredConfig(nextConfig)
-      log(`config updated via GUI: ${Object.keys(nextConfig.providers ?? {}).length} providers, ${chains.size} models`)
+      // The GUI saves on every edit; an unchanged config is noise in the log.
+      if (JSON.stringify(nextConfig) !== JSON.stringify(prevConfig))
+        log(`config updated via GUI: ${Object.keys(nextConfig.providers ?? {}).length} providers, ${chains.size} models`)
       const opencodeSynced = syncOpencode() // карта моделей в конфиге opencode — чтобы новые модели были видны сразу
       res.writeHead(200, { "content-type": "application/json" })
       return res.end(JSON.stringify({ ok: true, opencodeSynced, restartRequired: (nextConfig.port ?? 8787) !== listenPort }))
@@ -1472,6 +1480,11 @@ const fmtDur = (ms) => {
   return m >= 1 ? `${m}m ${s % 60}s` : `${s}s`
 }
 
+// Chat log lines carry the harness session id as a trailing tag, so the GUI can
+// show which conversation a request came from. Mirrors session_tag() in
+// rust-desktop/src/proxy/metrics.rs.
+const sesTag = (session) => (session ? ` [ses:${session}]` : "")
+
 async function proxyChat(body, res, session = null) {
   rollUsageDay()
   const exposed = body.model
@@ -1566,7 +1579,7 @@ async function proxyChat(body, res, session = null) {
         usage.failed++
         hourStat().failed++
         if (sStat) sStat.errors++
-        log(`${exposed} → ошибка: ${up.name}/${up.model} (HTTP 400${t.trim() ? `: ${upstreamErrorMessage(t)}` : ""})`)
+        log(`${exposed} → ошибка: ${up.name}/${up.model} (HTTP 400${t.trim() ? `: ${upstreamErrorMessage(t)}` : ""})${sesTag(session)}`)
         res.writeHead(400, { "content-type": resp.headers.get("content-type") ?? "application/json" })
         return res.end(t)
       }
@@ -1582,7 +1595,7 @@ async function proxyChat(body, res, session = null) {
       if (streamRequested && !isSse) {
         headers["content-type"] = "text/event-stream; charset=utf-8"
         headers["cache-control"] = "no-cache"
-        log(`${exposed} → ${up.name}/${up.model}: upstream вернул обычный JSON вместо SSE, адаптирую поток`)
+        log(`${exposed} → ${up.name}/${up.model}: upstream вернул обычный JSON вместо SSE, адаптирую поток${sesTag(session)}`)
       }
       // "ok" means the upstream answered successfully. A 401/404 passed straight
       // through is a failed attempt, not a success.
@@ -1611,7 +1624,7 @@ async function proxyChat(body, res, session = null) {
         mStat.errors++
         if (sStat) sStat.errors++
         lastError = `${up.name}: пустой ответ`
-        log(`${exposed} → свитч: ${up.name}/${up.model} ответил пусто, пробую следующего`)
+        log(`${exposed} → свитч: ${up.name}/${up.model} ответил пусто, пробую следующего${sesTag(session)}`)
       }
 
       if (!resp.body) {
@@ -1644,10 +1657,10 @@ async function proxyChat(body, res, session = null) {
             countOutcome(resp.ok)
             committed = true
             // Only now is it known that the stream carried a real answer.
-            log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
+            log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})${sesTag(session)}`)
             await flushHeld()
           }
-          for await (const event of normalizeSse(resp.body, exposed, up)) {
+          for await (const event of normalizeSse(resp.body, exposed, up, session)) {
             tail = (tail + event).slice(-8192) // usage arrives in the final chunk
             if (frameHasAnswer(event)) answered = true
             if (committed) {
@@ -1682,7 +1695,7 @@ async function proxyChat(body, res, session = null) {
           const text = Buffer.concat(chunks).toString("utf8")
           res.writeHead(resp.status, headers)
           countOutcome(resp.ok)
-          log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})`)
+          log(`${exposed} → ${resp.ok ? "ответ" : "ошибка"}: ${up.name}/${up.model} (HTTP ${resp.status})${sesTag(session)}`)
           const normalized = streamRequested ? completionToSse(text, up) : null
           res.end(normalized ?? text)
           tally(text, pStat, mStat, sStat)
@@ -1690,7 +1703,7 @@ async function proxyChat(body, res, session = null) {
       } catch (err) {
         if (!res.destroyed && !res.writableEnded && res.headersSent) {
           const message = `upstream stream ended unexpectedly: ${err.message ?? String(err)}`
-          log(`${exposed} → ошибка потока ${up.name}/${up.model}: ${message}`)
+          log(`${exposed} → ошибка потока ${up.name}/${up.model}: ${message}${sesTag(session)}`)
           if (streamRequested) {
             res.write(streamErrorSse(message))
             res.end()

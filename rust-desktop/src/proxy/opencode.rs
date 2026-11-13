@@ -202,21 +202,24 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
         }
     }
     provider.insert("models".into(), Value::Object(models));
+    let serialized = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&document).unwrap_or_else(|_| raw.clone())
+    );
+    // The GUI saves on every edit, and most edits do not touch the model map.
+    // Rewriting an unchanged file churns its mtime and opencode reloads the
+    // whole config for nothing, so an identical document is left alone and
+    // nothing is logged.
+    if serialized == raw {
+        return true;
+    }
     if let Some(parent) = path.parent() {
         if fs::create_dir_all(parent).is_err() {
             return false;
         }
     }
     let _ = fs::write(format!("{}.bak", path.display()), &raw);
-    if fs::write(
-        &path,
-        format!(
-            "{}\n",
-            serde_json::to_string_pretty(&document).unwrap_or_else(|_| raw.clone())
-        ),
-    )
-    .is_err()
-    {
+    if fs::write(&path, serialized).is_err() {
         return false;
     }
     push_log(

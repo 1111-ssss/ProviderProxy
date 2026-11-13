@@ -11,7 +11,7 @@ use tokio::time::timeout;
 use super::{
     auth::authorized,
     handlers::json_error,
-    metrics::{hour_stat, model_stat, provider_stat, push_log, session_stat},
+    metrics::{hour_stat, model_stat, provider_stat, push_chat_log, session_stat},
     routing::{failover_status, with_model},
     stream::stream_upstream_response,
     types::{AppState, Upstream},
@@ -166,8 +166,9 @@ pub(super) async fn chat_completions(
                     // headers, so only the error bucket moves.
                     record_failure(&state, upstream, &key, &session);
                     last_error = format!("{}: {err}", upstream.name);
-                    push_log(
+                    push_chat_log(
                         &state,
+                        session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
                     continue;
@@ -226,8 +227,9 @@ pub(super) async fn chat_completions(
                     }
                 }
                 last_error = format!("{}: HTTP {status}", upstream.name);
-                push_log(
+                push_chat_log(
                     &state,
+                    session.as_deref(),
                     format!(
                         "{exposed} → свитч: {}/{} заблокирован (HTTP {status}), пробую следующего",
                         upstream.name, upstream.model
@@ -242,8 +244,9 @@ pub(super) async fn chat_completions(
                 {
                     record_failure(&state, upstream, &key, &session);
                     last_error = format!("{}: HTTP 400, unsupported content", upstream.name);
-                    push_log(
+                    push_chat_log(
                         &state,
+                        session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
                     continue;
@@ -263,8 +266,9 @@ pub(super) async fn chat_completions(
                             row.errors += 1;
                         }
                     }
-                    push_log(
+                    push_chat_log(
                         &state,
+                        session.as_deref(),
                         format!(
                             "{exposed} → ошибка: {}/{} (HTTP 400)",
                             upstream.name, upstream.model
@@ -279,8 +283,9 @@ pub(super) async fn chat_completions(
                 }
                 record_failure(&state, &upstream, &key, &session);
                 last_error = format!("{}: HTTP 400 {text}", upstream.name);
-                push_log(
+                push_chat_log(
                     &state,
+                    session.as_deref(),
                     format!("{exposed} → свитч: {last_error}, пробую следующего"),
                 );
                 continue;
@@ -291,8 +296,9 @@ pub(super) async fn chat_completions(
             if retry_forever && !status.is_success() {
                 record_failure(&state, &upstream, &key, &session);
                 last_error = format!("{}: HTTP {status}", upstream.name);
-                push_log(
+                push_chat_log(
                     &state,
+                    session.as_deref(),
                     format!("{exposed} → свитч: {last_error}, пробую следующего"),
                 );
                 continue;
@@ -327,8 +333,9 @@ pub(super) async fn chat_completions(
             if !status.is_success() {
                 // A non-2xx that is passed straight through was already logged
                 // above, because its body is forwarded unchanged.
-                push_log(
+                push_chat_log(
                     &state,
+                    session.as_deref(),
                     format!(
                         "{exposed} → ошибка: {}/{} (HTTP {status})",
                         upstream.name, upstream.model
@@ -352,8 +359,9 @@ pub(super) async fn chat_completions(
                     // answer: a 200 that held nothing but reasoning used to be
                     // logged as "ответ" and then fail silently on the client.
                     if status.is_success() {
-                        push_log(
+                        push_chat_log(
                             &state,
+                            session.as_deref(),
                             format!(
                                 "{exposed} → ответ: {}/{} (HTTP {status})",
                                 upstream.name, upstream.model
@@ -368,8 +376,9 @@ pub(super) async fn chat_completions(
                     revert_provisional_ok(&state, upstream, &session);
                     record_failure(&state, &upstream, &key, &session);
                     last_error = format!("{}: {err}", upstream.name);
-                    push_log(
+                    push_chat_log(
                         &state,
+                        session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
                 }
@@ -395,8 +404,9 @@ pub(super) async fn chat_completions(
             .min()
             .unwrap_or(Duration::from_secs(2))
             .clamp(Duration::from_secs(1), Duration::from_secs(60));
-        push_log(
+        push_chat_log(
             &state,
+            session.as_deref(),
             format!(
                 "{exposed} → все апстримы недоступны, повторяю через {} с (режим ретрая)",
                 wait.as_secs()

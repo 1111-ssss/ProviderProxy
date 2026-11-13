@@ -339,7 +339,14 @@
   .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
   .log-card .t { display: flex; gap: 10px; align-items: baseline; }
   .log-card .tm { color: #7d8796; font-size: 11px; font-variant-numeric: tabular-nums; }
+  /* The chain or model name follows the time with a clear gap of its own. */
+  .log-card .chain { color: #c3cede; font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Session id is pushed to the right, just left of the event badge. */
+  .log-card .ses { margin-left: auto; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 8px; background: var(--surface); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .log-card .b { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 10px; background: var(--surface); color: var(--muted); }
+  /* When the session chip is present it takes the free space, so the badge only
+     needs the small gap next to it. */
+  .log-card .ses + .b { margin-left: 8px; }
   .log-card .m { margin-top: 3px; font-size: 12.5px; color: var(--text); word-break: break-word; }
   .log-card .m b { color: #d8e4f1; font-weight: 650; }
   .log-card.ok { border-left-color: var(--success); } .log-card.ok .b { background: rgba(105, 215, 160, .12); color: #b7e2c6; }
@@ -1248,6 +1255,20 @@
             <input id="s-retry-forever" type="checkbox">
             <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>
           </label>
+          <label>
+            <span class="field-label">Буфер размышлений
+              <button type="button" class="field-help" data-hint="Сколько модель может думать вслух, прежде чем прокси сочтёт попытку пустой и перейдёт к следующей. Больше — терпимее к долгим размышлениям, но больше памяти на активный запрос." aria-label="Что значит «Буфер размышлений»">?</button>
+            </span>
+            <select id="s-pending-buffer">
+              <option value="16384">16 КиБ</option>
+              <option value="262144">256 КиБ</option>
+              <option value="1048576">1 МиБ</option>
+              <option value="2097152">2 МиБ</option>
+              <option value="4194304">4 МиБ</option>
+              <option value="8388608">8 МиБ</option>
+              <option value="16777216">16 МиБ</option>
+            </select>
+          </label>
         </div>
       </div>
       <div class="settings-block">
@@ -1906,7 +1927,7 @@ function renderModels() {
               .map(
                 (u, i) => `
                 <div class="step">
-                  <span class="n">${i + 1}.</span><span class="opencode-model chain-model"><strong>${esc(u.provider ?? "")}/${esc(u.model ?? "")}</strong></span>${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
+                  <span class="n">${i + 1}.</span><span class="opencode-model chain-model"><strong>${esc(u.model ?? "")}</strong></span>${u.provider && !cfg.providers[u.provider] ? `<span class="muted">(провайдер удалён)</span>` : ""}
         </div>`,
               )
               .join("")
@@ -2174,6 +2195,7 @@ function renderSettings() {
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
+  $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
   $("s-version").textContent = cfg.appVersion ?? "—"
   $("s-theme").value = settings.theme
@@ -2530,6 +2552,10 @@ num("s-port", "port")
 num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
+$("s-pending-buffer").onchange = (e) => {
+  cfg.pendingBufferBytes = Number(e.target.value)
+  save()
+}
 $("s-retry-forever").onchange = (e) => {
   cfg.retryForever = e.target.checked
   save()
@@ -3806,13 +3832,19 @@ $("log-filter").onchange = (event) => {
   renderLogs()
 }
 
-// Разбираем строку вида "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ..." в карточку.
+// Разбираем строку вида "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ... [ses:ses_x]"
+// в карточку. Строка чата несёт id сессии хвостовым тегом, имя модели/цепочки
+// уходит в заголовок, а id сессии встаёт справа, левее бейджа события.
 const logCard = (line) => {
   const m = String(line).match(/^\[([^\]]+)\]\s*(.*)$/)
   const ts = m?.[1] ?? ""
-  const rest = m?.[2] ?? line
+  let rest = m?.[2] ?? line
+  const sessionMatch = rest.match(/\s*\[ses:([^\]]+)\]\s*$/)
+  const session = sessionMatch?.[1] ?? ""
+  if (sessionMatch) rest = rest.slice(0, sessionMatch.index)
   const [head, ...tail] = rest.split(" → ")
   const detail = tail.join(" → ")
+  const isChat = tail.length > 0
   const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
   const card = document.createElement("div")
   card.className = "log-card" + (cls ? ` ${cls}` : "")
@@ -3821,6 +3853,23 @@ const logCard = (line) => {
   const tm = document.createElement("span")
   tm.className = "tm"
   tm.textContent = ts
+  // The model or chain name sits right after the time with a clear gap, so the
+  // header reads "time · chain ... session · badge".
+  if (isChat) {
+    const chain = document.createElement("span")
+    chain.className = "chain"
+    chain.textContent = head
+    top.append(tm, chain)
+  } else {
+    top.append(tm)
+  }
+  if (session) {
+    const chip = document.createElement("span")
+    chip.className = "ses"
+    chip.textContent = session.replace(/^ses_/, "")
+    chip.title = session
+    top.append(chip)
+  }
   const badge = document.createElement("span")
   badge.className = "b"
   // The badge is a short tag, not the whole message: a detail without a colon
@@ -3829,13 +3878,16 @@ const logCard = (line) => {
   const fallback = cls === "err" ? "ошибка" : cls === "warn" ? "блок" : "инфо"
   badge.textContent = tag && tag.length <= 24 ? tag : fallback
   badge.title = tag
-  top.append(tm, badge)
+  top.append(badge)
   const msg = document.createElement("div")
   msg.className = "m"
-  const em = document.createElement("b")
-  em.textContent = head
-  msg.append(em)
-  if (detail) msg.append(` ${detail}`)
+  if (isChat) {
+    msg.textContent = detail
+  } else {
+    const em = document.createElement("b")
+    em.textContent = head
+    msg.append(em)
+  }
   card.append(top, msg)
   return card
 }

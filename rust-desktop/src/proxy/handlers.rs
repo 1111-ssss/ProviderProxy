@@ -240,18 +240,22 @@ pub(crate) async fn put_config(
     }
     *state.config.write().unwrap() = merged.clone();
     *state.chains.write().unwrap() = new_chains.clone();
-    push_log(
-        &state,
-        format!(
-            "config updated via GUI: {} providers, {} models",
-            merged
-                .get("providers")
-                .and_then(Value::as_object)
-                .map(|v| v.len())
-                .unwrap_or(0),
-            new_chains.len()
-        ),
-    );
+    // The GUI saves on every edit, so an unchanged config is common. Logging it
+    // each time filled the log with noise and hid real changes.
+    if merged != previous {
+        push_log(
+            &state,
+            format!(
+                "config updated via GUI: {} providers, {} models",
+                merged
+                    .get("providers")
+                    .and_then(Value::as_object)
+                    .map(|v| v.len())
+                    .unwrap_or(0),
+                new_chains.len()
+            ),
+        );
+    }
     let synced = sync_opencode(&state).await;
     Json(json!({
         "ok": true,

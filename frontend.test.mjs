@@ -192,6 +192,15 @@ for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
     assert.ok(html.includes('id="log-search"') && html.includes('id="log-filter"'), "logs need search and a filter")
     assert.ok(!html.includes("чистятся сами"), "logs must not carry the self-cleaning blurb")
     assert.ok(html.includes("const atTop = box.scrollTop <= 60"), "log refresh should preserve the newest entries at the top")
+    // New log layout: chain/model in the header next to the time, session id
+    // pushed right just before the event badge, provider stripped from chain chips.
+    assert.ok(html.includes('chain.className = "chain"'), "the chain name belongs in the log header")
+    assert.ok(html.includes('chip.className = "ses"'), "the session id renders as its own right-aligned chip")
+    assert.ok(html.includes("sessionMatch.index"), "the session tag is stripped from the message body")
+    assert.ok(html.includes(".log-card .ses + .b { margin-left: 8px; }"), "the badge keeps a small gap after the session chip")
+    assert.ok(!html.includes('${esc(u.provider ?? "")}/${esc(u.model ?? "")}'), "chain steps must show the model name only")
+    assert.ok(html.includes('id="s-pending-buffer"'), "the reasoning buffer size is configurable")
+    assert.ok(html.includes("16 КиБ") && html.includes("16 МиБ"), "the buffer picker spans 16 KiB to 16 MiB")
     assert.equal(run("formatContext(1000000)"), "1m")
     assert.equal(run("formatContext(1500000)"), "1.5m")
     assert.equal(run("contextLabel({ contextLength: 50000, contextLengthManual: true, providerContextLength: 1000000 })"), "50k / 1m")
