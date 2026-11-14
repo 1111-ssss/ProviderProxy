@@ -435,9 +435,15 @@ setInterval(() => {
   if (configDirty) save(true)
 }, 5 * 60 * 1000)
 // Hourly: check for app updates and refresh the model lists of providers whose
-// automatic selection is on. Providers refresh one after another to spare the network.
-setInterval(() => checkForDesktopUpdate(), 60 * 60 * 1000)
-setInterval(() => syncAutoAllProviders(), 60 * 60 * 1000)
+// automatic selection is on. Skipped while the window is hidden (or minimized to
+// the tray), so a background app does not wake for nothing. Providers refresh
+// one after another to spare the network.
+const hourlyMaintenance = () => {
+  if (document.hidden) return
+  checkForDesktopUpdate()
+  syncAutoAllProviders()
+}
+setInterval(hourlyMaintenance, 60 * 60 * 1000)
 
 // Logs and usage refresh every 3s, but only while the tab is visible.
 setInterval(() => {
