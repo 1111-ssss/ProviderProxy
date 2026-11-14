@@ -1,0 +1,40 @@
+  :root {
+    color-scheme: dark;
+    --bg: #0f141b;
+    --panel: #171e27;
+    --panel-raised: #1c2530;
+    --surface: #222d39;
+    --surface-hover: #293747;
+    --border: #304052;
+    --border-strong: #43546a;
+    --text: #edf3f8;
+    --muted: #9aaabd;
+    --faint: #718195;
+    --accent: #9abaff;
+    --accent-strong: #6f99ed;
+    --success: #69d7a0;
+    --danger: #ff9c9c;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .22);
+    --body-background: radial-gradient(circle at 50% -20%, #1d2a3a 0, var(--bg) 52%);
+    --section-background: rgba(23, 30, 39, .92);
+    --control-background: var(--surface);
+    --control-hover: var(--surface-hover);
+    --primary-text: #07101f;
+    --primary-hover: #84aaff;
+    --disabled-background: var(--surface);
+  }
+  body[data-theme="light"] {
+    color-scheme: light;
+    --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4;
+    --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf;
+    --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca;
+    --accent-strong: #4d82df; --success: #218b59; --danger: #c54848;
+    --shadow: 0 20px 60px rgba(31, 55, 80, .15);
+    --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%);
+    --section-background: rgba(255, 255, 255, .9);
+    --control-background: #ffffff; --control-hover: #f1f5f9;
+    --primary-text: #ffffff; --primary-hover: #3f73ca; --disabled-background: #eef2f6;
+  }
+  @media (prefers-color-scheme: light) {
+    body[data-theme="system"] { color-scheme: light; --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4; --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf; --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca; --accent-strong: #4d82df; --success: #218b59; --danger: #c54848; --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%); --section-background: rgba(255, 255, 255, .9); --control-background: #fff; --control-hover: #f1f5f9; --primary-text: #fff; --primary-hover: #3f73ca; --disabled-background: #eef2f6; }
+  }

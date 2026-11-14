@@ -1,0 +1,461 @@
+  input[type="checkbox"]::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    transform: scale(0);
+    background-color: var(--primary-text);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 6.4L4.8 9.2L10 3.4'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 6.4L4.8 9.2L10 3.4'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate { background: var(--accent-strong); border-color: var(--accent-strong); }
+  input[type="checkbox"]:checked::before { transform: scale(1); }
+  input[type="checkbox"]:indeterminate::before {
+    width: 8px;
+    height: 2px;
+    transform: scale(1);
+    border-radius: 1px;
+    -webkit-mask: none;
+    mask: none;
+  }
+  input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .45; }
+  input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* The chain switch hides its real checkbox; keep that box out of the
+     layout and the hit area now that checkboxes have their own size. */
+  .chain-toggle input[type="checkbox"] { width: 1px; height: 1px; border: 0; border-radius: 0; background: none; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); border-radius: 16px; padding: 0; width: min(680px, calc(100vw - 28px)); max-height: calc(100vh - 28px); overflow: hidden; box-shadow: var(--shadow); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+  .dialog-form { display: flex; flex-direction: column; max-height: calc(100vh - 28px); }
+  .dialog-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); }
+  .dialog-header h3 { margin: 0; font-size: 18px; }
+  .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+  .dialog-body { flex: 1 1 auto; min-height: 0; padding: 22px 24px 14px; overflow: auto; }
+  dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
+  dialog label.sr-only { display: block; margin: 0; }
+  dialog label input, dialog label select { font-size: 14px; }
+  .dialog-section { border: 1px solid var(--border); border-radius: 11px; padding: 14px; margin: 16px 0; background: rgba(28, 37, 48, .48); }
+  .dialog-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+  .dialog-section-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .dialog-count { color: var(--accent); font-size: 11px; white-space: nowrap; }
+  .chain-editor { display: grid; gap: 8px; padding-right: 2px; }
+  .chain-editor:empty { display: block; }
+  .chain-row { display: grid; grid-template-columns: 24px minmax(130px, .7fr) minmax(170px, 1.3fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .7); }
+  .chain-row[draggable="true"] .step-number { cursor: grab; }
+  .chain-row.is-dragging { opacity: .45; }
+  .chain-row.is-drop-target { border-color: var(--accent); }
+  .chain-row select, .chain-row input { width: 100%; min-width: 0; }
+  .step-number { color: var(--faint); font-variant-numeric: tabular-nums; text-align: center; }
+  .row-controls { display: flex; gap: 4px; }
+  .icon-button { min-width: 36px; padding: 6px 8px; }
+  .icon-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+  .dialog-add-row { display: grid; grid-template-columns: minmax(130px, .75fr) minmax(170px, 1.25fr) auto; gap: 8px; }
+  .dialog-add-row select, .dialog-add-row input { min-width: 0; width: 100%; }
+  .manual-add { margin-top: 12px; }
+  .manual-add summary { display: flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; font-size: 12px; list-style: none; }
+  .manual-add summary::-webkit-details-marker { display: none; }
+  .manual-add summary::before { content: ""; flex: 0 0 auto; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform .16s ease; }
+  .manual-add[open] summary::before { transform: rotate(90deg); }
+  .manual-add summary:hover { color: var(--text); }
+  .manual-add .dialog-add-row { grid-template-columns: minmax(0, 1fr) auto; margin-top: 10px; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px 22px; border-top: 1px solid var(--border); background: var(--panel); }
+  /* `dialog label` adds 14px under every field, which also hit the search
+     label inside a filter bar: a phantom gap above the provider list and a
+     count that no longer lined up with the search field. */
+  .dialog-section .filter-bar { margin-bottom: 0; }
+  /* The picker's own gap is the space under its search field; the bar's 14px
+     bottom margin stacked on top of it and left a 22px hole before the list. */
+  .provider-picker .filter-bar { margin-bottom: 0; }
+  .provider-picker .filter-bar > label { margin-bottom: 0; }
+  .dialog-section .provider-picker { gap: 8px; }
+  .fetched { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; max-height: 220px; overflow: auto; }
+  .chip { display: inline-flex; gap: 6px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 3px 4px 3px 8px; }
+  .chip button { min-height: 28px; padding: 2px 7px; }
+  .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid rgba(105, 215, 160, .25); border-radius: 9px; background: #173c2b; color: #c2f3d6; display: none; z-index: 10; box-shadow: var(--shadow); }
+  .status.err { background: #4a252b; color: #ffd1d1; border-color: rgba(255, 156, 156, .3); }
+  details summary { cursor: pointer; color: var(--muted); }
+  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; min-height: 0; padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border: 1px solid var(--border); border-radius: 12px; }
+  .tabs-brand { display: flex; align-items: center; gap: 9px; padding: 3px 5px 12px; border-bottom: 1px solid var(--border); }
+  /* The logo PNG is already a dark tile, so an extra accent border drew a
+     second frame around it. Keep only the image, softly rounded. */
+  .tabs-brand-mark { display: block; flex: 0 0 auto; width: 30px; height: 30px; border: 0; border-radius: 8px; object-fit: cover; box-shadow: 0 0 0 1px rgba(0, 0, 0, .28); }
+  .tabs-brand strong { display: block; font-size: 13px; line-height: 1.2; }
+  .tabs-brand-text { min-width: 0; }
+  .tabs button.tabs-collapse { display: grid; place-items: center; width: auto; min-width: 30px; min-height: 30px; flex: 0 0 auto; margin-left: auto; padding: 5px; background: transparent; border-color: transparent; color: var(--muted); }
+  .tabs-collapse svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+  .tab-group { display: grid; gap: 5px; padding: 7px 6px 8px; border: 1px solid rgba(67, 84, 106, .55); border-radius: 11px; background: rgba(23, 30, 39, .28); transition: background .16s ease, border-color .16s ease, box-shadow .16s ease; }
+  .tab-group-toggle { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 24px; padding: 1px 4px; border: 0; border-radius: 5px; background: transparent; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-align: left; text-transform: uppercase; }
+  .tab-group-toggle:hover:not(:disabled) { background: rgba(111, 153, 237, .08); border-color: transparent; color: var(--accent); }
+  .tab-group-chevron { margin-left: auto; color: inherit; font-size: 14px; line-height: 1; transition: transform .16s ease; }
+  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-90deg); }
+  .tab-group.is-collapsed .tab-group-tabs { display: none; }
+  .tab-group.is-active { background: rgba(111, 153, 237, .08); border-color: rgba(111, 153, 237, .48); box-shadow: 0 0 0 1px rgba(111, 153, 237, .08); }
+  .tab-group-tabs { display: grid; gap: 4px; padding-top: 2px; }
+  .tabs button { display: flex; width: 100%; align-items: center; justify-content: flex-start; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 36px; padding: 8px 10px; text-align: left; }
+  .tabs button.active { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 650; box-shadow: 0 4px 12px rgba(0, 0, 0, .12); }
+  .tab-index { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tabs button.active .tab-index { color: var(--accent); }
+  .settings-nav-button { margin-top: auto; border-color: var(--border); background: rgba(34, 45, 57, .42) !important; color: var(--text) !important; font-weight: 650; }
+  .settings-nav-icon { display: inline-flex; color: var(--accent); }
+  .settings-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: 6px; }
+  main.nav-collapsed .tabs-brand { width: 100%; justify-content: center; padding: 0; border-bottom: 0; }
+  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tab-group, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
+  main.nav-collapsed .tabs button.tabs-collapse { margin: 0; padding: 5px; }
+  main.nav-collapsed .tabs-collapse svg { transform: rotate(180deg); }
+  main.nav-collapsed .tab-group { padding: 3px 0; border-bottom: 0; }
+  main.nav-collapsed .tab-group-tabs { display: grid; }
+  main.nav-collapsed .tabs button { justify-content: center; padding: 8px 4px; }
+  main.nav-collapsed .tabs button > span:not(.tab-index):not(.settings-nav-icon) { display: none; }
+  main.nav-collapsed .tab-index { font-weight: 700; }
+  .update-banner { display: flex; align-items: center; gap: 9px; max-width: min(460px, 100%); padding: 7px 8px 7px 11px; border: 1px solid rgba(111, 153, 237, .52); border-radius: 9px; background: rgba(111, 153, 237, .12); color: var(--text); }
+  .update-banner[hidden] { display: none; }
+  .update-banner-message { min-width: 0; color: var(--muted); font-size: 12px; }
+  .update-banner-message strong { color: var(--text); }
+  .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
+  /* Update entry above "Settings" in the navigation. Appears only when the
+     automatic or manual check found a release; the bar shows the download. */
+  .update-nav-button { margin-top: 8px; border-color: rgba(111, 153, 237, .55); background: rgba(111, 153, 237, .16) !important; color: var(--text) !important; font-weight: 650; flex-wrap: wrap; row-gap: 6px; }
+  .update-nav-button .update-nav-icon { display: inline-flex; color: var(--accent-strong); }
+  .update-nav-button .update-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .update-nav-button .update-progress { flex-basis: 100%; height: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+  .update-nav-button .update-progress-fill { display: block; height: 100%; width: 0%; border-radius: 4px; background: var(--accent-strong); transition: width .25s ease; }
+  .update-nav-button[hidden] { display: none; }
+  section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
+   /* The filter is one control row: the select matches the search height and
+   keeps its width, so switching options never shifts the layout. */
+  .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .log-controls input, .log-controls select { height: 38px; min-height: 38px; line-height: 20px; padding-top: 0; padding-bottom: 0; }
+  /* WebKitGTK drew its own select chrome taller than the search field. One
+     drawn control keeps both the same height in the desktop app. */
+  .log-controls select { appearance: none; -webkit-appearance: none; padding: 0 32px 0 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23808f9f' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 14px; }
+  .log-controls input { min-width: 0; }
+   .log-pager { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 8px; }
+  .logbox { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; display: grid; gap: 8px; margin: 0; padding: 2px; }
+  .log-card { background: var(--panel-raised); border: 1px solid var(--border); border-left: 3px solid var(--border-strong); border-radius: 8px; padding: 8px 12px; }
+  .log-card .t { display: flex; gap: 10px; align-items: baseline; }
+  .log-card .tm { color: #7d8796; font-size: 11px; font-variant-numeric: tabular-nums; }
+  /* The chain or model name follows the time with a clear gap of its own. */
+  .log-card .chain { color: #c3cede; font-size: 11.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Session id is pushed to the right, just left of the event badge. */
+  .log-card .ses { margin-left: auto; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; padding: 1px 6px; border-radius: 8px; background: var(--surface); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .log-card .b { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 10px; background: var(--surface); color: var(--muted); }
+  /* When the session chip is present it takes the free space, so the badge only
+     needs the small gap next to it. */
+  .log-card .ses + .b { margin-left: 8px; }
+  .log-card .m { margin-top: 3px; font-size: 12.5px; color: var(--text); word-break: break-word; }
+  .log-card .m b { color: #d8e4f1; font-weight: 650; }
+  .log-card.ok { border-left-color: var(--success); } .log-card.ok .b { background: rgba(105, 215, 160, .12); color: #b7e2c6; }
+  .log-card.warn { border-left-color: #e5bd61; } .log-card.warn .b { background: rgba(229, 189, 97, .12); color: #edd9a0; }
+  .log-card.err { border-left-color: var(--danger); } .log-card.err .b { background: rgba(255, 156, 156, .12); color: #f0b9b9; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+  .tile .v { font-size: 20px; font-weight: 600; }
+  .tile .k { color: var(--muted); font-size: 12px; }
+  .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
+  .chart-card { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .chart-head h3 { margin: 0; font-size: 14px; }
+  .chart-head p { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+  .chart-head > div { min-width: 0; }
+  .chart-head .muted { white-space: nowrap; }
+  .outcome-layout { display: grid; grid-template-columns: 164px minmax(0, 1fr); align-items: center; gap: 18px; min-height: 164px; }
+  .donut-wrap { position: relative; width: 164px; height: 164px; }
+  .donut-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .donut-track, .donut-segment { fill: none; stroke-width: 13; }
+  .donut-track { stroke: #2d3b4b; }
+  .donut-segment { stroke-linecap: round; transition: stroke-dasharray .25s ease, stroke-dashoffset .25s ease; }
+  .donut-segment.ok { stroke: var(--success); }
+  .donut-segment.failed { stroke: var(--danger); }
+  .donut-segment.other { stroke: var(--accent); }
+  .donut-segment.skipped { stroke: var(--faint); }
+  .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+  .donut-center strong { font-size: 26px; line-height: 1; letter-spacing: -.04em; }
+  .donut-center span { color: var(--muted); font-size: 11px; margin-top: 5px; }
+  .chart-legend { display: grid; gap: 10px; }
+  .legend-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-dot.ok { background: var(--success); }
+  .legend-dot.failed { background: var(--danger); }
+  .legend-dot.other { background: var(--accent); }
+  .legend-dot.skipped { background: var(--faint); }
+  .legend-name { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The outcome card is half the grid on desktop and full width on mobile.
+     When the card leaves the donut too little room, stack the legend under it
+     instead of squeezing it to a few characters. */
+  .chart-card { container-type: inline-size; }
+  @container (max-width: 420px) {
+    .outcome-layout { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+    .chart-legend { width: 100%; }
+    .legend-name { white-space: normal; }
+  }
+  .legend-value { font-variant-numeric: tabular-nums; font-weight: 650; }
+  .token-bars { display: grid; gap: 13px; }
+  .token-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; line-height: 1; }
+  .token-key { display: inline-flex; align-items: center; gap: 5px; line-height: 1; }
+  .token-key::before { content: ""; width: 8px; height: 8px; border-radius: 2px; }
+  .token-key.success::before { background: #69d7a0; }
+  .token-key.error::before { background: #ff9c9c; }
+  .token-key.input::before { background: #6f99ed; }
+  .token-key.output::before { background: #c894f5; }
+  .token-key.limit::before { background: #f0b866; }
+  .token-key.other::before { background: #7b8798; }
+  .token-fill.limit { background: linear-gradient(90deg, #d99a3f, #f3cb8b); }
+  .token-fill.other { background: linear-gradient(90deg, #6b7686, #9aa5b3); }
+  /* Exact counts under each bar: the bar shows the shape, this row shows the
+     numbers the shape hides at small widths. */
+  .token-row-foot { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .sep { opacity: .4; padding: 0 1px; }
+  /* Table text stays readable but quieter than the chart fills: the numbers are
+     the point, the colour is only a hint. Scoped to tables: an unscoped `.warn`
+     also matched `.log-card.warn` and turned the whole log message yellow. */
+  table .warn { color: #d3b183; }
+  table .bad { color: #d99a9a; }
+  table .ok-cell { color: #86c7a7; }
+  table .problem-rate { margin-left: 6px; color: var(--muted); font-size: 10px; }
+  /* Statistics is split into groups so one long page does not bury the table a
+     reader came for. The tabs reuse the day-selector look for consistency. */
+  .usage-groups { display: flex; gap: 4px; flex-wrap: wrap; margin: 14px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+  .usage-group { flex: 1 1 auto; min-height: 32px; padding: 5px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .usage-group:hover:not(.active) { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .usage-group.active { background: rgba(111, 153, 237, .16); border-color: rgba(111, 153, 237, .5); color: #dbe7ff; }
+  .usage-panel { display: none; margin-top: 14px; }
+  .usage-panel.active { display: block; }
+  /* 24 fixed columns so an idle hour still leaves a visible slot. */
+  .hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 150px; margin-top: 8px; }
+  .hour-col { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 2px; height: 100%; min-width: 0; }
+  .hour-col-stack { display: flex; align-items: flex-end; gap: 1px; height: 100%; min-height: 0; }
+  .hour-bar { flex: 1 1 0; min-width: 0; border-radius: 2px 2px 0 0; background: #6f99ed; }
+  .hour-bar.out { background: #c894f5; }
+  .hour-bar.req { background: #69d7a0; }
+  .hour-label { text-align: center; font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hour-col.empty .hour-label { opacity: .45; }
+  /* The hint is drawn on hover/focus instead of relying on a native tooltip,
+     which lags behind the pointer on a 24-column chart. */
+  .hour-col { position: relative; }
+  /* The hint follows the pointer, so the numbers appear where the eye already
+     is instead of above the whole chart. JS sets --hint-x/--hint-y and clamps
+     them to the card. */
+  .hour-hint { position: absolute; left: 50%; top: var(--hint-y, 70px); z-index: 5; display: none; width: max-content; max-width: 200px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: #10161e; color: var(--text); font-size: 11px; line-height: 1.45; text-align: left; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; }
+  .hour-hint span { display: block; }
+  .hour-hint-time { display: block; margin-bottom: 2px; text-align: center; font-variant-numeric: tabular-nums; }
+  /* Near either edge the centred hint would hang outside the window, so it
+     anchors to the column side instead. */
+  .hour-hint-left, .hour-hint-right { transform: translate(-50%, calc(-100% - 8px)); }
+  .hour-col:hover .hour-hint, .hour-col:focus-visible .hour-hint { display: block; }
+  .hour-col:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .hour-total { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .token-row { display: grid; gap: 5px; }
+  .token-row-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; min-width: 0; }
+  /* The name must be allowed to shrink: a flex item defaults to min-width:auto,
+     so a long provider name pushed the problem rate outside the card. */
+  .token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .token-row-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto; }
+  .token-row-head .problem-rate { color: #ffb0b0; }
+  .token-track { display: flex; justify-content: space-between; height: 7px; overflow: hidden; border-radius: 999px; background: #2a3746; }
+  .token-fill { display: block; height: 100%; min-width: 0; border-radius: inherit; transition: width .25s ease; }
+  .token-fill.success { background: linear-gradient(90deg, #45b984, #9be7be); }
+  .token-fill.error { background: linear-gradient(90deg, #ff8585, #ffc0c0); }
+  .token-fill.input { background: linear-gradient(90deg, #4f7fe0, #8fb4ff); }
+  .token-fill.output { background: linear-gradient(90deg, #a66ae0, #d9b5fa); }
+   .chart-empty { color: var(--muted); font-size: 12px; padding: 24px 0; text-align: center; }
+   /* One row that scrolls sideways instead of wrapping: seven days never fit on
+      a narrow window, and a wrapped block pushed the charts down. The scrollbar
+      itself is hidden — the wheel and trackpad scroll it — because a visible bar
+      under the tabs looked like a second control row. */
+    .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: rgba(15, 20, 27, .42); }
+    .usage-days:not(.is-overflowing) { overflow-x: hidden; }
+   .usage-days::-webkit-scrollbar { display: none; }
+   .usage-day { flex: 1 1 120px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 120px; min-height: 52px; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
+   .usage-day strong { color: inherit; font-size: 12px; }
+   .usage-day small { color: inherit; font-size: 10px; opacity: .7; }
+   .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
+   .usage-day.active { background: rgba(111, 153, 237, .16); border-color: rgba(111, 153, 237, .5); color: #dbe7ff; }
+   .usage-day.empty { opacity: .58; }
+  .search-field { position: relative; flex: 1 1 220px; min-width: 180px; }
+  .search-field input { width: 100%; padding-right: 32px; }
+  /* One centered glyph instead of a circle plus a separately rotated handle:
+     the two pieces drifted apart and the circle sat above the field center. */
+  .search-field::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    width: 15px;
+    height: 15px;
+    transform: translateY(-50%);
+    background-color: var(--faint);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.6'/%3E%3Cpath d='M10.5 10.5L14 14'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.6'/%3E%3Cpath d='M10.5 10.5L14 14'/%3E%3C/svg%3E") center / contain no-repeat;
+    pointer-events: none;
+  }
+  .search-field input { padding-left: 34px; }
+  .search-clear { position: absolute; right: 4px; top: 4px; min-height: 30px; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); }
+  .search-clear:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--text); }
+  .filter-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
+  .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .settings-form { width: 100%; }
+  .settings-page { min-height: 0; }
+  /* Two fixed columns squeezed every settings card to ~200px while the sidebar
+     was still visible. Stack the cards whenever a column would be unusable. */
+  /* Two columns at most: auto-fit opened a third empty slot beside a pair of
+     cards and left a dead column of background. */
+  .settings-page-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  @media (min-width: 920px) { .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .48); }
+  .settings-block.wide { grid-column: 1 / -1; }
+  .settings-block h3 { margin: 0; font-size: 14px; }
+  .settings-block > p { margin: 4px 0 14px; color: var(--muted); font-size: 12px; }
+  .settings-page label { display: grid; gap: 6px; margin: 0; color: var(--muted); font-size: 12px; }
+  /* A field label with a small "?" that opens the explanation on hover/focus.
+     The hint stays in the DOM as the accessible description. */
+  .field-label { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .field-label > span:first-child { min-width: 0; }
+  .field-help {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    font: 700 10px/1 ui-monospace, monospace;
+    cursor: help;
+  }
+  .field-help:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: transparent; }
+  /* The hint is a fixed layer placed by script next to the "?" it belongs to.
+     An absolutely positioned tooltip was clipped by the scrolling settings
+     card, and a hover target on the whole label blocked the input under it. */
+  .field-hint-layer {
+    position: fixed;
+    z-index: 60;
+    max-width: min(280px, calc(100vw - 24px));
+    padding: 7px 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    font: 400 11px/1.4 system-ui, sans-serif;
+    text-align: left;
+    white-space: normal;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+  }
+  .field-hint-layer[hidden] { display: none; }
+  .settings-page .setting-option { display: flex; align-items: center; gap: 9px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-page .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 0; }
+  .settings-page .setting-option span { display: grid; gap: 2px; }
+  .settings-page .setting-option small { color: var(--muted); font-size: 11px; }
+  .settings-page .setting-option.is-disabled { opacity: .6; }
+  .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
+  /* The name gets the room the short numeric columns leave, and wraps instead
+     of being cut when the window is narrow. */
+  .session-name { display: block; cursor: copy; overflow-wrap: anywhere; }
+  /* The name absorbs the width the short numeric columns leave free; the
+     numeric headers stay on one line instead of wrapping into a two-line block. */
+  #u-sessions th:first-child, #u-sessions td:first-child { width: 100%; }
+  #u-sessions th:not(:first-child), #u-sessions td:not(:first-child) { white-space: nowrap; }
+  .session-name:hover { color: var(--accent); text-decoration: underline dotted; }
+  .usage-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .usage-pager button { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+  .usage-pager .muted { font-variant-numeric: tabular-nums; }
+  .rollback-list { display: grid; gap: 6px; max-height: min(46vh, 420px); overflow: auto; padding: 2px; }
+  .rollback-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--control-background); color: var(--text); text-align: left; }
+  .rollback-row:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
+  .rollback-row.is-current { opacity: .6; }
+  .rollback-version { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .rollback-tag { padding: 1px 7px; border-radius: 10px; background: rgba(111, 153, 237, .16); color: var(--accent); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .rollback-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .settings-value { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); overflow-wrap: anywhere; }
+  .settings-page-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  /* Inside a card the two field columns must collapse too, or a numeric input
+     ends up ~70px wide. */
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap: 12px; }
+  .settings-grid label { margin: 0; min-width: 0; }
+  /* A field must shrink with its column. Without this the default intrinsic
+     input width wins and the control spills out of the card. Checkboxes keep
+     their own size: width:100% turned one into a 216px block that squeezed the
+     label text to zero width. */
+  .settings-grid label input:not([type="checkbox"]), .settings-grid label select { width: 100%; min-width: 0; }
+  .settings-grid .setting-option { display: flex; align-items: center; gap: 9px; grid-column: 1 / -1; min-width: 0; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(34, 45, 57, .34); color: var(--text); }
+  .settings-grid .setting-option input { flex: 0 0 auto; min-height: 16px; margin: 0; }
+  /* The text column must be a shrinkable flex item with a minmax(0,1fr) track.
+     A plain `display: grid` sizes the track to the longest line's max-content,
+     so a long help text spilled out of the card and collapsed its own width. */
+  .settings-grid .setting-option span { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+  .settings-grid .setting-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+  .settings-grid .setting-option.is-disabled { opacity: .6; }
+  .settings-grid .setting-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; min-width: 0; flex-wrap: wrap; }
+  /* A saved shortcut path is one long unbreakable string on Windows; let it
+     wrap inside the card instead of pushing the button out of view. Below
+     roughly 300px of column the button drops under the text instead of
+     squeezing it to a few characters per line. */
+  .settings-grid .setting-action span { flex: 1 1 170px; min-width: 0; overflow-wrap: anywhere; }
+  .settings-grid .setting-action small { min-width: 0; overflow-wrap: anywhere; }
+  /* Two buttons of equal width that stack when the card cannot hold them.
+     Fixed 120px columns overflowed a 249px card at one window width; wrapping
+     flex never does, and a button always keeps its label inside. */
+  .settings-grid .setting-action .row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin-left: auto; flex: 1 1 100%; }
+  .settings-grid .setting-action .row > button { flex: 1 1 140px; min-width: 0; }
+  /* Same height as every other button (38px from the base control rule); the
+     override to 32px made this row look stunted. */
+  .settings-grid .setting-action button { min-width: 0; min-height: 38px; padding: 8px 10px; justify-content: center; white-space: normal; text-align: center; }
+  .settings-section-title { grid-column: 1 / -1; margin: 4px 0 -3px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .settings-exit { margin-right: auto; }
+  .provider-picker { display: grid; gap: 8px; }
+  .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; padding: 1px 2px 2px; }
+  .provider-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 38px; text-align: left; }
+  .provider-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .provider-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .provider-option.active { border-color: var(--accent-strong); background: rgba(111, 153, 237, .16); color: #dbe7ff; }
+  .provider-current { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(34, 45, 57, .55); }
+  .provider-current strong { color: var(--text); }
+  .opencode-panel { margin: 0 0 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(28, 37, 48, .7); }
+  .opencode-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+  .opencode-panel-head h3 { margin: 0; font-size: 14px; }
+  .opencode-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .integration-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  /* A bare switch: no card, no label, no reserved width. */
+  .integration-card .chain-toggle { margin: 0; padding: 0; gap: 0; border-color: transparent; background: none; min-height: 32px; }
+  .integration-card .chain-toggle:hover { border-color: transparent; background: none; }
+  /* Two labelled fields under the panel title. Both labels sit above their
+     input, with the same gap, so they read as one group instead of a label
+     floating beside a box. */
+  .opencode-config-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(180px, .6fr); gap: 12px 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .opencode-config-grid label { display: grid; gap: 6px; margin: 0; min-width: 0; font-size: 12px; color: var(--muted); }
+  .opencode-config-grid input { width: 100%; min-width: 0; }
+  .opencode-preview-head { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+  .opencode-preview { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .opencode-preview-toggle { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px; margin-top: 2px; color: var(--muted); background: rgba(34, 45, 57, .55); border-style: dashed; }
+  .opencode-preview-toggle:hover:not(:disabled) { color: var(--text); }
+  .opencode-model { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .65); }
+  .opencode-model strong { color: #dbe7ff; font-size: 12px; }
+  .opencode-model span { color: var(--muted); font-size: 11px; }
+  .opencode-panel .integration-skill-card { margin-top: 16px; }
+  .model-context { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .model-warning { color: #f2c781; font-size: 11px; white-space: nowrap; cursor: help; }
+  .check .model-context { margin-left: auto; }
+  .chip .model-context { padding-right: 4px; }
+  .provider-models { display: grid; gap: 8px; }
+  /* Steps fill a column top-to-bottom, then the next column: 1..5 down the
+     left, 6..9 down the right, so the numbering reads like a list. */
+  .chain { grid-template-columns: repeat(var(--step-cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--step-rows, 1), auto); grid-auto-flow: column; }
+  .step { min-width: 0; }
+  .provider-models .card { margin-bottom: 0; }
+  .direct-model-card { padding: 16px 18px; border-color: rgba(111, 153, 237, .28); background: linear-gradient(135deg, rgba(28, 37, 48, .86), rgba(24, 32, 42, .72)); }
+  .direct-model-card:hover { border-color: rgba(111, 153, 237, .62); }
+  .direct-model-card .model-card-head { min-height: 38px; }
+  /* Chips flow in rows of at most four. --model-cols is set once for the whole
+     list, so every card uses the same count instead of one card fitting three
+     and its neighbour two. */
+  .provider-model-list { display: grid; grid-template-columns: repeat(var(--model-cols, 1), minmax(0, 1fr)); gap: 8px; }
+  .direct-model-card .provider-model-list { margin-top: 12px; }
+  .direct-model-card .opencode-model { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 8px 10px; background: rgba(19, 27, 36, .72); }
+  .direct-model-card .opencode-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chain .step { min-width: 0; }
+  /* A chip sized to its text left the columns ragged; filling the cell makes
+     every row line up, with the ellipsis handling the long ids. */

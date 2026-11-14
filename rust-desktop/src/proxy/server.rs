@@ -1,5 +1,6 @@
 use axum::{
     extract::DefaultBodyLimit,
+    response::Response,
     routing::{get, post},
     Router,
 };
@@ -13,6 +14,7 @@ use std::{
 use tokio::net::TcpListener as TokioTcpListener;
 
 use super::{
+    assets,
     chat,
     config::{load_config, open_storage, LOG_MAX_DEFAULT},
     handlers,
@@ -205,10 +207,22 @@ pub fn start_server(
     Ok(ServerHandle { port: actual_port })
 }
 
+/// Serve an embedded stylesheet or script by its file name. The directory is in
+/// the route, so each handler rebuilds the full request path for `assets::serve`.
+async fn css_asset(axum::extract::Path(file): axum::extract::Path<String>) -> Response {
+    assets::serve(&format!("/css/{file}"))
+}
+
+async fn js_asset(axum::extract::Path(file): axum::extract::Path<String>) -> Response {
+    assets::serve(&format!("/js/{file}"))
+}
+
 fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(handlers::index))
         .route("/index.html", get(handlers::index))
+        .route("/css/{file}", get(css_asset))
+        .route("/js/{file}", get(js_asset))
         .route("/api/ping", get(handlers::ping))
         .route("/api/shutdown", post(handlers::shutdown))
         .route(

@@ -141,6 +141,15 @@ async fn protects_api_and_redacts_config_but_serves_the_gui() {
         assert_eq!(response.headers()["cache-control"], "no-store, max-age=0");
         assert!(response.text().await.unwrap().contains("<html"));
     }
+    // Stylesheets and scripts are embedded in the binary and served from the
+    // same local server, for both the WebView and a normal browser.
+    for path in ["/css/tokens.css", "/js/core.js"] {
+        let response = proxy.client.get(proxy.url(path)).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert_eq!(response.headers()["cache-control"], "no-store, max-age=0");
+    }
+    let missing = proxy.client.get(proxy.url("/js/missing.js")).send().await.unwrap();
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
     let config: Value = proxy
         .client
         .get(proxy.url("/api/config"))

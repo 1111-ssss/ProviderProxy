@@ -16,6 +16,7 @@ use std::{
 };
 
 use super::{
+    assets,
     auth::authorized,
     config::{
         export_config, merge_config_secrets, merge_imported_config, public_config, save_config,
@@ -29,7 +30,6 @@ use super::{
     types::{AppState, ImageUsage, ProviderModelsRequest},
 };
 
-const INDEX_HTML: &str = include_str!("../../frontend/index.html");
 const IMAGE_SKILL: &str = include_str!("../../../skills/image-generation/SKILL.md");
 
 fn image_skill_path(state: &AppState) -> PathBuf {
@@ -58,13 +58,7 @@ fn image_skill_status(state: &AppState) -> (PathBuf, bool, bool) {
 }
 
 pub(crate) async fn index() -> impl IntoResponse {
-    (
-        [
-            ("content-type", "text/html; charset=utf-8"),
-            ("cache-control", "no-store, max-age=0"),
-        ],
-        INDEX_HTML,
-    )
+    assets::serve("/")
 }
 
 pub(crate) async fn ping() -> impl IntoResponse {

@@ -1,13 +1,33 @@
-// Dependency-free regression checks for the shared image UI in both frontends.
+// Dependency-free regression checks for the message UI. Source is split into
+// frontend/css/*.css and frontend/js/*.js, linked from frontend/index.html.
 // Run: node --test frontend.test.mjs
 import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import vm from "node:vm"
 
+const FRONTEND = new URL("rust-desktop/frontend/", import.meta.url)
+const indexHtml = readFileSync(new URL("index.html", FRONTEND), "utf8")
+const cssRefs = [...indexHtml.matchAll(/<link rel="stylesheet" href="\/css\/([^"]+)">/g)].map((m) => m[1])
+const jsRefs = [...indexHtml.matchAll(/<script src="\/js\/([^"]+)"><\/script>/g)].map((m) => m[1])
+// css+js concatenated in document order, so string checks read like the old
+// single-file bundle while the source stays split.
+const styles = cssRefs.map((n) => readFileSync(new URL(`css/${n}`, FRONTEND), "utf8")).join("\n")
+const scripts = jsRefs.map((n) => readFileSync(new URL(`js/${n}`, FRONTEND), "utf8")).join("\n")
+
+test("index.html wires every stylesheet and script it needs", () => {
+  assert.ok(cssRefs.length >= 1 && jsRefs.length >= 1, "the document must link its assets")
+  for (const name of cssRefs) assert.doesNotThrow(() => readFileSync(new URL(`css/${name}`, FRONTEND)), `${name} must exist`)
+  for (const name of jsRefs) assert.doesNotThrow(() => readFileSync(new URL(`js/${name}`, FRONTEND)), `${name} must exist`)
+  // The Rust server lists exactly the same files, so a served GUI cannot miss one.
+  const assetsRs = readFileSync(new URL("rust-desktop/src/proxy/assets.rs", import.meta.url), "utf8")
+  for (const name of cssRefs) assert.ok(assetsRs.includes(`/css/${name}`), `assets.rs must serve /css/${name}`)
+  for (const name of jsRefs) assert.ok(assetsRs.includes(`/js/${name}`), `assets.rs must serve /js/${name}`)
+})
+
 for (const file of ["rust-desktop/frontend/index.html"]) {
-  const html = readFileSync(new URL(file, import.meta.url), "utf8")
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1]
+  const html = indexHtml + "\n" + styles + "\n" + scripts
+  const script = scripts
   const elements = new Map()
   const element = (id) => {
     if (!elements.has(id)) elements.set(id, { value: "", innerHTML: "", querySelectorAll: () => [] })

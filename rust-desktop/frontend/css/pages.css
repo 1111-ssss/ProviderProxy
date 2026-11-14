@@ -1,0 +1,181 @@
+  .chain .step .opencode-model { flex: 1 1 auto; min-width: 0; }
+  .chain .chain-model { min-width: 0; }
+  .chain .chain-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
+  .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  /* Two fixed columns squeezed the form to ~190px between 760 and 1000px.
+     Stack them whenever a column would be narrower than a usable form. */
+  .image-layout { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; align-items: start; }
+  .settings-button { display: inline-grid; place-items: center; min-width: 42px; padding: 8px 11px; line-height: 1; }
+  .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .image-section-actions { display: flex; align-items: center; gap: 8px; }
+  .image-settings-button { min-width: 38px; padding: 7px 9px; }
+  .image-settings-button svg { width: 17px; height: 17px; }
+  #dlg-image-settings { width: min(620px, calc(100vw - 28px)); }
+  #dlg-model-settings { width: min(440px, calc(100vw - 28px)); }
+  .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid rgba(111, 153, 237, .3); border-radius: 10px; background: rgba(34, 45, 57, .48); }
+  .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .skill-card h4 { margin: 0; }
+  .skill-card p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .skill-path { color: var(--faint); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .skill-status { color: var(--muted); font-size: 12px; }
+  .skill-status.is-ok { color: var(--success); }
+  .skill-status.is-warn { color: #f2c781; }
+  .image-form, .image-result { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  /* An auto grid column grows to the browser's default control width, so
+     the form used to spill out of its card at mid widths. */
+  .image-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .image-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+  .image-form label input, .image-form label select { width: 100%; min-width: 0; height: 42px; }
+  .image-form .row { align-items: end; }
+  .image-form .row > label { flex: 1 1 150px; min-width: 0; }
+  .image-field-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  .image-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .image-file-row { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+  .image-file-row input[type="file"] { width: 100%; padding: 7px; }
+  .image-reference-name { color: var(--faint); font-size: 11px; min-height: 16px; }
+  .image-result-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .image-result-head h3 { margin: 0; }
+  .image-result.is-error { border-color: rgba(255, 156, 156, .78); box-shadow: 0 0 0 1px rgba(255, 156, 156, .18), 0 12px 30px rgba(120, 30, 40, .14); }
+  .image-task-status { color: var(--muted); font-size: 12px; }
+  .image-preview { display: grid; place-items: center; min-height: 280px; margin-top: 14px; border: 1px dashed var(--border-strong); border-radius: 10px; overflow: hidden; background: rgba(15, 20, 27, .55); }
+  .image-preview img { display: block; max-width: 100%; max-height: 560px; object-fit: contain; }
+  .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
+  .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
+  .image-model-select { display: grid; gap: 6px; }
+  .app-header, main > section { grid-column: 2; }
+  @media (max-width: 700px) {
+    main, main.nav-collapsed { grid-template-columns: 1fr; }
+    .app-header, main > section { grid-column: 1; }
+    .tabs { grid-column: 1; grid-row: auto; position: static; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    section[data-tab="logs"] { height: auto; }
+    section[data-tab="logs"] .logbox { flex: 0 1 auto; max-height: calc(100vh - 260px); min-height: 240px; }
+    .tabs-brand { display: none; }
+    main.nav-collapsed .tabs-brand { display: flex; }
+    .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+    section { padding: 16px; }
+    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
+    .dialog-actions { padding-left: 16px; padding-right: 16px; }
+    .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
+    .model-card-head { align-items: flex-start; flex-wrap: wrap; }
+    .chain-toggle { order: 3; margin-left: 0; }
+    .model-actions { margin-left: auto; }
+    .chain-row input, .chain-row .row-controls, .dialog-add-row input, .dialog-add-row button { grid-column: 2; }
+    .dialog-add-row select { grid-column: 2; }
+    .opencode-config-grid { grid-template-columns: 1fr; }
+    .usage-grid { grid-template-columns: 1fr; }
+    .outcome-layout { grid-template-columns: 140px minmax(0, 1fr); gap: 12px; }
+    .donut-wrap { width: 140px; height: 140px; }
+    .settings-grid, .settings-page-grid { grid-template-columns: 1fr; }
+    .image-layout { grid-template-columns: 1fr; }
+    .tab-group { flex: 1 1 auto; padding: 6px; border-bottom: 1px solid rgba(67, 84, 106, .55); }
+    .tab-group-tabs { display: flex; flex-wrap: wrap; }
+    .tab-group:last-child { padding-bottom: 6px; }
+    .tabs button { width: auto; }
+  }
+
+  /* Keep the desktop shell inside the viewport: navigation and the active
+     work card scroll independently instead of moving the whole page. */
+  @media (min-width: 701px) {
+    body { overflow: hidden; }
+    main { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+    main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
+    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; }
+    main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
+    section[data-tab="logs"] { height: 100%; overflow: auto; }
+    section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
+  }
+
+  /* A CSS chevron has a stable box and a real rotation center. The text
+     glyph used before had a font-dependent baseline and looked off-center. */
+  .tab-group-chevron {
+    display: block;
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    margin-left: auto;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    font-size: 0;
+    line-height: 0;
+    transform: rotate(45deg);
+    transform-origin: 50% 50%;
+    transition: transform .16s ease;
+  }
+  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-45deg); }
+
+  /* Use theme surfaces instead of dark-only rgba backgrounds. */
+  .card,
+  .chart-card,
+  .settings-block,
+  .image-form,
+  .image-result {
+    background: color-mix(in srgb, var(--panel-raised) 86%, var(--panel));
+  }
+  .tab-group { border-color: color-mix(in srgb, var(--border-strong) 70%, transparent); background: color-mix(in srgb, var(--panel-raised) 56%, var(--panel)); }
+  .settings-page .setting-option,
+  .settings-grid .setting-option,
+  .provider-current,
+  .opencode-preview-toggle,
+  .skill-card { background: color-mix(in srgb, var(--surface) 72%, var(--panel)); }
+  .settings-nav-button { background: var(--surface) !important; }
+  code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+  .step .prov, .opencode-model strong, .model-kind-icon { color: var(--accent); }
+  .chain-toggle.is-on { color: var(--success); }
+  .chain-toggle.is-off { color: var(--muted); }
+  .log-card .tm, .log-card .b { color: var(--muted); }
+  .log-card.ok .b { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+  .log-card.warn .b { color: #a47718; background: color-mix(in srgb, #e5bd61 16%, transparent); }
+  .log-card.err .b { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+  .donut-track { stroke: var(--border-strong); }
+  .log-card .m b, .token-row-head span:first-child { color: var(--text); }
+  .token-track { justify-content: flex-start; background: var(--surface); }
+  .token-fill { flex: 0 0 auto; }
+  .token-row-head .problem-rate { color: var(--danger); }
+  .usage-days { background: color-mix(in srgb, var(--panel-raised) 70%, var(--panel)); }
+  .usage-day.active, .provider-option.active { color: var(--text); }
+  .image-preview { background: color-mix(in srgb, var(--bg) 72%, var(--panel)); }
+
+  /* Keep the remaining component surfaces readable when the light palette is active. */
+  body[data-theme="light"] .card.chain-disabled,
+  body[data-theme="light"] .dialog-section,
+  body[data-theme="light"] .chain-row,
+  body[data-theme="light"] .opencode-model,
+  body[data-theme="light"] .direct-model-card .opencode-model {
+    background: color-mix(in srgb, var(--surface) 70%, var(--panel));
+  }
+  body[data-theme="light"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
+  body[data-theme="light"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+  body[data-theme="light"] .opencode-panel,
+  body[data-theme="light"] .direct-model-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
+  }
+  body[data-theme="light"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+  body[data-theme="light"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+  @media (prefers-color-scheme: light) {
+    body[data-theme="system"] .card.chain-disabled,
+    body[data-theme="system"] .dialog-section,
+    body[data-theme="system"] .chain-row,
+    body[data-theme="system"] .opencode-model,
+    body[data-theme="system"] .direct-model-card .opencode-model {
+      background: color-mix(in srgb, var(--surface) 70%, var(--panel));
+    }
+    body[data-theme="system"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
+    body[data-theme="system"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+    body[data-theme="system"] .opencode-panel,
+    body[data-theme="system"] .direct-model-card {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
+    }
+    body[data-theme="system"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
+    body[data-theme="system"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+  }
+
+  @media (max-width: 700px) {
+    body { overflow: auto; }
+    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: calc(100dvh - clamp(32px, 6vw, 64px)); align-items: start; grid-template-rows: none; }
+    main > section { grid-row: auto; height: auto; max-height: none; overflow: visible; }
+    .tabs { grid-row: auto; height: auto; max-height: none; overflow: visible; align-self: start; }
+    section[data-tab="logs"] { height: auto; overflow: visible; }
+    section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: auto; }
+  }

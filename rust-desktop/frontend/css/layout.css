@@ -1,0 +1,165 @@
+  * { box-sizing: border-box; }
+  /* dvh follows the visible viewport when a mobile browser shows or hides its
+     chrome; plain vh leaves the bottom of the page unreachable. */
+  body { font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--body-background); color: var(--text); margin: 0; padding: clamp(16px, 3vw, 32px); min-height: 100vh; min-height: 100dvh; }
+  main { width: 100%; max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: minmax(210px, 224px) minmax(0, 1fr); align-items: start; gap: 18px; transition: grid-template-columns .2s ease; }
+  main.nav-collapsed { grid-template-columns: 44px minmax(0, 1fr); }
+  h1 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.03em; margin: 0; }
+  h2 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
+  h3 { font-size: 15px; margin: 0 0 14px; }
+  h4 { font-size: 13px; margin: 0; }
+  section { background: var(--section-background); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
+  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
+  input, select, textarea, button { font: inherit; background: var(--control-background); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
+  /* Match the input surface: a grey select next to white inputs made the
+     light theme look patchy. */
+  select, select option { color: var(--text); background-color: var(--control-background); }
+  select option:checked { color: var(--text); background-color: var(--surface-hover); }
+  select:disabled { color: var(--muted); opacity: 1; }
+  input::placeholder { color: var(--faint); }
+  textarea { width: 100%; min-height: 120px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button { cursor: pointer; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+  button:hover:not(:disabled) { border-color: var(--accent-strong); background: var(--control-hover); }
+  button:disabled { cursor: not-allowed; background: var(--disabled-background); border-color: var(--border); color: var(--faint); opacity: 1; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--primary-text); font-weight: 700; }
+  button.primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+  button.primary:disabled { background: var(--disabled-background); border-color: var(--border); color: var(--faint); }
+  /* "Удалить" sits next to "Изменить" and needs the same outline: a fully
+     transparent border made the pair look mismatched and clipped. */
+  button.quiet { background: var(--control-background); border-color: var(--border-strong); color: var(--muted); }
+  button.quiet:hover:not(:disabled) { color: var(--text); background: var(--control-hover); border-color: var(--accent-strong); }
+  button.quiet.danger { color: var(--danger); }
+  button.danger { color: var(--danger); }
+  button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
+  /* Column separators: without them a wide table reads as one blob of numbers. */
+  table td + td, table th + th { border-left: 1px solid var(--border); padding-left: 12px; }
+  /* The provider table's only long field is baseURL: let it take the free
+     width and keep the count and actions at their content size, so no row has
+     a wide empty cell between a number and the next separator. */
+  #providers th:first-child, #providers td:first-child { width: 1%; white-space: nowrap; }
+  #providers th:nth-child(2), #providers td:nth-child(2) { width: 100%; overflow-wrap: anywhere; }
+  #providers th:nth-child(3), #providers td:nth-child(3) { width: 1%; white-space: nowrap; }
+  /* No width on the actions column: `1%` collapsed it to the flex items'
+     min-content (about 20px) and squeezed the buttons. Auto sizing gives it
+     exactly the icons' width while baseURL keeps the free space. */
+  #providers th:last-child, #providers td:last-child { white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .card { border: 1px solid var(--border); background: rgba(28, 37, 48, .7); border-radius: 11px; padding: 14px 16px; margin-bottom: 10px; }
+  .card:hover { border-color: #40536a; }
+  .card.chain-disabled { border-color: rgba(113, 129, 149, .38); background: linear-gradient(135deg, rgba(24, 31, 40, .78), rgba(20, 26, 34, .72)); }
+  .card.chain-disabled .model-title, .card.chain-disabled .step .prov { color: #9ba8b8; }
+  .chain-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; order: 3; margin-left: 0; min-height: 38px; padding: 5px 10px 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; user-select: none; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
+  .chain-toggle:hover { transform: translateY(-1px); }
+  .chain-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .chain-toggle input:focus-visible + .chain-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .chain-toggle.is-on { color: #b9efd0; border-color: rgba(105, 215, 160, .28); background: rgba(105, 215, 160, .08); }
+  .chain-toggle.is-off { color: #aab6c5; border-color: rgba(154, 170, 190, .28); background: rgba(113, 129, 149, .08); }
+  .chain-switch { position: relative; flex: 0 0 auto; width: 31px; height: 18px; border-radius: 999px; background: #3c4a5a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); transition: background .16s ease; }
+  .chain-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #d5dde8; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .16s ease, background .16s ease; }
+  .chain-toggle.is-on .chain-switch { background: #43b77d; }
+  .chain-toggle.is-on .chain-switch::after { transform: translateX(13px); background: #f2fff7; }
+  .chain-toggle-text { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+  .chain-toggle-text small { display: block; margin-top: 1px; color: inherit; font-size: 10px; font-weight: 500; opacity: .72; }
+  /* Tighter list: the 7px gap plus a 32px row made the chain feel airy and
+     pushed the header away from its steps. */
+  .card .chain { margin: 10px 0 0; display: grid; gap: 5px; }
+  .step { display: flex; gap: 7px; align-items: center; font-size: 13px; min-height: 0; }
+  .step .n { color: var(--faint); width: 16px; font-variant-numeric: tabular-nums; text-align: right; }
+  .step .opencode-model { padding: 4px 8px; }
+  .chain-empty { color: var(--muted); font-size: 12px; padding: 6px 0 2px; }
+  .step .prov { color: #a9d6ff; font-weight: 650; }
+  code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
+  /* Name first, its tags beside it; when the pair does not fit the tags drop to
+     the next line inside the same group, never under the buttons. */
+  /* Same separator the integration card uses: the header and its models are
+     two groups, not one run of text. */
+  .model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .model-head-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; flex: 1 1 auto; }
+  .model-badges { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+  .model-title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Toggle and the two icon buttons: three bare controls in one row, no frame
+     and no background, so the header stays quiet next to the name. */
+  .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-left: auto; min-width: 0; flex: 0 0 auto; }
+  .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
+  .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
+  .model-actions { display: flex; flex-direction: row; gap: 8px; }
+  /* Provider rows use the same borderless icon actions as the model cards, so
+     the two lists read as one app instead of a table with boxy buttons. */
+/* Optional homepage/checkin links sit by the name: as actions-cell buttons
+     they reserved a four-icon column and left a hole on every row without them. */
+  .provider-links { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+  .provider-links .icon-action { width: 26px; height: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  .provider-links .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .provider-links .icon-action svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .provider-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
+  .provider-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  .provider-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .provider-actions .icon-action.danger { color: #e08f8f; }
+  .provider-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  .provider-actions .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* Borderless icon buttons: the row reads as three quiet controls, and only
+     hover paints a surface behind the one under the pointer. */
+  .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; color: var(--muted); }
+  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .model-card-head .model-actions .icon-action.danger { color: #e08f8f; }
+  .model-card-head .model-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  /* Icon-only actions: a 30px square keeps the row compact and the same gap
+     between toggle, edit and delete. */
+  .model-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; }
+  .model-actions .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* In the cards the toggle is the switch alone: no label, no box around it. */
+  .model-card-head .chain-toggle { min-height: 32px; padding: 0; gap: 0; border-color: transparent; background: none; }
+  .model-card-head .chain-toggle:hover { background: none; border-color: transparent; }
+  .model-card-head .chain-switch { width: 34px; height: 20px; }
+  .model-card-head .chain-switch::after { width: 14px; height: 14px; }
+  .model-card-head .chain-toggle.is-on .chain-switch::after { transform: translateX(14px); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  /* One card per model: checkbox, id and metadata in one frame, the ⋮ rides
+     inside the same frame instead of owning a row of its own. */
+  /* Filter on the left, the "all models" bookmark on the right: one row, same
+     height as the filter input. */
+  .pm-filter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; margin-top: 8px; }
+  .pm-filter-row > input { min-width: 0; }
+  .pm-autoload { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); cursor: pointer; white-space: nowrap; }
+  .pm-autoload:hover { border-color: var(--border-strong); }
+  .pm-autoload-body { display: grid; gap: 1px; min-width: 0; }
+  .pm-autoload-body strong { font-size: 12px; font-weight: 650; }
+  .pm-autoload-body small { color: var(--muted); font-size: 10px; }
+  .pm-autoload input:checked ~ .pm-autoload-body strong { color: #9de8c0; }
+  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
+  .provider-model-card:hover { border-color: var(--border-strong); background: rgba(34, 45, 57, .55); }
+  .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
+  /* The id and its ctx badge flow as inline text: the badge stays on the same
+     line while there is room, and a long id wraps inside the card instead of
+     being cut — full info beats a tidy ellipsis here. */
+  .provider-model-card-body { display: block; flex: 1 1 auto; min-width: 0; }
+  .provider-model-card-body code { display: inline; overflow: visible; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+  .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; margin-left: 7px; vertical-align: baseline; }
+  .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; margin-left: auto; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+  .model-settings-button:hover { color: var(--text); }
+  /* Native checkboxes ignored the palette: a saturated blue square that looked
+     foreign in every theme. Draw them from the theme tokens instead. */
+  input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    min-height: 0;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--control-background);
+    cursor: pointer;
+    transition: background .14s ease, border-color .14s ease;
+  }

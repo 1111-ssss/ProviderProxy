@@ -4,6 +4,7 @@
 //! path, start the server, and use the bound port from the returned handle.
 mod auth;
 mod chat;
+mod assets;
 mod config;
 mod crypto;
 mod handlers;
