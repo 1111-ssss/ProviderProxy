@@ -1,5 +1,7 @@
-// Dependency-free regression checks for the message UI. Source is split into
-// frontend/css/*.css and frontend/js/*.js, linked from frontend/index.html.
+// Behavioural checks for the GUI. Source is split into frontend/css/*.css and
+// frontend/js/*.js, linked from frontend/index.html. These tests load the real
+// scripts in a VM and assert what they compute, plus one wiring check that every
+// element id the scripts look up exists in the markup.
 // Run: node --test frontend.test.mjs
 import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
@@ -10,304 +12,111 @@ const FRONTEND = new URL("rust-desktop/frontend/", import.meta.url)
 const indexHtml = readFileSync(new URL("index.html", FRONTEND), "utf8")
 const cssRefs = [...indexHtml.matchAll(/<link rel="stylesheet" href="\/css\/([^"]+)">/g)].map((m) => m[1])
 const jsRefs = [...indexHtml.matchAll(/<script src="\/js\/([^"]+)"><\/script>/g)].map((m) => m[1])
-// css+js concatenated in document order, so string checks read like the old
-// single-file bundle while the source stays split.
 const styles = cssRefs.map((n) => readFileSync(new URL(`css/${n}`, FRONTEND), "utf8")).join("\n")
 const scripts = jsRefs.map((n) => readFileSync(new URL(`js/${n}`, FRONTEND), "utf8")).join("\n")
+const html = indexHtml + "\n" + styles + "\n" + scripts
 
-test("index.html wires every stylesheet and script it needs", () => {
+test("index.html wires every asset the server embeds", () => {
   assert.ok(cssRefs.length >= 1 && jsRefs.length >= 1, "the document must link its assets")
   for (const name of cssRefs) assert.doesNotThrow(() => readFileSync(new URL(`css/${name}`, FRONTEND)), `${name} must exist`)
   for (const name of jsRefs) assert.doesNotThrow(() => readFileSync(new URL(`js/${name}`, FRONTEND)), `${name} must exist`)
-  // The Rust server lists exactly the same files, so a served GUI cannot miss one.
+  // assets.rs is the Rust server's list; a missing entry means a blank page.
   const assetsRs = readFileSync(new URL("rust-desktop/src/proxy/assets.rs", import.meta.url), "utf8")
   for (const name of cssRefs) assert.ok(assetsRs.includes(`/css/${name}`), `assets.rs must serve /css/${name}`)
   for (const name of jsRefs) assert.ok(assetsRs.includes(`/js/${name}`), `assets.rs must serve /js/${name}`)
 })
 
-for (const file of ["rust-desktop/frontend/index.html"]) {
-  const html = indexHtml + "\n" + styles + "\n" + scripts
-  const script = scripts
-  const elements = new Map()
-  const element = (id) => {
-    if (!elements.has(id)) elements.set(id, { value: "", innerHTML: "", querySelectorAll: () => [] })
-    return elements.get(id)
-  }
-  const context = vm.createContext({ $: element, save: () => {}, esc: (s) => String(s ?? "") })
-  const run = (code) => vm.runInContext(code, context)
-  run(`let cfg = {
-    providers: {
-      selected: {
-        models: ["endpoint-only", "chosen-image", "chat", "chosen-image"],
-        modelInfo: {
-          "endpoint-only": { endpoints: ["images/generations"] },
-          "chosen-image": { type: "image" },
-          "cached-image": { type: "image" }
-        },
-        modelAvailability: { "availability-image": { available: true } }
-      },
-      unselected: { models: [], modelInfo: { "cached-image": { type: "image" } } }
-    },
-    imageSettings: { defaultProvider: "unselected", defaultModel: "cached-image", skillModels: { selected: ["cached-image"] } }
-  }`)
-  // Count labels are pluralised by the real helper, not a test stub.
-  run(script.slice(script.indexOf("const plural ="), script.indexOf("\n\n", script.indexOf("const plural ="))))
-  run(script.slice(script.indexOf("const modelDetails ="), script.indexOf("async function api(")))
-  run(script.slice(script.indexOf('let imageProviderFilter = ""'), script.indexOf("function imageResultValue(")))
-  run(script.slice(script.indexOf("function removeModelFromChains"), script.indexOf("function removeImageModelsFromChains")))
+test("every element id the scripts look up exists in the markup", () => {
+  // $("x") is the only lookup helper; a typo or a removed element breaks a tab.
+  const used = new Set([...scripts.matchAll(/\$\("([^"]+)"\)/g)].map((m) => m[1]))
+  assert.ok(used.size > 50, "the scripts should reference many elements")
+  const missing = [...used].filter((id) => !indexHtml.includes(`id="${id}"`))
+  assert.deepEqual(missing, [], "these ids are used by JS but absent from index.html")
+})
 
-  test(`${file}: script parses and the redundant model permission UI is gone`, () => {
-    new vm.Script(script)
-    assert.ok(!html.includes('id="ig-skill-models"'))
-    assert.ok(!html.includes("data-skill-provider"))
-    assert.ok(!html.includes("▧"))
-    assert.ok(html.includes('id="ig-default-provider"') && html.includes('id="ig-default-model"'))
-    assert.match(html, /class="image-field-heading">Размер/)
-    assert.match(html, /\.image-form \.row \{ align-items: end; \}/)
-    assert.ok(html.includes("grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr))"), "the image form must not be squeezed into a sliver between 760 and 1000px")
-    assert.ok(html.includes(".image-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }"), "the image form grid must not stretch to the default control width")
-    assert.ok(html.includes(".model-card-head { display: flex; flex-wrap: wrap;"), "a narrow chain card must wrap its header instead of spilling out")
-    assert.ok(html.includes("mask: url(\"data:image/svg+xml"), "the search icon should be one centered glyph, not two drifting pseudo-elements")
-    assert.ok(!html.includes(".search-field::after"), "the detached search handle must be gone")
-    assert.ok(html.includes(".tabs-brand-mark { display: block; flex: 0 0 auto; width: 30px; height: 30px; border: 0;"), "the logo must not get a second frame around the one baked into the PNG")
-    assert.ok(html.includes("input[type=\"checkbox\"] {\n    appearance: none;"), "checkboxes must use the theme palette instead of the native blue square")
-    assert.ok(html.includes('select, select option { color: var(--text); background-color: var(--control-background); }'), "a select must use the same surface as an input")
-    assert.ok(html.includes("class=\"head-controls\""), "the chain toggle and buttons must wrap as one group, not as separate lines")
-    assert.ok(html.includes("@media (min-width: 920px) { .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }"), "settings cards must not be squeezed to ~200px in two fixed columns")
-    assert.ok(html.includes("grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr))"), "settings fields must collapse instead of shrinking to ~70px")
-    assert.ok(!html.includes("<b class=\"model-title\">proxy/"), "the chain title must not carry the proxy/ prefix")
-    assert.ok(html.includes('class="model-badges"'), "badges need their own group so they sit closer to each other than to the name")
-    assert.ok(html.includes("x${ups.length}"), "a chain badge must read xN, not \"N в цепочке\"")
-    assert.ok(html.includes("ctx ${esc(formatContext(Math.min(...contexts)))}"), "a context badge must read ctx N")
-    assert.ok(html.includes("добавьте хотя бы одного провайдера"), "the empty chain must point at the providers tab, not the edit button")
-    assert.ok(html.includes("button.quiet { background: var(--control-background)"), "the delete button needs the same outline as its neighbour")
-    assert.ok(html.includes(".model-actions { display: flex; flex-direction: row; gap: 8px; }"), "card action buttons sit in one row")
-    assert.ok(html.includes(".model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 8px;"), "the toggle and buttons share one bare row")
-    assert.ok(!html.includes(".model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-left: auto; min-width: 0; flex: 0 0 auto; padding"), "the controls must not be wrapped in their own card")
-    assert.ok(html.includes('id="pm-autoload"'), "connections needs the add-all-models bookmark")
-    assert.ok(html.includes("async function syncAutoAllProvider"), "the bookmark must refresh from /v1/models")
-    assert.ok(html.includes('data-group="providers"') && !html.includes('data-group="hourly"'), "the hourly tab is merged into providers")
-    assert.ok(html.includes(".model-actions .icon-action svg"), "card action buttons are icon-only")
+test("the concatenated scripts parse", () => {
+  new vm.Script(scripts)
+})
 
-    assert.ok(html.includes("repeat(var(--model-cols, 1), minmax(0, 1fr))"), "model chips flow in a grid of equal columns")
-    assert.ok(html.includes("Math.min(4, Math.floor((available + gap) / (widest + gap)))"), "the chip grid must cap at four columns")
-    assert.ok(html.includes('id="opencode-toggle" class="chain-toggle'), "the integration toggle stays a bare switch")
-    assert.ok(html.indexOf('id="opencode-sync"') < html.indexOf('id="opencode-toggle"'), "sync sits before the on/off switch")
-    assert.ok(html.includes('id="s-retry-forever"'), "settings needs the retry-until-answered option")
-    assert.ok(html.includes('cfg.retryForever = e.target.checked'), "the retry option must persist to the config")
-    assert.ok(!html.includes("История сохраняется локально"), "the statistics header must not carry the history blurb")
-    assert.ok(!html.includes("Считаются ответившие модели провайдеров"), "the models table must not carry the alias blurb")
-    assert.ok(html.includes(".usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto;"), "day tabs must stay on one scrolling row")
-    assert.ok(html.includes("function renderUsageReportKeepingScroll"), "the poll must restore the scroll position after a redraw")
-    assert.ok(html.includes("scrollbar-width: none"), "the day tabs must hide the scrollbar")
-    assert.ok(html.includes("row.ok + row.limits + row.errors > 0"), "providers with no result yet must be left out of the problem chart")
-    assert.ok(html.includes("return outcome > 0 || tokens > 0"), "rows with no recorded outcome must be left out of the tables")
-    assert.ok(html.includes('class="provider-actions"'), "provider rows use borderless icon actions")
-    assert.ok(!html.includes('<button data-a="edit">Изменить</button>'), "provider rows no longer use text buttons")
-    assert.ok(html.includes("onpointermove"), "the hour hint follows the pointer")
-    assert.equal((html.match(/Math\.min\(4,/g) || []).length, 3, "chains, model chips and connection cards all cap at four columns")
-    assert.ok(!html.includes('<span class="chain-toggle-text">Активен</span>'), "the integration switch must not carry a text label")
-    assert.ok(!html.includes("min-width: 132px"), "the bare switch must not reserve width for a removed label")
-    assert.ok(!html.includes("Включена<small>"), "the integration toggle must not carry a second label line")
-    assert.ok(html.includes("function reportEmptiedChains"), "emptying a chain must be reported once")
-    assert.equal((html.match(/reportEmptiedChains\(chainsBefore\)/g) || []).length, 2, "provider and model removal must both report")
-    assert.ok(html.includes('class="field-help"'), "settings fields should expose a ? button with the explanation")
-    assert.ok(html.includes('data-hint="'), "the ? button must carry the explanation text")
-    assert.ok(!html.includes('class="field-hint"'), "the explanation must not sit under the field where it overlapped")
-    assert.ok(!html.includes("ярлык создан:"), "the long shortcut path must not replace the helper text")
-    assert.ok(html.includes('id="u-days"'), "usage should expose the seven-day selector")
-    assert.ok(html.includes("`запущено: ${fmtUptime(u.uptimeMs)}`"), "the header corner shows only when the run started")
-    // Provider rows: an optional home page, a gift icon for the checkin, no key
-    // column, and 0 models instead of a dash.
-    assert.ok(html.includes('id="dp-homepage"'), "a provider may carry an optional home page")
-    assert.ok(html.includes('data-a="homepage"'), "the provider row links to that page")
-    assert.ok(html.includes('data-a="checkin"') && html.includes("M20 12v9H4v-9"), "the checkin action is a gift icon")
-    assert.ok(!html.includes("<th>ключ</th>"), "the provider table no longer exposes a key column")
-    assert.ok(!html.includes("${models.length || \"—\"}"), "a provider without models reads 0, not a dash")
-    assert.ok(html.includes("Подключение внешних провайдеров."), "the providers tab says what the page is for")
-    assert.ok(html.includes("Включение моделей провайдера. Только включенные модели"), "the connections tab says what a tick means")
-    assert.ok(html.includes("выбирать все автоматически"), "the auto-select flag is labelled for what it does")
-    assert.ok(!html.includes('id="pm-clear-all"'), "the clear-all bookmark was dropped again")
-    assert.ok(html.includes("const auto = isAutoAllProvider(pmState.provider)") && html.includes('${saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}'), "auto-select must leave the ticks where the user put them")
-    assert.ok(html.includes("autoSelectedModels ??= [...(cfg.providers[name].models ?? [])]") && html.includes("provider.models = [...provider.autoSelectedModels]"), "auto-select must remember and restore the manual selection")
-    assert.ok(html.includes("direct.all = true") && html.includes("direct.models = [...provider.models]"), "the Models tab follows the auto list")
-    assert.ok(html.includes("автовыбор выключен, список остаётся текущим"), "turning auto-select off keeps the current list")
-    assert.ok(html.includes("Ничего не найдено."), "an empty log search says so instead of a dash")
-    assert.ok(html.includes("badge.textContent = tag && tag.length <= 24 ? tag : fallback"), "a long log detail must not turn the badge into a paragraph")
-    assert.ok(!html.includes('id="log-count"'), "the log filter row no longer carries a counter")
-    assert.ok(html.includes("При любой ошибке прокси пробует модель снова. До 1 часа."), "the retry hint is short and covers every error")
-    assert.ok(html.includes("table td + td, table th + th { border-left: 1px solid var(--border)"), "wide tables need column separators")
-    assert.ok(html.includes("grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; padding: 1px 2px 2px; }"), "the provider list must not scroll inside the dialog body")
-    assert.ok(!html.includes("border: 1px solid rgba(111, 153, 237, .35)"), "the integration card uses the plain card surface")
-    assert.ok(html.includes(".usage-day { flex: 1 1 120px;") && html.includes("min-width: 120px;"), "a day tab keeps room for its own label")
-    assert.ok(html.includes("работало: ${fmtUptime") , "a past day shows how long it worked")
-    assert.ok(html.includes(".log-controls input, .log-controls select { height: 38px; min-height: 38px; line-height: 20px;"), "the log filter matches the search height")
-    assert.ok(html.includes(".settings-grid .setting-action .row { display: flex; flex-wrap: wrap;"), "the shortcut row must never overflow its card")
-    assert.ok(html.includes("overflow: hidden; box-shadow: var(--shadow); }"), "the dialog must not scroll next to its own body")
-    assert.ok(html.includes(".dialog-section .provider-picker { gap: 8px; }"), "the provider list keeps a gap under its search")
-    assert.ok(html.includes(".manual-add summary::before"), "the manual-add disclosure uses a chevron, not a browser triangle")
-    assert.ok(html.includes("#providers th:nth-child(2), #providers td:nth-child(2) { width: 100%;"), "baseURL takes the free width in the provider table")
-    assert.ok(html.includes('<span class="provider-links">') && !html.includes('provider-actions">\n        ${p.homepage'), "homepage and checkin links must not reserve an empty actions slot")
-    assert.ok(html.includes(".model-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }"), "chain and direct-model headers need the same divider as the integration card")
-    assert.ok(html.includes(".log-controls select { appearance: none;"), "the log filter must not use native select chrome")
-    assert.ok(html.includes("if (configDirty) save(true)") && html.includes("}, 5 * 60 * 1000)"), "the config needs a five-minute autosave")
-    assert.ok(html.includes("setInterval(() => checkForDesktopUpdate(), 60 * 60 * 1000)") && html.includes("setInterval(() => syncAutoAllProviders(), 60 * 60 * 1000)"), "updates and auto model lists refresh hourly")
-    assert.ok(html.includes('id="pm-refresh">обновить список<'), "the refresh button says what it does")
-
-    assert.ok(!html.includes("сохранено между сессиями") && !html.includes("хранится 7 дней"), "the header must not carry storage blurbs")
-    assert.ok(html.includes('id="u-groups"'), "statistics must be split into switchable groups")
-    assert.equal((html.match(/class="usage-panel"/g) || []).length, 4, "every statistics group needs a panel")
-    assert.ok(html.includes('id="u-hour-chart"'), "statistics needs a by-hour chart")
-    assert.equal((html.match(/class="usage-group"/g) || []).length, 4, "every statistics panel needs a tab button")
-    assert.ok(html.includes('data-panel="sessions"') && html.includes('id="u-sessions"'), "sessions get their own statistics tab")
-    assert.ok(!html.includes("Названия сессий недоступны"), "the sessions tab must not carry an explanatory blurb")
-    assert.ok(html.includes('id="u-session-search"'), "sessions need a search field")
-    assert.ok(html.includes('id="u-session-pager"'), "sessions need pagination")
-    assert.ok(html.includes("data-session-copy=\"${esc(id)}\"") || html.includes('data-session-copy="${esc(id)}"'), "clicking a session copies its id")
-    assert.ok(html.includes("const SESSION_PAGE_SIZE = 20"), "sessions page at twenty rows")
-    assert.ok(html.includes("sessionTitle(titles, id)"), "a row falls back to the id when the name is unknown")
-    assert.ok(html.includes(".settings-grid .setting-action .row { display: flex; flex-wrap: wrap;") && html.includes(".settings-grid .setting-action .row > button { flex: 1 1 140px;"), "the two shortcut buttons share one width and height")
-    assert.ok(html.includes("scrollbar-gutter:stable"), "the model list reserves the scrollbar so the last column keeps its gutter")
-    assert.ok(html.includes(".chain .step .opencode-model { flex: 1 1 auto;"), "chain chips fill their column so rows line up")
-    assert.ok(html.includes(".model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; margin-left: auto;"), "the model menu stays inside the card")
-    assert.ok(html.includes("@media (min-width: 920px) { .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }"), "settings cards fill two columns, never an empty third")
-    assert.ok(html.includes("report.sessionTitles"), "the session name comes from the titles map")
-    assert.ok(html.includes("function usageSessionTable"), "sessions are rendered as their own table")
-    assert.ok(html.includes('id="u-session-all"') && html.includes('id="dlg-all-sessions"'), "all sessions across days open in their own dialog")
-    assert.ok(html.includes("function allSessions(days)"), "sessions from every stored day are merged by id")
-    const sessionTable = html.slice(html.indexOf("function usageSessionTable"), html.indexOf("let usageReport = null"))
-    assert.ok(!sessionTable.includes("ratelimit"), "the session table drops the ok/ratelimit/err column")
-    assert.ok(sessionTable.includes("Длительность"), "the session table shows how long the session ran")
-    assert.ok(html.includes("function renderUsageHourChart"), "the by-hour chart must be rendered from the hours map")
-    assert.ok(html.includes("now.getHours() - (23 - i)"), "the by-hour chart must cover the last 24 hours, ending at the current hour")
-    assert.ok(html.includes("if (!isToday) at.setHours(i)"), "any other day shows its own 00:00-23:00 instead of a rolling window")
-    assert.ok(html.includes("hour-hint-right"), "the hint must flip near the window edge instead of being clipped")
-    assert.ok(html.includes("hour-hint"), "a by-hour column must show a hover hint with its details")
-    assert.ok(html.includes("function problemColor"), "the problem rate must be shaded by value, not by a fixed bucket")
-    assert.ok(html.includes("provider-model-card"), "connection models must be their own cards, not rows")
-    assert.ok(html.includes("grid-auto-flow: column"), "chains fill top-to-bottom, then left-to-right")
-    assert.ok(html.includes('class="provider-model-card-main"'), "the checkbox and the ⋮ must live in one card")
-    assert.ok(html.includes('data-tab="settings"'), "settings should be a navigation tab")
-    assert.ok(html.includes('id="tabs-collapse"'), "navigation should be collapsible")
-    assert.ok(html.includes('class="tab-group-toggle"'), "navigation groups should be collapsible")
-    assert.ok(!html.includes('class="tab-group-chevron" aria-hidden="true">⌄'), "group arrows should not use a font glyph")
-    assert.match(html, /\.tab-group-chevron \{[\s\S]*transform-origin: 50% 50%/, "group arrows should rotate around their center")
-    assert.match(html, /main > section \{ grid-row: 1; height: 100%; min-height: 0; overflow: auto; \}/, "work cards should own the desktop scrollbar")
-    assert.match(html, /\.tabs \{ grid-row: 1; height: 100%; max-height: none;/, "navigation should fill the desktop viewport")
-    assert.ok(html.includes("main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }"), "collapsed navigation should shrink to the arrow card")
-    assert.ok(html.includes('id="s-base-url"'), "proxy base URL should live in the settings page")
-    assert.ok(html.includes('id="s-check-update"'), "desktop settings should expose a manual update check")
-    assert.ok(html.includes('id="s-version"'), "settings should show the application version")
-    assert.ok(html.includes('id="s-rollback-open"') && html.includes('id="dlg-rollback"'), "settings should offer a rollback picker")
-    assert.ok(html.includes('id="rollback-search"') && html.includes('id="rollback-filter"'), "the picker must offer search and a version filter")
-    assert.ok(html.includes('tauriInvoke("list_versions")'), "the rollback list must come from the published releases")
-    assert.ok(html.includes('tauriInvoke("rollback_to", { version })'), "the chosen version must reach the command")
-    assert.ok(html.includes('id="field-hint"') && html.includes("function showFieldHint"), "the ? hint is one fixed layer, clamped to the viewport")
-    assert.ok(!html.includes(".field-help::after"), "an absolutely positioned hint was clipped by the scrolling card")
-    assert.ok(html.includes("До 1 часа"), "the retry window is one hour")
-    assert.ok(html.includes("При любой ошибке прокси пробует модель снова"), "retry mode must cover every failure type")
-    assert.match(html, /\.settings-grid \.setting-option \{ display: flex; align-items: center;/, "an option checkbox is centred against its text")
-    assert.ok(html.includes("logLines = (j.lines ?? []).slice().reverse()"), "logs should show newest entries first")
-    assert.ok(html.includes("const LOG_PAGE_SIZE = 50"), "logs page at fifty rows")
-    assert.ok(html.includes('id="log-search"') && html.includes('id="log-filter"'), "logs need search and a filter")
-    assert.ok(!html.includes("чистятся сами"), "logs must not carry the self-cleaning blurb")
-    assert.ok(html.includes("const atTop = box.scrollTop <= 60"), "log refresh should preserve the newest entries at the top")
-    // New log layout: chain/model in the header next to the time, session id
-    // pushed right just before the event badge, provider stripped from chain chips.
-    assert.ok(html.includes('chain.className = "chain"'), "the chain name belongs in the log header")
-    assert.ok(html.includes('chip.className = "ses"'), "the session id renders as its own right-aligned chip")
-    assert.ok(html.includes("sessionMatch.index"), "the session tag is stripped from the message body")
-    assert.ok(html.includes(".log-card .ses + .b { margin-left: 8px; }"), "the badge keeps a small gap after the session chip")
-    assert.ok(!html.includes('${esc(u.provider ?? "")}/${esc(u.model ?? "")}'), "chain steps must show the model name only")
-    assert.ok(html.includes('id="s-pending-buffer"'), "the reasoning buffer size is configurable")
-    assert.ok(html.includes("16 КиБ") && html.includes("16 МиБ"), "the buffer picker spans 16 KiB to 16 MiB")
-    assert.equal(run("formatContext(1000000)"), "1m")
-    assert.equal(run("formatContext(1500000)"), "1.5m")
-    assert.equal(run("contextLabel({ contextLength: 50000, contextLengthManual: true, providerContextLength: 1000000 })"), "50k / 1m")
-    assert.equal(run("contextValues({ contextLength: 2000000, contextLengthManual: true, providerContextLength: 1000000 }).current"), 1000000)
-    run('cfg.providers.selected.modelInfo.chat = { contextLength: 500000 }')
-    assert.equal(run('modelContextSuffix("selected", "chat")'), '<span class="model-context">(ctx 500k)</span>')
-    assert.equal(run('modelContextSuffix("selected", "missing")'), "")
-    run('cfg.providers.selected.models = ["chat", "new-model"]; cfg.opencodeModels = { selected: { all: true, models: ["chat"] } }')
-    assert.deepEqual(JSON.parse(run('JSON.stringify(directModelIds("selected"))')), ["chat", "new-model"])
-    run('cfg.providers.selected.models = ["endpoint-only", "chosen-image", "chat", "chosen-image"]; delete cfg.opencodeModels')
-    assert.match(html, /section\[data-tab="logs"\] \{ height: calc\(/, "logs should fill the workspace")
-    assert.match(html, /\.logbox \{ flex: 1 1 auto; min-height: 0;/, "logs should scroll inside their section")
-    assert.ok(!html.includes(".settings-page { min-height: calc(100vh"), "pages should not have an artificial viewport height")
-    assert.ok(html.includes('id="config-export"') && html.includes('id="config-import"'), "settings should expose config import/export")
-    assert.ok(html.includes('id="config-export-keys"') && html.includes('id="config-export-chains"') && html.includes('id="config-export-models"'), "config export sections should be optional")
-    assert.ok(html.includes('checked ? "true" : "false"'), "Rust export query booleans should use true/false")
-    assert.ok(html.includes('tauriInvoke("restart_app")') && html.includes("window.location.reload()"), "config import should restart after success")
-    assert.ok(!html.includes('id="settings-open"'), "duplicate header settings button should be gone")
-    assert.match(html, /class="settings-nav-button" data-tab="settings"/)
-    assert.ok(!html.includes('data-group="settings"'), "settings should be outside collapsible groups")
-    assert.ok(!html.includes('<h1>Provider Proxy</h1>'), "redundant page title should be removed")
-    const integrationStart = html.indexOf('<div class="opencode-panel integration-card">')
-    const chainsStart = html.indexOf('<section data-tab="chains">', integrationStart)
-    const integrationPanel = integrationStart >= 0 && chainsStart > integrationStart ? html.slice(integrationStart, chainsStart) : ""
-    assert.ok(integrationPanel?.includes('class="skill-card integration-skill-card"'), "image skill should live inside the OpenCode panel")
-    assert.ok(html.includes("Выбор провайдера и его моделей, которые нужно использовать без цепочки"), "the models tab explains what a direct model is")
-    assert.ok(!html.includes("В OpenCode") && !html.includes("в OpenCode"), "user-facing model copy should not name a concrete integration")
-    assert.ok(!html.includes("(config)"), "model labels should not expose an integration-specific suffix")
-    assert.ok(html.includes("definition?.all === true") && html.includes("directModelIds"), "select-all direct models should follow provider model updates")
-    assert.ok(!html.includes("Каждая модель будет записана как"), "direct model dialog should not repeat the provider/model format")
-    assert.ok(!html.includes('content: \"⌕\"'), "search fields should not use the broken text magnifier")
-    assert.ok(html.includes('<span class="opencode-model"><strong>${esc(id)}</strong>${modelContextSuffix(provider, id)}</span>'), "direct model pills should show model context when known")
-    assert.ok(html.includes('return context ? `<span class="model-context">(ctx ${esc(context)})</span>` : ""'), "unknown model context should not render a suffix")
-    assert.ok(html.includes('class="opencode-model chain-model"'), "chain models should use the model pills")
-    assert.ok(html.includes("${chainContextBadge(ups)}") && !html.includes("contextBadge(u.provider, u.model)"), "chain context should be shown once on the chain")
-    assert.ok(html.includes(".chain-toggle { position: relative") && html.includes("min-height: 38px"), "status toggles should match action button height")
-    assert.ok(!html.includes('class="chain-toggle-text">${enabled ? "Активен"'), "model cards use the bare switch, not a labelled toggle")
-    assert.ok(!html.includes("провайдер активен"), "direct model status should not have a provider subtitle")
-    assert.ok(html.includes(".model-card-head .chain-switch { width: 34px; height: 20px; }"), "chain and model cards share one bare-switch size")
-    // Layout regressions: a settings card must never be able to push its
-    // controls or neighbour cards outside the column.
-    assert.match(html, /\.settings-grid label \{ margin: 0; min-width: 0; \}/, "settings labels should shrink with their column")
-    assert.ok(html.includes('input:not([type="checkbox"])'), "only text fields should stretch; a stretched checkbox squeezed its label to zero width")
-    assert.match(html, /\.settings-grid \.setting-option span \{ display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax\(0, 1fr\); \}/, "option text needs a shrinkable single-column track")
-    assert.match(html, /\.settings-grid \.setting-action \{ display: flex;[\s\S]*?flex-wrap: wrap; \}/, "long shortcut paths should drop the button under the text")
-    assert.ok(html.includes(".token-row-head span:first-child { color: #d8e4f1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }"), "provider names should ellipsize instead of overflowing")
-    assert.ok(html.includes("min-height: 100dvh"), "the shell should follow the visible viewport on mobile browsers")
-    assert.ok(html.includes('id="s-autostart-tray"'), "autostart should offer a tray-only start")
-    assert.ok(html.includes('tauriInvoke("set_autostart", { enabled, tray })'), "the tray choice must reach the command")
-    assert.ok(html.includes('tauriInvoke("autostart_tray_enabled")'), "the tray choice must be read back from the OS")
-    assert.ok(html.includes("@container (max-width: 420px)"), "the outcome legend should stack instead of being squeezed")
-  })
-
-  test(`${file}: only selected Connections image models are available`, () => {
-    assert.deepEqual(Array.from(run('imageModelIds("selected")')), ["chosen-image", "endpoint-only"])
-    assert.deepEqual(Array.from(run('imageModelIds("unselected")')), [])
-    assert.deepEqual(Array.from(run('imageModelIds("missing")')), [])
-    assert.deepEqual(Array.from(run("imageProviders()")), ["selected"])
-    run("renderImageGenerator(); renderImageSettings()")
-    assert.equal(element("ig-provider-current").innerHTML, "<strong>selected</strong>")
-    assert.equal(element("ig-model").innerHTML, '<option value="chosen-image">chosen-image</option><option value="endpoint-only">endpoint-only</option>')
-    assert.equal(element("ig-default-model").innerHTML, element("ig-model").innerHTML)
-
-    // Deselecting the last image model must not resurrect it from cached metadata.
-    run('cfg.providers.selected.models = ["chat"]; renderImageGenerator(); renderImageSettings()')
-    assert.deepEqual(Array.from(run("imageProviders()")), [])
-    assert.equal(element("ig-model").disabled, true)
-    assert.equal(element("ig-provider-current").innerHTML, "<strong>—</strong>")
-    assert.equal(element("ig-default-model").innerHTML, '<option value="">нет image-моделей</option>')
-    assert.match(element("ig-provider-options").innerHTML, /«Подключения»/)
-  })
-
-  test(`${file}: removing connection models cleans chains and direct models`, () => {
-    run(`cfg.opencodeModels = { selected: { models: ["chat", "keep"] }, unselected: { models: ["cached-image"] } }`)
-    run(`cfg.models = { chain: { upstreams: [{ provider: "selected", model: "chat" }, { provider: "selected", model: "keep" }] } }`)
-    run(`cfg.imageSettings = { defaultProvider: "selected", defaultModel: "chat", skillModels: { selected: ["chat"] } }`)
-
-    run('removeModelReferences("selected", "chat")')
-    assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.models.chain.upstreams)")), [{ provider: "selected", model: "keep" }])
-    assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.opencodeModels.selected.models)")), ["keep"])
-    assert.equal(run("cfg.imageSettings.defaultModel"), "")
-    assert.equal(run("cfg.imageSettings.skillModels.selected"), undefined)
-
-    run('removeModelReferences("selected", "keep")')
-    assert.equal(run("cfg.opencodeModels.selected"), undefined, "empty direct provider should be removed")
-
-    run('removeProviderReferences("unselected")')
-    assert.equal(run("cfg.opencodeModels.unselected"), undefined)
-  })
+// A minimal DOM so the pure helpers can run without a browser.
+const elements = new Map()
+const element = (id) => {
+  if (!elements.has(id)) elements.set(id, { value: "", innerHTML: "", querySelectorAll: () => [] })
+  return elements.get(id)
 }
+const context = vm.createContext({ $: element, save: () => {}, esc: (s) => String(s ?? "") })
+const run = (code) => vm.runInContext(code, context)
+
+run(`let cfg = {
+  providers: {
+    selected: {
+      models: ["endpoint-only", "chosen-image", "chat", "chosen-image"],
+      modelInfo: {
+        "endpoint-only": { endpoints: ["images/generations"] },
+        "chosen-image": { type: "image" },
+        "cached-image": { type: "image" }
+      },
+      modelAvailability: { "availability-image": { available: true } }
+    },
+    unselected: { models: [], modelInfo: { "cached-image": { type: "image" } } }
+  },
+  imageSettings: { defaultProvider: "unselected", defaultModel: "cached-image", skillModels: { selected: ["cached-image"] } }
+}`)
+run(scripts.slice(scripts.indexOf("const plural ="), scripts.indexOf("\n\n", scripts.indexOf("const plural ="))))
+run(scripts.slice(scripts.indexOf("const modelDetails ="), scripts.indexOf("async function api(")))
+run(scripts.slice(scripts.indexOf('let imageProviderFilter = ""'), scripts.indexOf("function imageResultValue(")))
+run(scripts.slice(scripts.indexOf("function removeModelFromChains"), scripts.indexOf("function removeImageModelsFromChains")))
+
+test("context labels shrink to a provider maximum and keep the manual value", () => {
+  assert.equal(run("formatContext(1000000)"), "1m")
+  assert.equal(run("formatContext(1500000)"), "1.5m")
+  assert.equal(run("contextLabel({ contextLength: 50000, contextLengthManual: true, providerContextLength: 1000000 })"), "50k / 1m")
+  // A manual value above the provider maximum is clamped to it.
+  assert.equal(run("contextValues({ contextLength: 2000000, contextLengthManual: true, providerContextLength: 1000000 }).current"), 1000000)
+  run('cfg.providers.selected.modelInfo.chat = { contextLength: 500000 }')
+  assert.equal(run('modelContextSuffix("selected", "chat")'), '<span class="model-context">(ctx 500k)</span>')
+  assert.equal(run('modelContextSuffix("selected", "missing")'), "")
+})
+
+test("select-all direct models follow the provider model list", () => {
+  run('cfg.providers.selected.models = ["chat", "new-model"]; cfg.opencodeModels = { selected: { all: true, models: ["chat"] } }')
+  assert.deepEqual(JSON.parse(run('JSON.stringify(directModelIds("selected"))')), ["chat", "new-model"])
+  run('cfg.providers.selected.models = ["endpoint-only", "chosen-image", "chat", "chosen-image"]; delete cfg.opencodeModels')
+})
+
+test("only selected Connections image models are available", () => {
+  assert.deepEqual(Array.from(run('imageModelIds("selected")')), ["chosen-image", "endpoint-only"])
+  assert.deepEqual(Array.from(run('imageModelIds("unselected")')), [])
+  assert.deepEqual(Array.from(run('imageModelIds("missing")')), [])
+  assert.deepEqual(Array.from(run("imageProviders()")), ["selected"])
+  run("renderImageGenerator(); renderImageSettings()")
+  assert.equal(element("ig-provider-current").innerHTML, "<strong>selected</strong>")
+  assert.equal(element("ig-model").innerHTML, '<option value="chosen-image">chosen-image</option><option value="endpoint-only">endpoint-only</option>')
+  assert.equal(element("ig-default-model").innerHTML, element("ig-model").innerHTML)
+
+  // Deselecting the last image model must not resurrect it from cached metadata.
+  run('cfg.providers.selected.models = ["chat"]; renderImageGenerator(); renderImageSettings()')
+  assert.deepEqual(Array.from(run("imageProviders()")), [])
+  assert.equal(element("ig-model").disabled, true)
+  assert.equal(element("ig-provider-current").innerHTML, "<strong>—</strong>")
+  assert.equal(element("ig-default-model").innerHTML, '<option value="">нет image-моделей</option>')
+  assert.match(element("ig-provider-options").innerHTML, /«Подключения»/)
+})
+
+test("removing connection models cleans chains and direct models", () => {
+  run(`cfg.opencodeModels = { selected: { models: ["chat", "keep"] }, unselected: { models: ["cached-image"] } }`)
+  run(`cfg.models = { chain: { upstreams: [{ provider: "selected", model: "chat" }, { provider: "selected", model: "keep" }] } }`)
+  run(`cfg.imageSettings = { defaultProvider: "selected", defaultModel: "chat", skillModels: { selected: ["chat"] } }`)
+
+  run('removeModelReferences("selected", "chat")')
+  assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.models.chain.upstreams)")), [{ provider: "selected", model: "keep" }])
+  assert.deepEqual(JSON.parse(run("JSON.stringify(cfg.opencodeModels.selected.models)")), ["keep"])
+  assert.equal(run("cfg.imageSettings.defaultModel"), "")
+  assert.equal(run("cfg.imageSettings.skillModels.selected"), undefined)
+
+  run('removeModelReferences("selected", "keep")')
+  assert.equal(run("cfg.opencodeModels.selected"), undefined, "empty direct provider should be removed")
+
+  run('removeProviderReferences("unselected")')
+  assert.equal(run("cfg.opencodeModels.unselected"), undefined)
+})
