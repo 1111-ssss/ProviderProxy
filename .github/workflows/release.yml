@@ -72,19 +72,6 @@ jobs:
           mkdir -p "$RUNNER_TEMP/provider-proxy-release"
           PP_RELEASE_OUTPUT_DIR="$RUNNER_TEMP/provider-proxy-release" ./build-release.sh
 
-      - name: Package Node.js version
-        env:
-          VERSION: ${{ env.RELEASE_TAG }}
-        run: |
-          version="${VERSION#app-v}"
-          package_dir="$RUNNER_TEMP/provider-proxy-node/provider-proxy-node-v$version"
-          mkdir -p "$package_dir"
-          cp README.md server.mjs config.example.json launch.sh launch-windows.ps1 "$package_dir/"
-          cp -R public skills "$package_dir/"
-          (cd "$RUNNER_TEMP/provider-proxy-node" && zip -qr \
-            "$RUNNER_TEMP/provider-proxy-release/Provider-Proxy-Node-v$version.zip" \
-            "provider-proxy-node-v$version")
-
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,7 +79,7 @@ jobs:
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \
               --title "Provider Proxy $RELEASE_TAG" \
-              --notes "Unsigned portable ZIP builds for Rust desktop (Linux and Windows) and Node.js."
+              --notes "Unsigned portable ZIP builds for Provider Proxy desktop (Linux and Windows)."
           fi
           gh release upload "$RELEASE_TAG" \
             "$RUNNER_TEMP/provider-proxy-release/"Provider-Proxy*.zip \

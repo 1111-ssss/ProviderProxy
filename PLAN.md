@@ -62,9 +62,9 @@ rust-desktop/src/
 - [ ] **С1. Фронтенд**: разнести `rust-desktop/frontend/index.html` (≈4.3k строк) на
       `frontend/index.html` + `frontend/css/*` + `frontend/js/*`. Rust отдаёт их
       через `include_str!` (`proxy/assets.rs`). Повторно прописанную разметку свести.
-- [ ] **С2. Удалить Node-версию**: `server.mjs`, `public/`, `test.mjs`, `frontend.test.mjs`
-      (переписать под новый фронтенд), `launch.sh`, `launch-windows.ps1`, `release.ps1`,
-      Node-часть workflow. Обновить `.dockerignore`/README.
+- [x] **С2. Удалить Node-версию**: `server.mjs`, `public/`, `test.mjs`, `frontend.test.mjs`,
+      `launch.sh`, `launch-windows.ps1`, корневой `config.example.json`, `HANDOFF.md`,
+      Node-часть workflow и упоминания в ярлыках. `all`-скрипты и `build-release.sh` не трогаю (не мусор).
 - [ ] **С3. `handlers.rs`** (≈1k строк): разнести на `proxy/handlers/*`.
 - [ ] **С4. `main.rs`** (≈559 строк): вынести autostart и ярлыки в `platform/*`.
 - [ ] **С5. Мусор**: `HANDOFF.md` (устаревшая записка с другого ПК); `--version.db`

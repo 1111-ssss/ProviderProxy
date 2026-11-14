@@ -31,8 +31,7 @@ Tauri и тестируется без WebView. HTTP-маршруты, JSON-от
 
 Путь запроса: `server` → `handlers`/`chat` → `routing`/`stream`. Конфигурация хранится через
 `config` → `crypto`, а интеграция с OpenCode вынесена в `opencode`. Общие данные находятся в
-`types`, наблюдаемость — в `metrics`. `frontend/index.html` и отдельный Node.js backend этим
-рефакторингом не изменяются.
+`types`, наблюдаемость — в `metrics`. `frontend/` отдаётся тем же Rust-бэкендом.
 
 ## Проверки
 
@@ -105,7 +104,7 @@ cargo tauri dev -- ..\config.db
 ```
 
 Готовый бинарник находится в `target\release\provider-proxy-desktop.exe`. Его можно запускать
-напрямую или создать ярлыки Rust и npm:
+напрямую или создать ярлык:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -120,23 +119,22 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ## Ярлык и автоматическая пересборка
 
-Установить два пользовательских ярлыка — `Provider Proxy Rust` и `Provider Proxy npm`:
+Установить пользовательский ярлык `Provider Proxy`:
 
 ```bash
 ./install-shortcuts.sh
 ```
 
-Windows-ярлыки устанавливаются из PowerShell:
+Windows-ярлык устанавливается из PowerShell:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\install-shortcuts.ps1
 ```
 
-Скрипт создаёт ярлыки в меню «Пуск» и на рабочем столе. Rust-ярлык запускает
-`target\release\provider-proxy-desktop.exe`, а npm-ярлык запускает `server.mjs` и открывает
-локальный GUI. Для Rust сначала соберите приложение командой `cargo tauri build` или
-`cargo build --release`.
+Скрипт создаёт ярлык в меню «Пуск» и на рабочем столе, который запускает
+`target\release\provider-proxy-desktop.exe`. Для этого сначала соберите приложение командой
+`cargo tauri build` или `cargo build --release`.
 
 ## Автоматические обновления и GitHub Releases
 

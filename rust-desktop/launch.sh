@@ -1,6 +1,5 @@
 #!/bin/sh
-# Desktop-entry launcher for the Rust/Tauri build.
-# Keep the project config as the default, but allow PP_CONFIG_FILE for tests and alternate setups.
+# KRunner/desktop-entry launcher: build if sources are newer, then start the app.
 set -u
 
 DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
@@ -93,20 +92,6 @@ artifact_requires_newer_glibc() {
   [ -n "$runtime_glibc" ] && [ -n "$required_glibc" ] || return 1
   [ "$(printf '%s\n' "$runtime_glibc" "$required_glibc" | sort -V | tail -1)" != "$runtime_glibc" ]
 }
-
-# The old browser shortcut starts the Node backend from this same project. It
-# owns the configured port, so replace only that exact process when switching
-# to the Rust desktop build; unrelated Node processes are left untouched.
-if command -v ps >/dev/null 2>&1; then
-  ps -eo pid=,args= | while read -r pid command rest; do
-    [ "$command" = "node" ] || continue
-    set -- $rest
-    [ "${1:-}" = "$ROOT/server.mjs" ] || continue
-    kill "$pid" >/dev/null 2>&1 || true
-    printf '%s\n' "stopped old Node backend (pid $pid)" >>"$LOG"
-  done
-  sleep 0.2
-fi
 
 run_failed() {
   status="${1:-1}"

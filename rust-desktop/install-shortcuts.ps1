@@ -32,26 +32,17 @@ function New-ProviderProxyShortcut {
 }
 
 $RustLauncher = Join-Path $RustDir "launch-windows.ps1"
-$NpmLauncher = Join-Path $Root "launch-windows.ps1"
 $RustArguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$RustLauncher`""
-$NpmArguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$NpmLauncher`""
 $RustIcon = Join-Path $RustDir "target\release\provider-proxy-desktop.exe"
 if (-not (Test-Path -LiteralPath $RustIcon)) { $RustIcon = "$env:SystemRoot\System32\SHELL32.dll,3" }
 
 $Shortcuts = @(
     @{
-        Name = "Provider Proxy Rust.lnk"
+        Name = "Provider Proxy.lnk"
         Target = $PowerShell
         Arguments = $RustArguments
         WorkingDirectory = $Root
         Icon = $RustIcon
-    },
-    @{
-        Name = "Provider Proxy npm.lnk"
-        Target = $PowerShell
-        Arguments = $NpmArguments
-        WorkingDirectory = $Root
-        Icon = "$env:SystemRoot\System32\SHELL32.dll,14"
     }
 )
 
@@ -62,4 +53,4 @@ foreach ($Item in $Shortcuts) {
     }
 }
 
-Write-Host "Ярлыки Provider Proxy Rust и Provider Proxy npm созданы в меню Пуск и на рабочем столе."
+Write-Host "Ярлык Provider Proxy создан в меню Пуск и на рабочем столе."

@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import vm from "node:vm"
 
-for (const file of ["public/index.html", "rust-desktop/frontend/index.html"]) {
+for (const file of ["rust-desktop/frontend/index.html"]) {
   const html = readFileSync(new URL(file, import.meta.url), "utf8")
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1]
   const elements = new Map()
