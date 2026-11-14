@@ -243,7 +243,9 @@ async fn fails_over_and_skips_a_provider_during_its_cooldown() {
     assert_eq!(usage["retentionDays"], 7);
     assert_eq!(usage["days"].as_array().unwrap().len(), 7);
     assert_eq!(usage["providers"]["limited"]["limits"], 1);
-    assert_eq!(usage["models"]["alias"]["failovers"], 1);
+    // Model rows are keyed `provider/model`, never by chain alias.
+    assert_eq!(usage["models"]["limited/limited-model"]["failovers"], 1);
+    assert_eq!(usage["models"]["available/actual-model"]["ok"], 2);
     assert_eq!(usage["cooldowns"][0]["upstream"], "limited");
 
     let discovery: Value = proxy

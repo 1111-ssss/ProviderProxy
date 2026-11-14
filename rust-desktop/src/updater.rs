@@ -23,6 +23,10 @@ const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) struct UpdateInfo {
     pub(crate) version: String,
     pub(crate) current_version: String,
+    /// True when this version is not newer than the one the user rolled back
+    /// from. The GUI shows it only for a manual check and never auto-installs
+    /// it, so a deliberate rollback is not silently undone.
+    pub(crate) gated: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -141,6 +145,41 @@ fn current_version() -> Result<Version, String> {
         .map_err(|error| format!("некорректная текущая версия {CURRENT_VERSION}: {error}"))
 }
 
+/// The version the user rolled back from, remembered across restarts. While it
+/// is set, updates at or below it are hidden from the automatic check: a
+/// deliberate rollback must not be undone behind the user's back.
+fn rollback_ceiling_file() -> PathBuf {
+    if let Some(path) = std::env::var_os("PP_ROLLBACK_CEILING_FILE") {
+        return PathBuf::from(path);
+    }
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("provider-proxy/rollback-ceiling")
+}
+
+fn read_rollback_ceiling() -> Option<Version> {
+    let raw = fs::read_to_string(rollback_ceiling_file()).ok()?;
+    Version::parse(raw.trim()).ok()
+}
+
+fn write_rollback_ceiling(version: &Version) {
+    let path = rollback_ceiling_file();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, version.to_string());
+}
+
+pub(crate) fn clear_rollback_ceiling() {
+    let _ = fs::remove_file(rollback_ceiling_file());
+}
+
+/// A discovery is "gated" when it is not strictly newer than the version the
+/// user rolled back from. The GUI then keeps it to a manual check.
+fn is_gated(remote: &Version) -> bool {
+    read_rollback_ceiling().is_some_and(|ceiling| *remote <= ceiling)
+}
+
 /// Published releases, newest first. Only ones with a ZIP for this platform are
 /// offered: a version the app cannot install is not a rollback target.
 pub(crate) async fn list_versions() -> Result<Vec<VersionInfo>, String> {
@@ -194,7 +233,10 @@ fn rollback_targets(releases: Vec<GithubRelease>, current: &Version) -> Vec<Vers
 
 /// Install an older published release and restart into it. The config lives
 /// outside the binary, so settings and history survive the swap.
-pub(crate) async fn rollback_to(version: String) -> Result<bool, String> {
+pub(crate) async fn rollback_to(
+    version: String,
+    progress: Option<ProgressSink<'_>>,
+) -> Result<bool, String> {
     if cfg!(debug_assertions) {
         return Err("откат доступен только в release-сборке приложения".into());
     }
@@ -214,7 +256,10 @@ pub(crate) async fn rollback_to(version: String) -> Result<bool, String> {
         .ok_or_else(|| format!("релиз {version} не найден"))?;
     let url = release_asset(&release, &target)
         .ok_or_else(|| format!("в релизе {version} нет ZIP для этой платформы"))?;
-    let bytes = download(&url).await?;
+    let bytes = download_with_progress(&url, progress).await?;
+    // Remember where the user rolled back from, so the automatic check does not
+    // offer the very version they left.
+    write_rollback_ceiling(&current_version()?);
     schedule_update(stage_update(&version, &bytes)?)?;
     Ok(true)
 }
@@ -260,13 +305,25 @@ async fn latest_update() -> Result<Option<RemoteUpdate>, String> {
 }
 
 pub(crate) async fn check_for_update() -> Result<Option<UpdateInfo>, String> {
-    Ok(latest_update().await?.map(|update| UpdateInfo {
-        version: update.version,
-        current_version: CURRENT_VERSION.to_string(),
+    Ok(latest_update().await?.map(|update| {
+        let remote = Version::parse(&update.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+        UpdateInfo {
+            gated: is_gated(&remote),
+            version: update.version,
+            current_version: CURRENT_VERSION.to_string(),
+        }
     }))
 }
 
-async fn download(url: &str) -> Result<Vec<u8>, String> {
+/// Callback the caller supplies to observe a download: `(bytes_done, bytes_total)`.
+/// `total` is 0 when the server does not send `Content-Length`.
+pub(crate) type ProgressSink<'a> = &'a (dyn Fn(u64, u64) + Send + Sync);
+
+async fn download_with_progress(
+    url: &str,
+    progress: Option<ProgressSink<'_>>,
+) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
     let response = reqwest::Client::new()
         .get(url)
         .header(ACCEPT, "application/octet-stream")
@@ -280,11 +337,17 @@ async fn download(url: &str) -> Result<Vec<u8>, String> {
             response.status()
         ));
     }
-    response
-        .bytes()
-        .await
-        .map(|bytes| bytes.to_vec())
-        .map_err(|error| format!("не удалось прочитать ZIP обновления: {error}"))
+    let total = response.content_length().unwrap_or(0);
+    let mut bytes = Vec::with_capacity(total as usize);
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|error| format!("не удалось прочитать ZIP обновления: {error}"))?;
+        bytes.extend_from_slice(&chunk);
+        if let Some(report) = progress {
+            report(bytes.len() as u64, total);
+        }
+    }
+    Ok(bytes)
 }
 
 fn update_root(version: &str) -> Result<PathBuf, String> {
@@ -449,15 +512,21 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
     Err("автообновление не поддерживается на этой платформе".into())
 }
 
-pub(crate) async fn install_update(restart: bool) -> Result<bool, String> {
+pub(crate) async fn install_update(
+    restart: bool,
+    progress: Option<ProgressSink<'_>>,
+) -> Result<bool, String> {
     if cfg!(debug_assertions) {
         return Err("автообновление доступно только в release-сборке приложения".into());
     }
     let Some(update) = latest_update().await? else {
         return Ok(false);
     };
-    let bytes = download(&update.asset_url).await?;
+    let bytes = download_with_progress(&update.asset_url, progress).await?;
     let staged = stage_update(&update.version, &bytes)?;
+    // Installing any update clears the rollback ceiling: the user moved forward
+    // again, so the old "do not offer this" rule no longer applies.
+    clear_rollback_ceiling();
     if restart {
         schedule_update(staged)?;
     } else {
@@ -521,5 +590,29 @@ mod tests {
             versions.iter().map(Version::to_string).collect::<Vec<_>>(),
             vec!["0.1.5", "0.1.4"]
         );
+    }
+
+    /// After a rollback the user must not be offered the version they left
+    /// again: the automatic check hides anything at or below the ceiling, and a
+    /// genuinely newer release is offered normally.
+    #[test]
+    fn a_rollback_hides_versions_up_to_where_the_user_left() {
+        let ceiling = std::env::temp_dir().join(format!(
+            "provider-proxy-ceiling-{}.txt",
+            std::process::id()
+        ));
+        std::env::set_var("PP_ROLLBACK_CEILING_FILE", &ceiling);
+        clear_rollback_ceiling();
+        assert!(!is_gated(&Version::parse("9.9.9").unwrap()), "no ceiling: nothing is gated");
+
+        write_rollback_ceiling(&Version::parse("0.1.8").unwrap());
+        assert!(is_gated(&Version::parse("0.1.8").unwrap()), "the left version is gated");
+        assert!(is_gated(&Version::parse("0.1.7").unwrap()), "older is gated too");
+        assert!(!is_gated(&Version::parse("0.1.9").unwrap()), "a newer release stays visible");
+
+        clear_rollback_ceiling();
+        assert!(!is_gated(&Version::parse("0.1.8").unwrap()), "cleared: nothing is gated");
+        let _ = std::fs::remove_file(&ceiling);
+        std::env::remove_var("PP_ROLLBACK_CEILING_FILE");
     }
 }

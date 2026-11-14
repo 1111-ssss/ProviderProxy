@@ -312,7 +312,7 @@
   .settings-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: 6px; }
   main.nav-collapsed .tabs-brand { width: 100%; justify-content: center; padding: 0; border-bottom: 0; }
-  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tab-group, main.nav-collapsed .settings-nav-button { display: none; }
+  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tab-group, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
   main.nav-collapsed .tabs button.tabs-collapse { margin: 0; padding: 5px; }
   main.nav-collapsed .tabs-collapse svg { transform: rotate(180deg); }
   main.nav-collapsed .tab-group { padding: 3px 0; border-bottom: 0; }
@@ -325,6 +325,14 @@
   .update-banner-message { min-width: 0; color: var(--muted); font-size: 12px; }
   .update-banner-message strong { color: var(--text); }
   .update-banner button { min-height: 30px; padding: 5px 9px; background: var(--accent-strong); border-color: var(--accent-strong); color: #07101f; font-size: 12px; font-weight: 700; }
+  /* Update entry above "Settings" in the navigation. Appears only when the
+     automatic or manual check found a release; the bar shows the download. */
+  .update-nav-button { margin-top: 8px; border-color: rgba(111, 153, 237, .55); background: rgba(111, 153, 237, .16) !important; color: var(--text) !important; font-weight: 650; flex-wrap: wrap; row-gap: 6px; }
+  .update-nav-button .update-nav-icon { display: inline-flex; color: var(--accent-strong); }
+  .update-nav-button .update-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .update-nav-button .update-progress { flex-basis: 100%; height: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+  .update-nav-button .update-progress-fill { display: block; height: 100%; width: 0%; border-radius: 4px; background: var(--accent-strong); transition: width .25s ease; }
+  .update-nav-button[hidden] { display: none; }
   section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
    /* The filter is one control row: the select matches the search height and
    keeps its width, so switching options never shifts the layout. */
@@ -888,6 +896,7 @@
         <button data-tab="usage"><span class="tab-index">08</span><span class="tab-label">Статистика</span></button>
       </div>
     </div>
+        <button id="update-nav-button" class="update-nav-button" type="button" hidden aria-label="Доступно обновление"><span class="update-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg></span><span id="update-nav-label">Обновление</span><span class="update-progress" id="update-progress" hidden><span class="update-progress-fill" id="update-progress-fill"></span></span></button>
         <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
   </nav>
 
@@ -2298,6 +2307,30 @@ $("config-import-file").onchange = (event) => importConfigFile(event.target.file
 
 let updateInfo = null
 let updateBusy = false
+// The navigation entry above "Settings" appears only when a check found a
+// release; the bar inside it follows the download progress events.
+const updateNavButton = $("update-nav-button")
+const updateNavLabel = $("update-nav-label")
+const updateNavProgress = $("update-progress")
+const updateNavProgressFill = $("update-progress-fill")
+function setUpdateNav(state) {
+  // state: null (hide) | { progress: [done, total] } (show with a bar)
+  if (!state) {
+    updateNavButton.hidden = true
+    updateNavProgress.hidden = true
+    updateNavProgressFill.style.width = "0%"
+    return
+  }
+  const [done, total] = state.progress
+  updateNavButton.hidden = false
+  updateNavProgress.hidden = !total
+  updateNavProgressFill.style.width = total ? `${Math.min(100, Math.round((done / total) * 100))}%` : "0%"
+}
+window.__TAURI__?.event?.listen?.("update-progress", (event) => {
+  const payload = event.payload ?? {}
+  setUpdateNav({ progress: [Number(payload.done) || 0, Number(payload.total) || 0] })
+})
+updateNavButton.onclick = () => installDesktopUpdate(true)
 function setUpdateBanner(message, actionLabel = "", action = null) {
   const banner = $("update-banner")
   const button = $("update-banner-action")
@@ -2314,16 +2347,20 @@ async function installDesktopUpdate(restart = true) {
   if (!isDesktopApp() || updateBusy) return
   updateBusy = true
   setUpdateBanner("<strong>Загружаю обновление…</strong>")
+  setUpdateNav({ progress: [0, 0] })
   try {
     const installed = await tauriInvoke("install_update", { restart })
     if (!installed) {
       updateInfo = null
       setUpdateBanner("")
+      setUpdateNav(null)
     } else if (!restart) {
       setUpdateBanner("<strong>Обновление установлено.</strong> Перезапусти приложение, чтобы применить его.", "Перезапустить", restartDesktop)
+      setUpdateNav(null)
     }
   } catch (error) {
     setUpdateBanner(`Не удалось обновить: ${esc(error.message ?? error)}`, "Повторить", () => installDesktopUpdate(restart))
+    setUpdateNav(null)
   } finally {
     updateBusy = false
   }
@@ -2339,12 +2376,24 @@ async function checkForDesktopUpdate(manual = false) {
     const info = await tauriInvoke("check_for_update")
     if (!info) {
       updateInfo = null
+      setUpdateNav(null)
       if (manual) setUpdateBanner("<strong>Обновлений нет.</strong>", "Проверить снова", () => checkForDesktopUpdate(true))
       else setUpdateBanner("")
       return
     }
     updateInfo = info
+    // After a rollback the discovery may be at or below where the user left.
+    // It is offered only for a manual check and never auto-installed, so the
+    // rollback is not silently undone.
+    if (info.gated) {
+      setUpdateNav(null)
+      if (manual) setUpdateBanner(`<strong>Доступна версия ${esc(info.version)},</strong> но она не выше той, с которой ты откатился.`, "Установить всё равно", () => installDesktopUpdate(true))
+      else setUpdateBanner("")
+      return
+    }
     if (appSettings().autoUpdate) return installDesktopUpdate(appSettings().autoRestart)
+    setUpdateNav({ progress: [0, 0] })
+    updateNavLabel.textContent = `Обновить до ${info.version}`
     setUpdateBanner(`<strong>Доступна новая версия ${esc(info.version)}.</strong>`, "Обновить", () => installDesktopUpdate(true))
   } catch (error) {
     const message = error.message ?? String(error)
@@ -2616,9 +2665,24 @@ async function startRollback(version) {
   if (!version || updateBusy) return
   updateBusy = true
   setUpdateBanner(`<strong>Откатываю на ${esc(version)}…</strong>`)
+  setUpdateNav(null)
+  // The command exits the app once the swap is scheduled, so the choice must be
+  // saved first: a deliberate rollback turns automatic updates off, otherwise
+  // the next check would re-install the version the user just left.
+  const previousAutoUpdate = appSettings().autoUpdate
+  appSettings().autoUpdate = false
+  save()
   try {
-    if (!(await tauriInvoke("rollback_to", { version }))) setUpdateBanner("")
+    if (!(await tauriInvoke("rollback_to", { version }))) {
+      appSettings().autoUpdate = previousAutoUpdate
+      save()
+      renderSettings()
+      setUpdateBanner("")
+    }
   } catch (error) {
+    appSettings().autoUpdate = previousAutoUpdate
+    save()
+    renderSettings()
     setUpdateBanner(`Не удалось откатить: ${esc(error.message ?? error)}`, "Повторить", () => startRollback(version))
   } finally {
     updateBusy = false

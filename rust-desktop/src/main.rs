@@ -14,9 +14,18 @@ use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
     webview::NewWindowResponse,
-    Manager, Url, WebviewUrl, WebviewWindowBuilder,
+    Emitter, Manager, Url, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_opener::OpenerExt;
+
+/// Reports download progress to the GUI. Emitted from the download loop so the
+/// bar advances during a slow release asset.
+fn emit_update_progress(app: &tauri::AppHandle, done: u64, total: u64) {
+    let _ = app.emit(
+        "update-progress",
+        serde_json::json!({ "done": done, "total": total }),
+    );
+}
 
 #[tauri::command]
 async fn check_for_update() -> Result<Option<updater::UpdateInfo>, String> {
@@ -25,7 +34,8 @@ async fn check_for_update() -> Result<Option<updater::UpdateInfo>, String> {
 
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle, restart: bool) -> Result<bool, String> {
-    let installed = updater::install_update(restart).await?;
+    let report = |done, total| emit_update_progress(&app, done, total);
+    let installed = updater::install_update(restart, Some(&report)).await?;
     if restart {
         if installed {
             app.exit(0);
@@ -41,7 +51,8 @@ async fn list_versions() -> Result<Vec<updater::VersionInfo>, String> {
 
 #[tauri::command]
 async fn rollback_to(app: tauri::AppHandle, version: String) -> Result<bool, String> {
-    let installed = updater::rollback_to(version).await?;
+    let report = |done, total| emit_update_progress(&app, done, total);
+    let installed = updater::rollback_to(version, Some(&report)).await?;
     if installed {
         app.exit(0);
     }
