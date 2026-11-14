@@ -22,13 +22,14 @@ Node-версия (`server.mjs`, `public/`) удалена — история о
 
 | Путь | Что |
 | --- | --- |
-| `frontend/index.html` | каркас интерфейса: `<head>`, разметка вкладок, `<script src>` |
-| `frontend/css/*.css` | стили (тема, база, компоненты, страницы) |
-| `frontend/js/*.js` | логика интерфейса, обычные скрипты по порядку |
+| `rust-desktop/frontend/index.html` | каркас интерфейса: `<head>`, разметка вкладок, `<link>`/`<script src>` |
+| `rust-desktop/frontend/css/*.css` | стили: `tokens` (тема), `layout`, `components`, `pages` |
+| `rust-desktop/frontend/js/*.js` | логика: `core`, `providers`, `dialogs-provider`, `dialogs-chain`, `models`, `connections`, `shared`, `images`, `tabs`, `logs`, `usage` |
 | `rust-desktop/src/proxy/` | HTTP-бэкенд (не зависит от Tauri) |
 | `rust-desktop/src/proxy/assets.rs` | отдача `frontend/*` через `include_str!` |
+| `rust-desktop/src/proxy/handlers/` | HTTP-обработчики: `config`, `images`, `observe` |
 | `rust-desktop/src/main.rs` | запуск Tauri, окно, трей, регистрация команд |
-| `rust-desktop/src/platform/` | autostart и ярлыки ОС |
+| `rust-desktop/src/platform.rs` | autostart и ярлыки ОС |
 | `rust-desktop/src/updater.rs` | проверка/установка обновления, откат |
 
 ## Правила работы
@@ -64,11 +65,12 @@ GUI-смоук в реальном WebView: `rust-desktop/tests/checkin_smoke.py
 
 ## Как править фронтенд
 
-Фронтенд живёт в `frontend/` и отдаётся Rust-бэкендом по маршрутам из `proxy/assets.rs`.
-Нет шага сборки: правь `frontend/index.html`, `frontend/css/*.css` или
-`frontend/js/*.js`. Порядок `<script src>` в `index.html` задаёт порядок загрузки —
+Фронтенд живёт в `rust-desktop/frontend/` и отдаётся Rust-бэкендом по маршрутам из
+`proxy/assets.rs`. Нет шага сборки: правь `frontend/index.html`, `frontend/css/*.css` или
+`frontend/js/*.js`. Порядок `<link>`/`<script src>` в `index.html` задаёт порядок загрузки —
 скрипты делят одну область видимости, поэтому модуль использует то, что объявлено выше.
-Добавляя файл, зарегистрируй его и в `assets.rs`, и в `index.html`.
+Добавляя файл, зарегистрируй его и в `assets.rs`, и в `index.html` (тест `frontend.test.mjs`
+это проверяет).
 
 ## Окружение и переменные
 

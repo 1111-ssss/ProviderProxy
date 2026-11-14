@@ -2,7 +2,7 @@
 
 Это отдельная desktop-версия `provider_proxy` на Rust + Tauri 2.
 
-- интерфейс — тот же `frontend/index.html`, что и в web-версии;
+- интерфейс — `frontend/index.html` + `frontend/css/*` + `frontend/js/*`, отдаётся тем же Rust-бэкендом в WebView и браузере;
 - backend, failover, `/v1/chat/completions`, `/v1/models`, логи, usage и сохранение конфига — Rust;
 - окно работает на Linux и Windows через системный WebView;
 - API прокси слушает только `127.0.0.1` и доступен для OpenCode по `http://127.0.0.1:<port>/v1`.
@@ -12,9 +12,12 @@
 Backend разделён по ответственности, чтобы HTTP-слой не смешивался с конфигурацией и логикой
 провайдеров:
 
-- `src/main.rs` — запуск Tauri и создание единственного окна;
+- `src/main.rs` — запуск Tauri, окно, трей и регистрация команд;
+- `src/platform.rs` — автозапуск и ярлыки ОС;
+- `src/updater.rs` — проверка/установка обновления и откат;
 - `src/proxy/server.rs` — запуск Tokio/axum-сервера и таблица маршрутов;
-- `src/proxy/handlers.rs` — HTTP handlers для GUI, настройки и списки моделей;
+- `src/proxy/assets.rs` — отдача `frontend/*` через `include_str!`;
+- `src/proxy/handlers/` — HTTP handlers: `config` (конфиг и импорт/экспорт), `images` (skill и генерация изображений), `observe` (логи, usage, v1/models);
 - `src/proxy/chat.rs` — обработка chat completions, failover и cooldown;
 - `src/proxy/stream.rs` — передача JSON/SSE-ответов провайдера и сбор usage;
 - `src/proxy/types.rs` — состояние приложения, upstream-модели и usage-типы;
@@ -138,12 +141,22 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ## Автоматические обновления и GitHub Releases
 
-В production-сборке приложение через Tauri Updater проверяет
-`https://github.com/1111-ssss/ProviderProxy/releases/latest/download/latest.json`. Если найден
-подписанный релиз, GUI показывает предложение в правом верхнем углу обновить приложение и
-перезапустить его. Автоматическую загрузку и автоматический перезапуск можно включить отдельно
-в настройках. Debug-сборки проверку не выполняют. Для локальной релизной сборки без публикации
-проверку можно отключить переменной `PP_DISABLE_UPDATES=1`.
+Собственный updater (не Tauri Updater): `src/updater.rs` через GitHub API читает
+`https://api.github.com/repos/1111-ssss/ProviderProxy/releases`, для текущей платформы
+ищет ZIP `Provider-Proxy-vX.Y.Z-{linux,windows}-x64.zip`, скачивает его (с прогрессом,
+событие `update-progress`) и заменяет бинарник после завершения процесса.
+Debug-сборки проверку выполняют, но установку блокируют. Отключить проверку:
+`PP_DISABLE_UPDATES=1`.
+
+В настройках можно включить автоматическую загрузку и автоматический перезапуск
+раздельно. После ручного отката автоматическая проверка не предлагает версию, с которой
+пользователь ушёл (потолок хранится в `~/.config/provider-proxy/rollback-ceiling`),
+а автообновление выключается. Это локальный релиз без подписи артефактов: приложение
+доверяет HTTPS GitHub и правам владельца репозитория, поэтому не публикуйте релизы в
+репозитории, доступ к которому могут получить посторонние.
+
+Workflow `.github/workflows/release.yml` по тегу `app-vX.Y.Z` собирает и публикует
+неподписанные ZIP с portable-бинарниками Linux и Windows. Для сборки ключ подписи не нужен.
 
 В настройках desktop-версии также можно включить автозапуск. На Windows это пользовательский
 ключ `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, на Linux —
@@ -152,27 +165,14 @@ Set-ExecutionPolicy -Scope Process Bypass
 Там же кнопка «Создать ярлык» добавляет приложение в индекс меню приложений: пользовательский
 `.lnk` в меню «Пуск» Windows или `~/.local/share/applications/provider-proxy-rust.desktop` на Linux.
 
-Для подготовки подписи:
-
-```powershell
-cargo tauri signer generate -- -w "$HOME/.tauri/provider-proxy.key"
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME/.tauri/provider-proxy.key" -Raw
-```
-
-Содержимое `.pub` нужно записать в `plugins.updater.pubkey` в `tauri.conf.json`. Публичный ключ
-можно хранить в Git, а приватный ключ — только в GitHub Actions Secret
-`TAURI_SIGNING_PRIVATE_KEY` (и `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, если есть пароль). Workflow
-`.github/workflows/release.yml` по тегу `app-vX.Y.Z` публикует Windows `.exe`, Linux AppImage и
-`latest.json`; `tauri-action` подписывает updater-артефакты автоматически.
-
-Для установщика с updater-артефактами:
+Для сборки установщиков Tauri:
 
 ```powershell
 .\build-windows.ps1 -Installer
 ```
 
-Для локального exe без подписи достаточно `.\build-windows.ps1`. На Linux доступны
-`./build-linux.sh` и `./build-linux.sh --bundle`.
+Для обычного exe достаточно `.\build-windows.ps1`. На Linux доступны
+`./build-linux.sh` (бинарник) и `./build-linux.sh --bundle` (пакеты Tauri).
 
 Ярлык вызывает `launch.sh`. Перед запуском он сравнивает время изменения исходников Rust/Tauri и AppImage.
 Если AppImage отсутствует или устарел, выполняется `cargo tauri build -- --locked`, после чего запускается свежая
