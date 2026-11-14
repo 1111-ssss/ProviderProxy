@@ -363,6 +363,37 @@ async fn does_not_shut_down_a_stranger_on_the_configured_port() {
     let _ = fs::remove_file(path.with_extension("opencode.json"));
 }
 
+/// The takeover reads the port and token from the same storage the server uses,
+/// so a non-default port is not missed. (`/api/shutdown` itself exits the
+/// process, so the positive takeover is exercised without starting a server.)
+#[test]
+fn reads_the_configured_port_and_token_for_takeover() {
+    let path = std::env::temp_dir().join(format!("provider-proxy-endpoint-{}.json", now_ms()));
+    let opencode = path.with_extension("opencode.json");
+    fs::write(&opencode, "{}").unwrap();
+    fs::write(
+        &path,
+        json!({
+            "port": 45678,
+            "authToken": "secret-token",
+            "opencodeConfig": opencode.display().to_string(),
+            "providers": {},
+            "models": {}
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let (port, token) = super::server::configured_endpoint(&path).unwrap();
+    assert_eq!(port, 45678, "the port comes from the config");
+    assert_eq!(token, "secret-token", "the token comes from the config");
+
+    let database = database_path(&path);
+    let _ = fs::remove_file(&path);
+    let _ = fs::remove_file(database);
+    let _ = fs::remove_file(&opencode);
+}
+
 /// Reproduces the field crash: a long Russian answer split into many SSE
 /// chunks used to panic when the 8 KiB usage tail was trimmed mid-character.
 /// The client then saw a clean end of body with no error and the agent stopped

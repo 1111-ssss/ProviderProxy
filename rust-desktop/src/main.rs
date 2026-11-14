@@ -429,12 +429,34 @@ fn browser_url(url: &Url) -> Option<&str> {
     matches!(url.scheme(), "http" | "https").then(|| url.as_str())
 }
 
+/// Start the local proxy, taking over the port from a previous copy. A busy port
+/// used to panic here: the window never appeared and the old instance kept
+/// running, which reads as "the app reopened".
+fn start_proxy(config_path: PathBuf) -> provider_proxy_desktop::proxy::ServerHandle {
+    for attempt in 0..3 {
+        shutdown_running_instance(&config_path);
+        match start_server(config_path.clone()) {
+            Ok(server) => return server,
+            Err(error) if attempt < 2 => {
+                eprintln!("provider_proxy: порт занят, повторяю запуск ({attempt}): {error}");
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+            Err(error) => {
+                // No console on Windows release builds, so the message also goes
+                // to stderr for launch.sh, which captures it into its log.
+                eprintln!("provider_proxy: не удалось запустить прокси на порту: {error}");
+                std::process::exit(1);
+            }
+        }
+    }
+    unreachable!("start_proxy always returns or exits inside the loop")
+}
+
 fn main() {
     let config_path = requested_config_path();
     // A second launch replaces the running window instead of failing on a busy
     // port and leaving the old copy (and its stale config) on screen.
-    shutdown_running_instance(&config_path);
-    let server = Arc::new(start_server(config_path).expect("provider_proxy server must start"));
+    let server = Arc::new(start_proxy(config_path));
     let port = server.port;
     tauri::Builder::default()
         // Handle new windows natively; the GUI is served over the local HTTP
@@ -516,9 +538,14 @@ fn main() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 // Closing the window hides the app; the tray menu or in-app
-                // settings are used for a real process exit.
+                // settings are used for a real process exit. Hiding (rather than
+                // exiting) keeps the proxy serving opencode. If hiding ever
+                // fails there is no way back to the window, so exit instead of
+                // leaving an invisible copy running.
                 api.prevent_close();
-                let _ = window.hide();
+                if window.hide().is_err() {
+                    window.app_handle().exit(0);
+                }
             }
         })
         .run(tauri::generate_context!())
