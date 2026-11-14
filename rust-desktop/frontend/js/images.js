@@ -1,5 +1,3 @@
-// ---------- генерация изображений ----------
-
 let imageProviderFilter = ""
 const imageState = { provider: null, taskId: null, pollTimer: null, referenceImage: "" }
 

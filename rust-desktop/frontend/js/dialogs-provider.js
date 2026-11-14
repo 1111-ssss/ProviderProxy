@@ -1,5 +1,3 @@
-// ---------- диалог: провайдер ----------
-
 const dlgProvider = $("dlg-provider")
 let editingProvider = null
 

@@ -1,5 +1,3 @@
-// ---------- usage ----------
-
 const fmtTok = (raw = 0) => {
   const n = Math.max(0, Number(raw) || 0)
   const units = [["", 1], ["k", 1e3], ["m", 1e6], ["b", 1e9], ["t", 1e12]]
@@ -429,19 +427,19 @@ async function load() {
   }
 }
 
-// держим сервер живым, пока открыта вкладка GUI; закрыл вкладку — сервер сам выключится
+// Keep the local proxy warm while the GUI is open.
 setInterval(() => fetch("/api/ping").catch(() => {}), 5000)
 
-// Страховка раз в 5 минут: молча дописываем несохранённые правки.
+// Safety net: flush unsaved edits silently every five minutes.
 setInterval(() => {
   if (configDirty) save(true)
 }, 5 * 60 * 1000)
-// Раз в час: обновления приложения и списки моделей тех провайдеров, у которых
-// включён автовыбор. Провайдеры обновляются по очереди, чтобы не забить сеть.
+// Hourly: check for app updates and refresh the model lists of providers whose
+// automatic selection is on. Providers refresh one after another to spare the network.
 setInterval(() => checkForDesktopUpdate(), 60 * 60 * 1000)
 setInterval(() => syncAutoAllProviders(), 60 * 60 * 1000)
 
-// логи и usage обновляем каждые 3 с, но только если вкладка страницы видна (не свёрнута в фон)
+// Logs and usage refresh every 3s, but only while the tab is visible.
 setInterval(() => {
   if (document.hidden) return
   if (tab === "logs") loadLogs()

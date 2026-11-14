@@ -1,5 +1,3 @@
-// ---------- блок: модели провайдеров (галочки) ----------
-
 let pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
 
 function renderProviderModels() {
@@ -312,7 +310,7 @@ function renderPmList() {
         )
         .join("")
     : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить список» или добавь вручную"}</span>`
-  // перерисовки на каждый клик нет — только счётчики, иначе скролл списка прыгает наверх
+  // No redraw per click — only counters, otherwise the list scroll jumps to the top.
   $("pm-list").querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.onchange = () => {
       const arr = (cfg.providers[pmState.provider].models ??= [])

@@ -1,5 +1,3 @@
-// ---------- прямые модели OpenCode ----------
-
 const dlgOpenCodeModel = $("dlg-opencode-model")
 let directDraft = null // { provider, models, all, filter, providerFilter }
 

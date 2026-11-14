@@ -1,5 +1,3 @@
-// ---------- главная страница ----------
-
 function renderProviders() {
   const t = $("providers")
   const allEntries = Object.entries(cfg.providers)

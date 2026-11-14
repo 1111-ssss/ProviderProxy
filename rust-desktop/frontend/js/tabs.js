@@ -1,5 +1,3 @@
-// ---------- вкладки ----------
-
 const TABS = ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "settings"]
 let tab = localStorage.getItem("pp_tab") ?? "providers"
 

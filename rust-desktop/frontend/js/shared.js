@@ -1,5 +1,3 @@
-// ---------- общее ----------
-
 // Filterable chips list: header names the provider and counts matches, so a huge
 // aggregated catalog (OpenRouter & co) can't be mistaken for "all providers".
 function renderChips(containerId, provider, ids, onAdd, details = {}) {

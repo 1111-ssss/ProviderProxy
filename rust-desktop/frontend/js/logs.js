@@ -1,5 +1,3 @@
-// ---------- логи ----------
-
 const LOG_PAGE_SIZE = 50
 let logQuery = ""
 let logFilter = "all"
@@ -59,9 +57,9 @@ $("log-filter").onchange = (event) => {
   renderLogs()
 }
 
-// Разбираем строку вида "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ... [ses:ses_x]"
-// в карточку. Строка чата несёт id сессии хвостовым тегом, имя модели/цепочки
-// уходит в заголовок, а id сессии встаёт справа, левее бейджа события.
+// Parse a line like "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ... [ses:ses_x]"
+// into a card: a chat line carries the session id as a trailing tag, the
+// model/chain name goes to the header, and the session id sits at the right.
 const logCard = (line) => {
   const m = String(line).match(/^\[([^\]]+)\]\s*(.*)$/)
   const ts = m?.[1] ?? ""

@@ -1,5 +1,3 @@
-// ---------- диалог: модель ----------
-
 const dlgModel = $("dlg-model")
 let draft = null // { original, enabled, upstreams: [{provider, model}] }
 let pickProvider = null // провайдер, выбранный в пикере «или из выбранных моделей провайдера»
