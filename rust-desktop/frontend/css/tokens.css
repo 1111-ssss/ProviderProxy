@@ -178,6 +178,111 @@
     --tooltip-bg: #232629;
     --chart-in: #3daee9; --chart-out: #9b59b6; --chart-req: #27ae60;
   }
+  /* One Dark Pro (Atom One Dark). */
+  body[data-theme="one-dark"],
+  [data-theme-preview="one-dark"] {
+    color-scheme: dark;
+    --bg: #282c34; --panel: #21252b; --panel-raised: #2c313c;
+    --surface: #2c313c; --surface-hover: #3e4451;
+    --border: #3e4451; --border-strong: #4b5263;
+    --text: #abb2bf; --muted: #828997; --faint: #5c6370;
+    --accent: #61afef; --accent-strong: #528bff;
+    --success: #98c379; --warning: #e5c07b; --danger: #e06c75;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .35);
+    --body-background: radial-gradient(circle at 50% -20%, #2f333d 0, var(--bg) 52%);
+    --section-background: rgba(33, 37, 43, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #282c34; --primary-hover: #61afef; --disabled-background: var(--surface);
+    --surface-inset: rgba(18, 21, 25, .5);
+    --surface-soft: rgba(44, 49, 60, .6);
+    --switch-track: #4b5263; --switch-knob: #abb2bf; --switch-on: #98c379;
+    --tooltip-bg: #21252b;
+    --chart-in: #61afef; --chart-out: #c678dd; --chart-req: #98c379;
+  }
+  /* Dracula. */
+  body[data-theme="dracula"],
+  [data-theme-preview="dracula"] {
+    color-scheme: dark;
+    --bg: #282a36; --panel: #21222c; --panel-raised: #343746;
+    --surface: #343746; --surface-hover: #424450;
+    --border: #44475a; --border-strong: #6272a4;
+    --text: #f8f8f2; --muted: #a9b1d6; --faint: #6272a4;
+    --accent: #bd93f9; --accent-strong: #bd93f9;
+    --success: #50fa7b; --warning: #ffb86c; --danger: #ff5555;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .4);
+    --body-background: radial-gradient(circle at 50% -20%, #343746 0, var(--bg) 52%);
+    --section-background: rgba(33, 34, 44, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #282a36; --primary-hover: #ff79c6; --disabled-background: var(--surface);
+    --surface-inset: rgba(25, 26, 33, .5);
+    --surface-soft: rgba(52, 55, 70, .6);
+    --switch-track: #44475a; --switch-knob: #f8f8f2; --switch-on: #50fa7b;
+    --tooltip-bg: #21222c;
+    --chart-in: #8be9fd; --chart-out: #ff79c6; --chart-req: #50fa7b;
+  }
+  /* Tokyo Night. */
+  body[data-theme="tokyo-night"],
+  [data-theme-preview="tokyo-night"] {
+    color-scheme: dark;
+    --bg: #1a1b26; --panel: #16161e; --panel-raised: #1f2335;
+    --surface: #1f2335; --surface-hover: #292e42;
+    --border: #292e42; --border-strong: #3b4261;
+    --text: #c0caf5; --muted: #a9b1d6; --faint: #565f89;
+    --accent: #7aa2f7; --accent-strong: #7aa2f7;
+    --success: #9ece6a; --warning: #e0af68; --danger: #f7768e;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .4);
+    --body-background: radial-gradient(circle at 50% -20%, #1f2335 0, var(--bg) 52%);
+    --section-background: rgba(22, 22, 30, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #1a1b26; --primary-hover: #2ac3de; --disabled-background: var(--surface);
+    --surface-inset: rgba(13, 14, 20, .5);
+    --surface-soft: rgba(31, 35, 53, .6);
+    --switch-track: #3b4261; --switch-knob: #c0caf5; --switch-on: #9ece6a;
+    --tooltip-bg: #16161e;
+    --chart-in: #7aa2f7; --chart-out: #bb9af7; --chart-req: #9ece6a;
+  }
+  /* Gruvbox Dark. */
+  body[data-theme="gruvbox"],
+  [data-theme-preview="gruvbox"] {
+    color-scheme: dark;
+    --bg: #282828; --panel: #1d2021; --panel-raised: #3c3836;
+    --surface: #3c3836; --surface-hover: #504945;
+    --border: #504945; --border-strong: #665c54;
+    --text: #ebdbb2; --muted: #bdae93; --faint: #928374;
+    --accent: #83a598; --accent-strong: #8ec07c;
+    --success: #b8bb26; --warning: #fabd2f; --danger: #fb4934;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .4);
+    --body-background: radial-gradient(circle at 50% -20%, #3c3836 0, var(--bg) 52%);
+    --section-background: rgba(29, 32, 33, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #1d2021; --primary-hover: #8ec07c; --disabled-background: var(--surface);
+    --surface-inset: rgba(20, 22, 23, .5);
+    --surface-soft: rgba(60, 56, 54, .6);
+    --switch-track: #665c54; --switch-knob: #ebdbb2; --switch-on: #b8bb26;
+    --tooltip-bg: #1d2021;
+    --chart-in: #83a598; --chart-out: #d3869b; --chart-req: #b8bb26;
+  }
+  /* Night Owl. */
+  body[data-theme="night-owl"],
+  [data-theme-preview="night-owl"] {
+    color-scheme: dark;
+    --bg: #011627; --panel: #01111d; --panel-raised: #0b2942;
+    --surface: #0b253a; --surface-hover: #102a44;
+    --border: #102a44; --border-strong: #1d3b53;
+    --text: #d6deeb; --muted: #8badc1; --faint: #5f7e97;
+    --accent: #82aaff; --accent-strong: #7e57c2;
+    --success: #22da6e; --warning: #ecc48d; --danger: #ef5350;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .45);
+    --body-background: radial-gradient(circle at 50% -20%, #0b2942 0, var(--bg) 52%);
+    --section-background: rgba(1, 17, 29, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #ffffff; --primary-hover: #7e57c2; --disabled-background: var(--surface);
+    --surface-inset: rgba(0, 8, 15, .55);
+    --surface-soft: rgba(11, 37, 58, .6);
+    --switch-track: #1d3b53; --switch-knob: #d6deeb; --switch-on: #22da6e;
+    --tooltip-bg: #01111d;
+    --chart-in: #82aaff; --chart-out: #c792ea; --chart-req: #22da6e;
+  }
   /* "System" follows the OS. The dark values come from :root; the light media
      query below swaps in the light palette only when the desktop is light. */
   @media (prefers-color-scheme: light) {

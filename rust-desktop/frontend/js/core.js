@@ -183,6 +183,11 @@ const THEMES = [
   { id: "nord", label: "Nord" },
   { id: "ayu", label: "Ayu" },
   { id: "breeze", label: "Breeze" },
+  { id: "one-dark", label: "One Dark" },
+  { id: "dracula", label: "Dracula" },
+  { id: "tokyo-night", label: "Tokyo Night" },
+  { id: "gruvbox", label: "Gruvbox" },
+  { id: "night-owl", label: "Night Owl" },
 ]
 const THEME_IDS = THEMES.map((theme) => theme.id)
 const themeLabel = (id) => THEMES.find((theme) => theme.id === id)?.label ?? "Тёмная"

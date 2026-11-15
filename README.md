@@ -128,7 +128,8 @@ GitHub API. Для текущей платформы оно ищет ZIP с им
 
 В настройках кнопка «Тема интерфейса» открывает отдельное окно с превью-палитрами:
 «Тёмная», «Светлая», «Как в системе» (следует теме рабочего стола), «Catppuccin»,
-«Kanagawa», «Nord», «Ayu» и «Breeze». Выбор применяется сразу, а для desktop-версии —
+«Kanagawa», «Nord», «Ayu», «Breeze», «One Dark», «Dracula», «Tokyo Night», «Gruvbox» и
+«Night Owl». Выбор применяется сразу, а для desktop-версии —
 автозапуск вместе с Windows или Linux. На Windows используется пользовательский ключ Run, на
 Linux — файл `$XDG_CONFIG_HOME/autostart/provider-proxy.desktop`.
 В этом же разделе можно создать ярлык для индекса меню приложений: `.lnk` в меню «Пуск» Windows
