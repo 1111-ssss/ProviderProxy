@@ -120,3 +120,24 @@ test("removing connection models cleans chains and direct models", () => {
   run('removeProviderReferences("unselected")')
   assert.equal(run("cfg.opencodeModels.unselected"), undefined)
 })
+
+test("a chat log line shows the full session id and the chain under the date", () => {
+  // logCard builds DOM nodes; give it a tiny node/document stub of its own.
+  const node = (tag) => ({ tagName: tag, className: "", textContent: "", title: "", dataset: {}, children: [], append(...kids) { this.children.push(...kids) } })
+  const ctx = vm.createContext({ document: { createElement: (tag) => node(tag) } })
+  vm.runInContext(scripts.slice(scripts.indexOf("const logCard = ("), scripts.indexOf("const logEmpty =")), ctx)
+  const line = "[2026-11-15 10:04:35] logfare-1mil → ответ: logfare/deepseek-v4.1-flash-1017 (HTTP 200 OK) [ses:ses_e21fa60f0ffeD7GJwkbN2F0UGs]"
+  const card = vm.runInContext(`logCard(${JSON.stringify(line)})`, ctx)
+  // The header holds the date and the session chip; the chip keeps the whole id.
+  const top = card.children[0]
+  assert.equal(top.className, "t")
+  const ses = top.children.find((c) => c.className === "ses")
+  assert.ok(ses, "the session chip is present")
+  assert.equal(ses.textContent, "ses_e21fa60f0ffeD7GJwkbN2F0UGs", "the id is not shortened")
+  assert.equal(ses.dataset.sessionCopy, "ses_e21fa60f0ffeD7GJwkbN2F0UGs", "clicking copies the full id")
+  // The chain name sits on its own line right under the header, not inside it.
+  const chain = card.children.find((c) => c.className === "chain")
+  assert.ok(chain, "the chain name has its own line")
+  assert.equal(chain.textContent, "logfare-1mil")
+  assert.ok(!top.children.some((c) => c.className === "chain"), "the chain is not in the header row")
+})

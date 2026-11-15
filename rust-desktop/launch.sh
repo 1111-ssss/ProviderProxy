@@ -37,14 +37,13 @@ export PP_CONFIG_KEY_FILE="${PP_CONFIG_KEY_FILE:-$HOME/.config/provider-proxy/ma
 
 APPIMAGE=""
 pick_appimage() {
-  # Tauri names the current bundle from `productName`. Older builds used
-  # "Provider Proxy", while the current desktop app is "Provider Proxy Rust".
-  # Prefer the current name so a stale old AppImage cannot be launched (or
-  # selected forever by source_is_newer); keep the old pattern as a fallback
-  # for installations that have not been rebuilt yet.
+  # Tauri names the bundle from `productName` ("Provider Proxy"). Older builds
+  # used "Provider Proxy Rust". Prefer the current name so a stale old AppImage
+  # cannot be launched (or selected forever by source_is_newer); keep the old
+  # pattern as a fallback for installations that have not been rebuilt yet.
   for candidate in \
-    "$DIR"/target/release/bundle/appimage/Provider\ Proxy\ Rust_*.AppImage \
-    "$DIR"/target/release/bundle/appimage/Provider\ Proxy_*.AppImage; do
+    "$DIR"/target/release/bundle/appimage/Provider\ Proxy_*.AppImage \
+    "$DIR"/target/release/bundle/appimage/Provider\ Proxy\ Rust_*.AppImage; do
     if [ -x "$candidate" ]; then
       APPIMAGE="$candidate"
       return

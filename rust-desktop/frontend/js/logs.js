@@ -58,8 +58,8 @@ $("log-filter").onchange = (event) => {
 }
 
 // Parse a line like "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ... [ses:ses_x]"
-// into a card: a chat line carries the session id as a trailing tag, the
-// model/chain name goes to the header, and the session id sits at the right.
+// into a card: the date sits on top with the session id and event badge to the
+// right, the model/chain name goes on the next line, then the message.
 const logCard = (line) => {
   const m = String(line).match(/^\[([^\]]+)\]\s*(.*)$/)
   const ts = m?.[1] ?? ""
@@ -78,21 +78,15 @@ const logCard = (line) => {
   const tm = document.createElement("span")
   tm.className = "tm"
   tm.textContent = ts
-  // The model or chain name sits right after the time with a clear gap, so the
-  // header reads "time · chain ... session · badge".
-  if (isChat) {
-    const chain = document.createElement("span")
-    chain.className = "chain"
-    chain.textContent = head
-    top.append(tm, chain)
-  } else {
-    top.append(tm)
-  }
+  top.append(tm)
+  // The full session id, click to copy. Kept whole (with its ses_ prefix) so it
+  // can be pasted straight into a tool; no underline, the pointer shows it is clickable.
   if (session) {
     const chip = document.createElement("span")
     chip.className = "ses"
-    chip.textContent = session.replace(/^ses_/, "")
-    chip.title = session
+    chip.textContent = session
+    chip.title = `скопировать ${session}`
+    chip.dataset.sessionCopy = session
     top.append(chip)
   }
   const badge = document.createElement("span")
@@ -104,6 +98,14 @@ const logCard = (line) => {
   badge.textContent = tag && tag.length <= 24 ? tag : fallback
   badge.title = tag
   top.append(badge)
+  card.append(top)
+  // The model or chain name sits on its own line right under the date.
+  if (isChat) {
+    const chain = document.createElement("div")
+    chain.className = "chain"
+    chain.textContent = head
+    card.append(chain)
+  }
   const msg = document.createElement("div")
   msg.className = "m"
   if (isChat) {
@@ -113,7 +115,7 @@ const logCard = (line) => {
     em.textContent = head
     msg.append(em)
   }
-  card.append(top, msg)
+  card.append(msg)
   return card
 }
 

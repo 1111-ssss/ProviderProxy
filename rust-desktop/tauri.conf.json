@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Provider Proxy Rust",
+  "productName": "Provider Proxy",
   "version": "0.1.8",
   "identifier": "dev.providerproxy.desktop",
   "build": {

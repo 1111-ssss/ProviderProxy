@@ -12,7 +12,7 @@ desktop_value() {
 DESKTOP_DIR=$(desktop_value "$DIR")
 DESKTOP_ICON=$(desktop_value "$DIR/icons/icon.png")
 
-cat >"$APP_DIR/provider-proxy-rust.desktop" <<EOF
+cat >"$APP_DIR/provider-proxy.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Provider Proxy
@@ -25,13 +25,13 @@ Categories=Development;Utility;
 StartupWMClass=provider-proxy-desktop
 EOF
 
-chmod 0644 "$APP_DIR/provider-proxy-rust.desktop"
+chmod 0755 "$APP_DIR/provider-proxy.desktop"
 chmod 0755 "$DIR/launch.sh"
 rm -f \
-  "$APP_DIR/provider-proxy.desktop" \
   "$APP_DIR/Provider Proxy.desktop" \
   "$APP_DIR/provider-proxy-desktop.desktop" \
   "$APP_DIR/Provider Proxy Rust.desktop" \
+  "$APP_DIR/provider-proxy-rust.desktop" \
   "$APP_DIR/provider-proxy-npm.desktop"
 
 if command -v update-desktop-database >/dev/null 2>&1; then
@@ -43,4 +43,4 @@ elif command -v kbuildsycoca5 >/dev/null 2>&1; then
   kbuildsycoca5 >/dev/null 2>&1 || true
 fi
 
-printf '%s\n' "$APP_DIR/provider-proxy-rust.desktop"
+printf '%s\n' "$APP_DIR/provider-proxy.desktop"

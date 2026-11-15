@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use provider_proxy_desktop::proxy::default_config_path;
 use std::fs;
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::process::Command;
 
 /// Set when the app is started by the autostart entry. The window stays hidden
@@ -338,15 +338,25 @@ fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
         data_dir.join("applications")
     };
     fs::create_dir_all(&shortcut_dir).map_err(|error| error.to_string())?;
-    let shortcut = shortcut_dir.join("provider-proxy-rust.desktop");
+    let shortcut = shortcut_dir.join("provider-proxy.desktop");
     let executable = autostart_executable()?;
     let config = autostart_config_path()?;
     let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
-    let entry = format!(
-        "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={} {}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+    let icon = working_directory.join("icons/icon.png");
+    let mut entry = String::from(
+        "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\n",
+    );
+    entry.push_str(&format!(
+        "Exec={} {}\n",
         desktop_exec(&executable),
-        desktop_exec(&config),
-        desktop_exec(working_directory)
+        desktop_exec(&config)
+    ));
+    entry.push_str(&format!("Path={}\n", desktop_exec(working_directory)));
+    if icon.is_file() {
+        entry.push_str(&format!("Icon={}\n", desktop_exec(&icon)));
+    }
+    entry.push_str(
+        "Terminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
     );
     fs::write(&shortcut, entry).map_err(|error| error.to_string())?;
     // GNOME/KDE only treat a desktop file as launchable when it is executable.
@@ -355,7 +365,28 @@ fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
         use std::os::unix::fs::PermissionsExt;
         let _ = fs::set_permissions(&shortcut, fs::Permissions::from_mode(0o755));
     }
+    // Drop the earlier file names so the launcher does not show duplicates.
+    for stale in ["provider-proxy-rust.desktop", "provider-proxy-npm.desktop"] {
+        let path = shortcut_dir.join(stale);
+        if path != shortcut {
+            let _ = fs::remove_file(path);
+        }
+    }
+    // A newly written file stays invisible to the launcher until its database is
+    // refreshed, which is why the button used to appear to do nothing.
+    refresh_desktop_database(&shortcut_dir);
     Ok(shortcut.to_string_lossy().into_owned())
+}
+
+/// Refresh the launcher's application index after writing a `.desktop` file.
+#[cfg(target_os = "linux")]
+fn refresh_desktop_database(directory: &Path) {
+    let _ = Command::new("update-desktop-database").arg(directory).status();
+    for tool in ["kbuildsycoca6", "kbuildsycoca5"] {
+        if Command::new(tool).arg("--noincremental").status().is_ok() {
+            break;
+        }
+    }
 }
 
 #[tauri::command]
