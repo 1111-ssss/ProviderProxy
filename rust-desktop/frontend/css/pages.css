@@ -29,10 +29,15 @@
   .image-form .row { align-items: end; }
   .image-form .row > label { flex: 1 1 150px; min-width: 0; }
   .image-field-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+  /* These two captions must stay on one line: the muted hint follows the label
+     instead of dropping to a second row. */
+  .image-file-row .image-field-heading, .image-url-row .image-field-heading { flex-wrap: nowrap; }
   .image-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .image-file-row { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
-  .image-file-row input[type="file"] { width: 100%; padding: 7px; color: var(--muted); }
-  .image-file-row input[type="file"]::file-selector-button { margin-right: 10px; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--control-background); color: var(--text); font: inherit; cursor: pointer; }
+  /* The file input keeps the same height as the other fields, and its redrawn
+     button is centred in it so the row lines up with the URL field below. */
+  .image-file-row input[type="file"] { display: flex; align-items: center; width: 100%; height: 42px; min-height: 42px; padding: 4px 6px; color: var(--muted); cursor: pointer; }
+  .image-file-row input[type="file"]::file-selector-button { margin: 0 10px 0 0; padding: 5px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--control-background); color: var(--text); font: inherit; cursor: pointer; }
   .image-file-row input[type="file"]::file-selector-button:hover { border-color: var(--accent-strong); background: var(--control-hover); }
   /* The empty reference label used to reserve a blank line, opening a gap
      between the file row and the URL field. */
