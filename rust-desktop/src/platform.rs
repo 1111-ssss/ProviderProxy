@@ -342,7 +342,12 @@ fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
     let executable = autostart_executable()?;
     let config = autostart_config_path()?;
     let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
-    let icon = working_directory.join("icons/icon.png");
+    // The binary lives in target/release, but the icon ships next to the crate
+    // sources (rust-desktop/icons); check both so the entry gets a real icon.
+    let icon = ["icons/icon.png", "../../icons/icon.png"]
+        .iter()
+        .map(|rel| working_directory.join(rel))
+        .find(|path| path.is_file());
     let mut entry = String::from(
         "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\n",
     );
@@ -352,7 +357,7 @@ fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
         desktop_exec(&config)
     ));
     entry.push_str(&format!("Path={}\n", desktop_exec(working_directory)));
-    if icon.is_file() {
+    if let Some(icon) = icon {
         entry.push_str(&format!("Icon={}\n", desktop_exec(&icon)));
     }
     entry.push_str(
