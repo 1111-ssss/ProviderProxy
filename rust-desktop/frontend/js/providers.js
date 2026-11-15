@@ -546,16 +546,28 @@ async function checkForDesktopUpdate(manual = false) {
 }
 // Theme picker: one button per palette, each tinted by its own tokens so the
 // swatch shows the real colours before the user commits to it.
+let themeQuery = ""
+// Each dot paints one token; the button carries data-theme-preview, so the
+// variables resolve to that theme's palette without touching the page.
+const THEME_COLOR_KEYS = ["--bg", "--accent", "--success", "--warning", "--danger", "--text"]
 function renderThemeDialog() {
   const current = appSettings().theme
-  $("theme-options").innerHTML = THEMES.map(({ id, label }) => {
-    const active = id === current
-    return `<button type="button" class="theme-option${active ? " active" : ""}" data-theme-id="${esc(id)}" data-theme-preview="${esc(id)}" role="option" aria-selected="${active}">
+  const query = themeQuery.trim().toLowerCase()
+  const shown = query ? THEMES.filter((theme) => theme.label.toLowerCase().includes(query) || theme.id.includes(query)) : THEMES
+  $("theme-search-result").textContent = query ? `${shown.length} из ${THEMES.length}` : ""
+  $("theme-options").innerHTML = shown.length
+    ? shown
+        .map(({ id, label }) => {
+          const active = id === current
+          const dots = THEME_COLOR_KEYS.map((key) => `<span class="ts-dot" style="background:var(${key})"></span>`).join("")
+          return `<button type="button" class="theme-option${active ? " active" : ""}" data-theme-id="${esc(id)}" data-theme-preview="${esc(id)}" role="option" aria-selected="${active}">
       <span class="theme-option-swatch"><span class="ts-bar"></span><span class="ts-bar"></span><span class="ts-bar"></span></span>
-      <span class="theme-option-name">${esc(label)}</span>
+      <span class="theme-option-foot"><span class="theme-option-name">${esc(label)}</span><span class="theme-option-dots">${dots}</span></span>
       ${active ? '<span class="theme-option-check" aria-hidden="true">✓</span>' : ""}
     </button>`
-  }).join("")
+        })
+        .join("")
+    : `<span class="muted">тема не найдена — измени запрос</span>`
   $("theme-options").querySelectorAll("[data-theme-id]").forEach((button) => {
     button.onclick = () => {
       appSettings().theme = button.dataset.themeId
@@ -771,10 +783,19 @@ $("s-retry-forever").onchange = (e) => {
   save()
 }
 $("s-theme-open").onclick = () => {
+  themeQuery = ""
+  $("theme-search").value = ""
   renderThemeDialog()
   $("dlg-theme").showModal()
 }
 $("theme-close").onclick = () => $("dlg-theme").close()
+$("theme-search").oninput = (event) => {
+  themeQuery = event.target.value
+  renderThemeDialog()
+  const field = $("theme-search")
+  field.focus()
+  field.setSelectionRange(field.value.length, field.value.length)
+}
 $("s-auto-update").onchange = (e) => {
   appSettings().autoUpdate = e.target.checked
   renderSettings()

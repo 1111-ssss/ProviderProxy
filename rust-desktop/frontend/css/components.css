@@ -355,18 +355,25 @@
   .settings-version { margin-top: 10px; color: var(--muted); font-size: 11px; text-align: right; }
   /* Theme picker: a grid of preview buttons, like the provider cards. */
   .theme-open-button { width: 100%; display: flex; align-items: center; justify-content: space-between; text-align: left; }
-  .theme-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  /* Wider than the default dialog so the theme grid breathes. */
+  #dlg-theme { width: min(1100px, calc(100vw - 28px)); }
+  #dlg-theme .dialog-body { padding-top: 16px; }
+  .theme-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 10px; }
   .theme-option { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel); color: var(--text); text-align: left; }
   .theme-option:hover:not(:disabled) { border-color: var(--accent); }
   .theme-option.active { border-color: var(--accent-strong); box-shadow: 0 0 0 1px var(--accent-strong) inset; }
   /* The swatch reads colours straight from the theme's own tokens, so each
      button previews its palette without repainting the page. */
-  .theme-option-swatch { display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 7px; background: var(--bg); border: 1px solid var(--border); }
-  .theme-option-swatch .ts-bar { display: block; height: 9px; border-radius: 4px; }
+  .theme-option-swatch { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: 7px; background: var(--bg); border: 1px solid var(--border); }
+  .theme-option-swatch .ts-bar { display: block; height: 12px; border-radius: 4px; }
   .theme-option-swatch .ts-bar:nth-child(1) { width: 100%; background: var(--accent); }
   .theme-option-swatch .ts-bar:nth-child(2) { width: 78%; background: var(--text); opacity: .72; }
   .theme-option-swatch .ts-bar:nth-child(3) { width: 52%; background: var(--muted); }
+  .theme-option-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .theme-option-name { font-size: 12px; font-weight: 650; }
+  /* The six key palette colours as squares, so two similar themes still differ. */
+  .theme-option-dots { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+  .theme-option-dots .ts-dot { display: block; width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
   .theme-option-check { position: absolute; top: 7px; right: 9px; color: var(--accent-strong); font-weight: 700; }
   /* The name gets the room the short numeric columns leave, and wraps instead
      of being cut when the window is narrow. */
