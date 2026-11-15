@@ -33,7 +33,7 @@
   button.quiet:hover:not(:disabled) { color: var(--text); background: var(--control-hover); border-color: var(--accent-strong); }
   button.quiet.danger { color: var(--danger); }
   button.danger { color: var(--danger); }
-  button.danger:hover:not(:disabled) { border-color: rgba(255, 156, 156, .7); background: rgba(255, 156, 156, .1); }
+  button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 62%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
   table { width: 100%; border-collapse: collapse; }
   td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
   /* Column separators: without them a wide table reads as one blob of numbers. */
@@ -51,20 +51,21 @@
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   .muted { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .card { border: 1px solid var(--border); background: rgba(28, 37, 48, .7); border-radius: 11px; padding: 14px 16px; margin-bottom: 10px; }
-  .card:hover { border-color: #40536a; }
-  .card.chain-disabled { border-color: rgba(113, 129, 149, .38); background: linear-gradient(135deg, rgba(24, 31, 40, .78), rgba(20, 26, 34, .72)); }
-  .card.chain-disabled .model-title, .card.chain-disabled .step .prov { color: #9ba8b8; }
+  .card { border: 1px solid var(--border); background: var(--surface-soft); border-radius: 11px; padding: 14px 16px; margin-bottom: 10px; }
+  .card:hover { border-color: var(--border-strong); }
+  .card.chain-disabled { border-color: rgba(113, 129, 149, .38); background: color-mix(in srgb, var(--surface) 62%, var(--panel)); }
+  .card.chain-disabled .model-title, .card.chain-disabled .step .prov { color: var(--faint); }
+  /* A bare switch: the wrapper draws no box, only the track shows its state. */
   .chain-toggle { position: relative; display: inline-flex; align-items: center; gap: 8px; order: 3; margin-left: 0; min-height: 38px; padding: 5px 10px 5px 6px; border: 1px solid transparent; border-radius: 8px; cursor: pointer; user-select: none; white-space: nowrap; transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease; }
   .chain-toggle:hover { transform: translateY(-1px); }
   .chain-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   .chain-toggle input:focus-visible + .chain-switch { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .chain-toggle.is-on { color: #b9efd0; border-color: rgba(105, 215, 160, .28); background: rgba(105, 215, 160, .08); }
-  .chain-toggle.is-off { color: #aab6c5; border-color: rgba(154, 170, 190, .28); background: rgba(113, 129, 149, .08); }
-  .chain-switch { position: relative; flex: 0 0 auto; width: 31px; height: 18px; border-radius: 999px; background: #3c4a5a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); transition: background .16s ease; }
-  .chain-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #d5dde8; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .16s ease, background .16s ease; }
-  .chain-toggle.is-on .chain-switch { background: #43b77d; }
-  .chain-toggle.is-on .chain-switch::after { transform: translateX(13px); background: #f2fff7; }
+  .chain-toggle.is-on { color: var(--success); background: transparent; border-color: transparent; }
+  .chain-toggle.is-off { color: var(--muted); background: transparent; border-color: transparent; }
+  .chain-switch { position: relative; flex: 0 0 auto; width: 31px; height: 18px; border-radius: 999px; background: var(--switch-track); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); transition: background .16s ease; }
+  .chain-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--switch-knob); box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .16s ease, background .16s ease; }
+  .chain-toggle.is-on .chain-switch { background: var(--switch-on); }
+  .chain-toggle.is-on .chain-switch::after { transform: translateX(13px); background: var(--switch-knob); }
   .chain-toggle-text { font-size: 11px; font-weight: 700; letter-spacing: .01em; }
   .chain-toggle-text small { display: block; margin-top: 1px; color: inherit; font-size: 10px; font-weight: 500; opacity: .72; }
   /* Tighter list: the 7px gap plus a 32px row made the chain feel airy and
@@ -74,8 +75,8 @@
   .step .n { color: var(--faint); width: 16px; font-variant-numeric: tabular-nums; text-align: right; }
   .step .opencode-model { padding: 4px 8px; }
   .chain-empty { color: var(--muted); font-size: 12px; padding: 6px 0 2px; }
-  .step .prov { color: #a9d6ff; font-weight: 650; }
-  code { background: rgba(154, 186, 255, .1); color: #c9dcff; padding: 3px 6px; border-radius: 5px; font-size: 12px; }
+  .step .prov { color: var(--accent); font-weight: 650; }
+  code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); padding: 3px 6px; border-radius: 5px; font-size: 12px; }
   /* Name first, its tags beside it; when the pair does not fit the tags drop to
      the next line inside the same group, never under the buttons. */
   /* Same separator the integration card uses: the header and its models are
@@ -88,7 +89,7 @@
      and no background, so the header stays quiet next to the name. */
   .model-card-head .head-controls { display: flex; flex-direction: row; align-items: center; gap: 8px; margin-left: auto; min-width: 0; flex: 0 0 auto; }
   .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 11px; }
-  .pill.empty { color: #f2c781; border-color: rgba(242, 199, 129, .32); background: rgba(242, 199, 129, .08); }
+  .pill.empty { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
   .model-actions { display: flex; flex-direction: row; gap: 8px; }
   /* Provider rows use the same borderless icon actions as the model cards, so
      the two lists read as one app instead of a table with boxy buttons. */
@@ -96,20 +97,20 @@
      they reserved a four-icon column and left a hole on every row without them. */
   .provider-links { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
   .provider-links .icon-action { width: 26px; height: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
-  .provider-links .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
+  .provider-links .icon-action:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
   .provider-links .icon-action svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .provider-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
   .provider-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
-  .provider-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
-  .provider-actions .icon-action.danger { color: #e08f8f; }
-  .provider-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  .provider-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
+  .provider-actions .icon-action.danger { color: var(--danger); }
+  .provider-actions .icon-action.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
   .provider-actions .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   /* Borderless icon buttons: the row reads as three quiet controls, and only
      hover paints a surface behind the one under the pointer. */
   .model-card-head .model-actions .icon-action { border-color: transparent; background: transparent; color: var(--muted); }
-  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: rgba(154, 186, 255, .12); color: var(--text); }
-  .model-card-head .model-actions .icon-action.danger { color: #e08f8f; }
-  .model-card-head .model-actions .icon-action.danger:hover:not(:disabled) { background: rgba(255, 120, 120, .12); color: #ffb4b4; }
+  .model-card-head .model-actions .icon-action:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
+  .model-card-head .model-actions .icon-action.danger { color: var(--danger); }
+  .model-card-head .model-actions .icon-action.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
   /* Icon-only actions: a 30px square keeps the row compact and the same gap
      between toggle, edit and delete. */
   .model-actions .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 30px; padding: 0; }
@@ -128,14 +129,14 @@
      height as the filter input. */
   .pm-filter-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 8px; margin-top: 8px; }
   .pm-filter-row > input { min-width: 0; }
-  .pm-autoload { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); cursor: pointer; white-space: nowrap; }
+  .pm-autoload { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); cursor: pointer; white-space: nowrap; }
   .pm-autoload:hover { border-color: var(--border-strong); }
   .pm-autoload-body { display: grid; gap: 1px; min-width: 0; }
   .pm-autoload-body strong { font-size: 12px; font-weight: 650; }
   .pm-autoload-body small { color: var(--muted); font-size: 10px; }
-  .pm-autoload input:checked ~ .pm-autoload-body strong { color: #9de8c0; }
-  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(23, 30, 39, .55); }
-  .provider-model-card:hover { border-color: var(--border-strong); background: rgba(34, 45, 57, .55); }
+  .pm-autoload input:checked ~ .pm-autoload-body strong { color: var(--success); }
+  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+  .provider-model-card:hover { border-color: var(--border-strong); background: var(--surface-soft); }
   .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
   /* The id and its ctx badge flow as inline text: the badge stays on the same
      line while there is room, and a long id wraps inside the card instead of

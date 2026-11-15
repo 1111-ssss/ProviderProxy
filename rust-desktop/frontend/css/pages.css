@@ -1,7 +1,7 @@
   .chain .step .opencode-model { flex: 1 1 auto; min-width: 0; }
   .chain .chain-model { min-width: 0; }
   .chain .chain-model strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: #b8ceff; flex: 0 0 auto; }
+  .model-kind-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--accent); flex: 0 0 auto; }
   .model-kind-icon svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   /* Two fixed columns squeezed the form to ~190px between 760 and 1000px.
      Stack them whenever a column would be narrower than a usable form. */
@@ -13,15 +13,15 @@
   .image-settings-button svg { width: 17px; height: 17px; }
   #dlg-image-settings { width: min(620px, calc(100vw - 28px)); }
   #dlg-model-settings { width: min(440px, calc(100vw - 28px)); }
-  .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid rgba(111, 153, 237, .3); border-radius: 10px; background: rgba(34, 45, 57, .48); }
+  .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 10px; background: var(--surface-soft); }
   .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .skill-card h4 { margin: 0; }
   .skill-card p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .skill-path { color: var(--faint); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
   .skill-status { color: var(--muted); font-size: 12px; }
   .skill-status.is-ok { color: var(--success); }
-  .skill-status.is-warn { color: #f2c781; }
-  .image-form, .image-result { min-width: 0; background: rgba(28, 37, 48, .72); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .skill-status.is-warn { color: var(--warning); }
+  .image-form, .image-result { min-width: 0; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   /* An auto grid column grows to the browser's default control width, so
      the form used to spill out of its card at mid widths. */
   .image-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -36,9 +36,9 @@
   .image-reference-name { color: var(--faint); font-size: 11px; min-height: 16px; }
   .image-result-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
   .image-result-head h3 { margin: 0; }
-  .image-result.is-error { border-color: rgba(255, 156, 156, .78); box-shadow: 0 0 0 1px rgba(255, 156, 156, .18), 0 12px 30px rgba(120, 30, 40, .14); }
+  .image-result.is-error { border-color: color-mix(in srgb, var(--danger) 78%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent), 0 12px 30px rgba(120, 30, 40, .14); }
   .image-task-status { color: var(--muted); font-size: 12px; }
-  .image-preview { display: grid; place-items: center; min-height: 280px; margin-top: 14px; border: 1px dashed var(--border-strong); border-radius: 10px; overflow: hidden; background: rgba(15, 20, 27, .55); }
+  .image-preview { display: grid; place-items: center; min-height: 280px; margin-top: 14px; border: 1px dashed var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--surface-inset); }
   .image-preview img { display: block; max-width: 100%; max-height: 560px; object-fit: contain; }
   .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
   .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
@@ -68,7 +68,7 @@
     .donut-wrap { width: 140px; height: 140px; }
     .settings-grid, .settings-page-grid { grid-template-columns: 1fr; }
     .image-layout { grid-template-columns: 1fr; }
-    .tab-group { flex: 1 1 auto; padding: 6px; border-bottom: 1px solid rgba(67, 84, 106, .55); }
+    .tab-group { flex: 1 1 auto; padding: 6px; border-bottom: 1px solid var(--border); }
     .tab-group-tabs { display: flex; flex-wrap: wrap; }
     .tab-group:last-child { padding-bottom: 6px; }
     .tabs button { width: auto; }
@@ -125,7 +125,7 @@
   .chain-toggle.is-off { color: var(--muted); }
   .log-card .tm, .log-card .b { color: var(--muted); }
   .log-card.ok .b { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
-  .log-card.warn .b { color: #a47718; background: color-mix(in srgb, #e5bd61 16%, transparent); }
+  .log-card.warn .b { color: var(--warning); background: color-mix(in srgb, var(--warning) 16%, transparent); }
   .log-card.err .b { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
   .donut-track { stroke: var(--border-strong); }
   .log-card .m b, .token-row-head span:first-child { color: var(--text); }
@@ -135,41 +135,6 @@
   .usage-days { background: color-mix(in srgb, var(--panel-raised) 70%, var(--panel)); }
   .usage-day.active, .provider-option.active { color: var(--text); }
   .image-preview { background: color-mix(in srgb, var(--bg) 72%, var(--panel)); }
-
-  /* Keep the remaining component surfaces readable when the light palette is active. */
-  body[data-theme="light"] .card.chain-disabled,
-  body[data-theme="light"] .dialog-section,
-  body[data-theme="light"] .chain-row,
-  body[data-theme="light"] .opencode-model,
-  body[data-theme="light"] .direct-model-card .opencode-model {
-    background: color-mix(in srgb, var(--surface) 70%, var(--panel));
-  }
-  body[data-theme="light"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
-  body[data-theme="light"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
-  body[data-theme="light"] .opencode-panel,
-  body[data-theme="light"] .direct-model-card {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
-  }
-  body[data-theme="light"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
-  body[data-theme="light"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
-
-  @media (prefers-color-scheme: light) {
-    body[data-theme="system"] .card.chain-disabled,
-    body[data-theme="system"] .dialog-section,
-    body[data-theme="system"] .chain-row,
-    body[data-theme="system"] .opencode-model,
-    body[data-theme="system"] .direct-model-card .opencode-model {
-      background: color-mix(in srgb, var(--surface) 70%, var(--panel));
-    }
-    body[data-theme="system"] .chain-toggle.is-on { background: color-mix(in srgb, var(--success) 8%, transparent); }
-    body[data-theme="system"] .chain-toggle.is-off { background: color-mix(in srgb, var(--muted) 8%, transparent); }
-    body[data-theme="system"] .opencode-panel,
-    body[data-theme="system"] .direct-model-card {
-      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, transparent), color-mix(in srgb, var(--panel-raised) 88%, var(--panel)));
-    }
-    body[data-theme="system"] .provider-model-card:hover { background: color-mix(in srgb, var(--surface) 35%, transparent); }
-    body[data-theme="system"] button.danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
-  }
 
   @media (max-width: 700px) {
     body { overflow: auto; }

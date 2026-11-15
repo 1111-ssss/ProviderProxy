@@ -173,11 +173,15 @@ const tauriInvoke = (command, args) => {
   return typeof invoke === "function" ? invoke(command, args) : null
 }
 const isDesktopApp = () => typeof window.__TAURI__?.core?.invoke === "function"
+const THEMES = ["dark", "light", "system", "catppuccin", "kanagawa"]
+// catppuccin and kanagawa are dark palettes; system follows the OS.
+const LIGHT_THEMES = ["light"]
 function applyTheme(theme) {
   if (typeof document === "undefined") return
-  const next = ["dark", "light", "system"].includes(theme) ? theme : "dark"
+  const next = THEMES.includes(theme) ? theme : "dark"
   document.body.dataset.theme = next
-  document.documentElement.style.colorScheme = next === "light" ? "light" : next === "dark" ? "dark" : "normal"
+  const scheme = next === "system" ? "normal" : LIGHT_THEMES.includes(next) ? "light" : "dark"
+  document.documentElement.style.colorScheme = scheme
   localStorage.setItem("pp_theme", next)
 }
 applyTheme(typeof localStorage === "undefined" ? "dark" : localStorage.getItem("pp_theme") ?? "dark")

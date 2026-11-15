@@ -443,6 +443,8 @@
               <option value="dark">Тёмная</option>
               <option value="light">Светлая</option>
               <option value="system">Как в системе</option>
+              <option value="catppuccin">Catppuccin</option>
+              <option value="kanagawa">Kanagawa</option>
             </select>
           </label>
           <label class="setting-option" id="s-autostart-wrap">
@@ -513,22 +515,21 @@
   <form method="dialog" id="dp-form" class="dialog-form">
     <div class="dialog-header">
       <h3 id="dp-title">Добавить провайдера</h3>
-      <p>Сохрани адрес OpenAI-compatible API и ключ — модели будут доступны на следующем шаге.</p>
     </div>
     <div class="dialog-body">
-      <label>Имя (на него будут ссылаться модели)
+      <label>Имя провайдера
         <input id="dp-name" required placeholder="openrouter">
       </label>
-      <label>baseURL — OpenAI-совместимый адрес
+      <label>baseURL — адрес api провайдера
         <input id="dp-url" required placeholder="https://openrouter.ai/api/v1">
       </label>
-      <label>apiKey <span class="muted">сохраняется в зашифрованном виде</span>
+      <label>apiKey — приватный ключ провайдера
         <input id="dp-key" type="password" placeholder="sk-...">
       </label>
-      <label>Домашняя страница — необязательно; если задана, появится кнопка перехода
+      <label>Домашняя страница — добавляет кнопку открытия страницы (опционально)
         <input id="dp-homepage" placeholder="https://provider.example">
       </label>
-      <label>Ссылка для чекина — необязательно; если задана, появится кнопка с подарком
+      <label>Ссылка для чекина — для открытия страницы check in (опционально)
         <input id="dp-checkin" placeholder="https://provider.example/checkin">
       </label>
     </div>
