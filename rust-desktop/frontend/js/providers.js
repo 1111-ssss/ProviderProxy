@@ -345,7 +345,7 @@ function renderSettings() {
   $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
   $("s-version").textContent = cfg.appVersion ?? "—"
-  $("s-theme").value = settings.theme
+  $("s-theme-current").textContent = themeLabel(settings.theme)
   $("s-auto-update").checked = settings.autoUpdate
   $("s-auto-restart").checked = settings.autoRestart
   $("s-auto-restart").disabled = !settings.autoUpdate
@@ -544,6 +544,29 @@ async function checkForDesktopUpdate(manual = false) {
     }
   }
 }
+// Theme picker: one button per palette, each tinted by its own tokens so the
+// swatch shows the real colours before the user commits to it.
+function renderThemeDialog() {
+  const current = appSettings().theme
+  $("theme-options").innerHTML = THEMES.map(({ id, label }) => {
+    const active = id === current
+    return `<button type="button" class="theme-option${active ? " active" : ""}" data-theme-id="${esc(id)}" data-theme-preview="${esc(id)}" role="option" aria-selected="${active}">
+      <span class="theme-option-swatch"><span class="ts-bar"></span><span class="ts-bar"></span><span class="ts-bar"></span></span>
+      <span class="theme-option-name">${esc(label)}</span>
+      ${active ? '<span class="theme-option-check" aria-hidden="true">✓</span>' : ""}
+    </button>`
+  }).join("")
+  $("theme-options").querySelectorAll("[data-theme-id]").forEach((button) => {
+    button.onclick = () => {
+      appSettings().theme = button.dataset.themeId
+      applyTheme(button.dataset.themeId)
+      save()
+      renderSettings()
+      renderThemeDialog()
+    }
+  })
+}
+
 async function syncAutostartSetting() {
   if (!isDesktopApp()) return
   try {
@@ -747,11 +770,11 @@ $("s-retry-forever").onchange = (e) => {
   cfg.retryForever = e.target.checked
   save()
 }
-$("s-theme").onchange = (e) => {
-  appSettings().theme = e.target.value
-  applyTheme(e.target.value)
-  save()
+$("s-theme-open").onclick = () => {
+  renderThemeDialog()
+  $("dlg-theme").showModal()
 }
+$("theme-close").onclick = () => $("dlg-theme").close()
 $("s-auto-update").onchange = (e) => {
   appSettings().autoUpdate = e.target.checked
   renderSettings()

@@ -37,7 +37,20 @@
     --chart-out: #c894f5;
     --chart-req: #5fcf96;
   }
-  body[data-theme="light"] {
+  /* Every theme also answers a preview swatch, so the picker can show each
+     palette from its own tokens without switching the whole page. Dark repeats
+     :root so the "Тёмная" swatch is right even on a light page. */
+  [data-theme-preview="dark"] {
+    color-scheme: dark;
+    --bg: #0f141b; --panel: #171e27; --panel-raised: #1c2530; --surface: #222d39;
+    --surface-hover: #293747; --border: #304052; --border-strong: #43546a;
+    --text: #edf3f8; --muted: #9aaabd; --faint: #718195;
+    --accent: #9abaff; --accent-strong: #6f99ed;
+    --success: #5fcf96; --warning: #d8b25c; --danger: #ef8f8f;
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+  }
+  body[data-theme="light"],
+  [data-theme-preview="light"] {
     color-scheme: light;
     --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4;
     --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf;
@@ -61,7 +74,8 @@
     --chart-req: #12a065;
   }
   /* Catppuccin Mocha. */
-  body[data-theme="catppuccin"] {
+  body[data-theme="catppuccin"],
+  [data-theme-preview="catppuccin"] {
     color-scheme: dark;
     --bg: #1e1e2e; --panel: #181825; --panel-raised: #232334;
     --surface: #313244; --surface-hover: #45475a;
@@ -81,7 +95,8 @@
     --chart-in: #89b4fa; --chart-out: #cba6f7; --chart-req: #a6e3a1;
   }
   /* Kanagawa Wave. */
-  body[data-theme="kanagawa"] {
+  body[data-theme="kanagawa"],
+  [data-theme-preview="kanagawa"] {
     color-scheme: dark;
     --bg: #1f1f28; --panel: #16161d; --panel-raised: #2a2a37;
     --surface: #2a2a37; --surface-hover: #363646;
@@ -100,6 +115,72 @@
     --tooltip-bg: #16161d;
     --chart-in: #7e9cd8; --chart-out: #957fb8; --chart-req: #76946a;
   }
+  /* Nord. */
+  body[data-theme="nord"],
+  [data-theme-preview="nord"] {
+    color-scheme: dark;
+    --bg: #2e3440; --panel: #292e39; --panel-raised: #3b4252;
+    --surface: #3b4252; --surface-hover: #434c5e;
+    --border: #434c5e; --border-strong: #4c566a;
+    --text: #eceff4; --muted: #a8b1c2; --faint: #7b8496;
+    --accent: #88c0d0; --accent-strong: #81a1c1;
+    --success: #a3be8c; --warning: #ebcb8b; --danger: #bf616a;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .32);
+    --body-background: radial-gradient(circle at 50% -20%, #3b4252 0, var(--bg) 52%);
+    --section-background: rgba(41, 46, 57, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #2e3440; --primary-hover: #8fbcbb; --disabled-background: var(--surface);
+    --surface-inset: rgba(36, 41, 51, .5);
+    --surface-soft: rgba(59, 66, 82, .55);
+    --switch-track: #4c566a; --switch-knob: #eceff4; --switch-on: #a3be8c;
+    --tooltip-bg: #292e39;
+    --chart-in: #81a1c1; --chart-out: #b48ead; --chart-req: #a3be8c;
+  }
+  /* Ayu Dark. */
+  body[data-theme="ayu"],
+  [data-theme-preview="ayu"] {
+    color-scheme: dark;
+    --bg: #0b0e14; --panel: #0d1017; --panel-raised: #171b24;
+    --surface: #1f2430; --surface-hover: #242936;
+    --border: #242936; --border-strong: #343f4c;
+    --text: #bfbdb6; --muted: #8a9199; --faint: #565b66;
+    --accent: #ffb454; --accent-strong: #ffcc66;
+    --success: #aad94c; --warning: #ffb454; --danger: #f07178;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .45);
+    --body-background: radial-gradient(circle at 50% -20%, #171b24 0, var(--bg) 52%);
+    --section-background: rgba(13, 16, 23, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #0b0e14; --primary-hover: #ffcc66; --disabled-background: var(--surface);
+    --surface-inset: rgba(11, 14, 20, .5);
+    --surface-soft: rgba(31, 36, 48, .6);
+    --switch-track: #343f4c; --switch-knob: #bfbdb6; --switch-on: #aad94c;
+    --tooltip-bg: #0d1017;
+    --chart-in: #59c2ff; --chart-out: #d2a6ff; --chart-req: #aad94c;
+  }
+  /* Breeze Dark (KDE). */
+  body[data-theme="breeze"],
+  [data-theme-preview="breeze"] {
+    color-scheme: dark;
+    --bg: #1b1e20; --panel: #232629; --panel-raised: #2a2e32;
+    --surface: #31363b; --surface-hover: #3b4045;
+    --border: #31363b; --border-strong: #4a4f54;
+    --text: #eff0f1; --muted: #b0b6bb; --faint: #7a7f85;
+    --accent: #3daee9; --accent-strong: #3daee9;
+    --success: #27ae60; --warning: #f67400; --danger: #da4453;
+    --shadow: 0 20px 60px rgba(0, 0, 0, .4);
+    --body-background: radial-gradient(circle at 50% -20%, #2a2e32 0, var(--bg) 52%);
+    --section-background: rgba(35, 38, 41, .92);
+    --control-background: var(--surface); --control-hover: var(--surface-hover);
+    --primary-text: #ffffff; --primary-hover: #2980b9; --disabled-background: var(--surface);
+    --surface-inset: rgba(27, 30, 32, .5);
+    --surface-soft: rgba(49, 54, 59, .6);
+    --switch-track: #4a4f54; --switch-knob: #eff0f1; --switch-on: #27ae60;
+    --tooltip-bg: #232629;
+    --chart-in: #3daee9; --chart-out: #9b59b6; --chart-req: #27ae60;
+  }
+  /* "System" follows the OS. The dark values come from :root; the light media
+     query below swaps in the light palette only when the desktop is light. */
   @media (prefers-color-scheme: light) {
-    body[data-theme="system"] { color-scheme: light; --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4; --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf; --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca; --accent-strong: #4d82df; --success: #12a065; --warning: #c17d05; --danger: #d24545; --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%); --section-background: rgba(255, 255, 255, .9); --control-background: #fff; --control-hover: #f1f5f9; --primary-text: #fff; --primary-hover: #3f73ca; --disabled-background: #eef2f6; --surface-inset: rgba(226, 233, 242, .72); --surface-soft: rgba(231, 237, 244, .78); --switch-track: #c3cedb; --switch-knob: #fff; --switch-on: #12a065; --tooltip-bg: #fff; --chart-in: #4d82df; --chart-out: #a05fe0; --chart-req: #12a065; }
+    body[data-theme="system"],
+    [data-theme-preview="system"] { color-scheme: light; --bg: #eef3f8; --panel: #fff; --panel-raised: #f8fafc; --surface: #e7edf4; --surface-hover: #dce6f1; --border: #c8d4e0; --border-strong: #9cadbf; --text: #172333; --muted: #617287; --faint: #7d8da0; --accent: #356cca; --accent-strong: #4d82df; --success: #12a065; --warning: #c17d05; --danger: #d24545; --body-background: radial-gradient(circle at 50% -20%, #fff 0, var(--bg) 58%); --section-background: rgba(255, 255, 255, .9); --control-background: #fff; --control-hover: #f1f5f9; --primary-text: #fff; --primary-hover: #3f73ca; --disabled-background: #eef2f6; --surface-inset: rgba(226, 233, 242, .72); --surface-soft: rgba(231, 237, 244, .78); --switch-track: #c3cedb; --switch-knob: #fff; --switch-on: #12a065; --tooltip-bg: #fff; --chart-in: #4d82df; --chart-out: #a05fe0; --chart-req: #12a065; }
   }

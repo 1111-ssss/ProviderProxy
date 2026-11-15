@@ -141,3 +141,19 @@ test("a chat log line shows the full session id and the chain under the date", (
   assert.equal(chain.textContent, "logfare-1mil")
   assert.ok(!top.children.some((c) => c.className === "chain"), "the chain is not in the header row")
 })
+
+test("applyTheme accepts every palette offered by the picker", () => {
+  // THEMES is the single source: each picker button must map to a real palette.
+  const ctx = vm.createContext({ document: { body: { dataset: {} }, documentElement: { style: {} } }, localStorage: { store: {}, getItem(k) { return this.store[k] ?? null }, setItem(k, v) { this.store[k] = v } } })
+  vm.runInContext(scripts.slice(scripts.indexOf("const THEMES = ["), scripts.indexOf("async function api(")), ctx)
+  const ids = vm.runInContext("THEMES.map((t) => t.id)", ctx)
+  for (const id of ids) {
+    vm.runInContext(`applyTheme(${JSON.stringify(id)})`, ctx)
+    assert.equal(vm.runInContext("document.body.dataset.theme", ctx), id, `${id} must be applied`)
+    assert.equal(vm.runInContext("THEME_IDS.includes(document.body.dataset.theme)", ctx), true)
+  }
+  vm.runInContext('applyTheme("does-not-exist")', ctx)
+  assert.equal(vm.runInContext("document.body.dataset.theme", ctx), "dark", "an unknown value falls back to dark")
+  // The labels come from the same list, so the settings button can name the theme.
+  assert.equal(vm.runInContext('themeLabel("kanagawa")', ctx), "Kanagawa")
+})

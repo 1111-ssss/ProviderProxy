@@ -173,12 +173,24 @@ const tauriInvoke = (command, args) => {
   return typeof invoke === "function" ? invoke(command, args) : null
 }
 const isDesktopApp = () => typeof window.__TAURI__?.core?.invoke === "function"
-const THEMES = ["dark", "light", "system", "catppuccin", "kanagawa"]
-// catppuccin and kanagawa are dark palettes; system follows the OS.
+// Order shown in the theme picker; each key matches a [data-theme-preview] palette.
+const THEMES = [
+  { id: "dark", label: "Тёмная" },
+  { id: "light", label: "Светлая" },
+  { id: "system", label: "Как в системе" },
+  { id: "catppuccin", label: "Catppuccin" },
+  { id: "kanagawa", label: "Kanagawa" },
+  { id: "nord", label: "Nord" },
+  { id: "ayu", label: "Ayu" },
+  { id: "breeze", label: "Breeze" },
+]
+const THEME_IDS = THEMES.map((theme) => theme.id)
+const themeLabel = (id) => THEMES.find((theme) => theme.id === id)?.label ?? "Тёмная"
+// Only the light palette needs color-scheme: light; system lets the OS decide.
 const LIGHT_THEMES = ["light"]
 function applyTheme(theme) {
   if (typeof document === "undefined") return
-  const next = THEMES.includes(theme) ? theme : "dark"
+  const next = THEME_IDS.includes(theme) ? theme : "dark"
   document.body.dataset.theme = next
   const scheme = next === "system" ? "normal" : LIGHT_THEMES.includes(next) ? "light" : "dark"
   document.documentElement.style.colorScheme = scheme

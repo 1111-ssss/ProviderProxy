@@ -437,15 +437,9 @@
         <div class="settings-grid">
           <label>
             <span class="field-label">Тема интерфейса
-              <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола." aria-label="Что значит «Тема интерфейса»">?</button>
+              <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола. Остальные темы — фиксированные палитры." aria-label="Что значит «Тема интерфейса»">?</button>
             </span>
-            <select id="s-theme">
-              <option value="dark">Тёмная</option>
-              <option value="light">Светлая</option>
-              <option value="system">Как в системе</option>
-              <option value="catppuccin">Catppuccin</option>
-              <option value="kanagawa">Kanagawa</option>
-            </select>
+            <button type="button" id="s-theme-open" class="theme-open-button"><span id="s-theme-current">Тёмная</span></button>
           </label>
           <label class="setting-option" id="s-autostart-wrap">
             <input id="s-autostart" type="checkbox">
@@ -679,6 +673,22 @@
     </div>
     <div class="dialog-actions">
       <button type="button" id="image-settings-cancel">Закрыть</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: выбор темы интерфейса -->
+<dialog id="dlg-theme" aria-labelledby="theme-title" aria-describedby="theme-help">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="theme-title">Тема интерфейса</h3>
+      <p id="theme-help">Выбери палитру. Превью показывает цвета каждой темы; выбор применяется сразу.</p>
+    </div>
+    <div class="dialog-body">
+      <div id="theme-options" class="theme-options" role="listbox" aria-label="Доступные темы"></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="theme-close">Закрыть</button>
     </div>
   </form>
 </dialog>
