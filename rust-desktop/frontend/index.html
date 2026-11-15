@@ -684,14 +684,44 @@
       <h3 id="theme-title">Тема интерфейса</h3>
     </div>
     <div class="dialog-body">
-      <div class="filter-bar">
-        <label class="search-field" style="margin:0">
-          <span class="sr-only">Поиск темы</span>
-          <input id="theme-search" placeholder="Найти тему…" autocomplete="off">
-        </label>
-        <span id="theme-search-result" class="filter-result"></span>
+      <div class="theme-layout">
+        <div class="theme-list">
+          <div class="filter-bar">
+            <label class="search-field" style="margin:0">
+              <span class="sr-only">Поиск темы</span>
+              <input id="theme-search" placeholder="Найти тему…" autocomplete="off">
+            </label>
+            <span id="theme-search-result" class="filter-result"></span>
+          </div>
+          <div id="theme-options" class="theme-options" role="listbox" aria-label="Доступные темы"></div>
+        </div>
+        <!-- Decorative sample controls: they only show how the current theme
+             paints each element, so they are inert (pointer-events: none). -->
+        <aside class="theme-preview" aria-hidden="true">
+          <h4>Элементы</h4>
+          <span class="field-label">Текстовая метка</span>
+          <input placeholder="текстовое поле">
+          <select>
+            <option>Выпадающий список</option>
+            <option>Второй вариант</option>
+          </select>
+          <div class="row">
+            <button class="primary" type="button">Кнопка</button>
+            <button type="button">Тихая</button>
+            <button class="danger" type="button">Удалить</button>
+          </div>
+          <label class="chain-toggle is-on"><input type="checkbox" checked><span class="chain-switch"></span></label>
+          <label class="chain-toggle is-off"><input type="checkbox"><span class="chain-switch"></span></label>
+          <div class="row">
+            <span class="pill">метка</span>
+            <span class="pill empty">пусто</span>
+            <span class="ok-cell">успех</span>
+            <span class="warn">лимит</span>
+            <span class="bad">ошибка</span>
+          </div>
+          <div class="theme-preview-toast"><span class="b">ответ</span> сообщение в логе</div>
+        </aside>
       </div>
-      <div id="theme-options" class="theme-options" role="listbox" aria-label="Доступные темы"></div>
     </div>
     <div class="dialog-actions">
       <button type="button" id="theme-close">Закрыть</button>
