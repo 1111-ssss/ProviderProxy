@@ -157,3 +157,16 @@ test("applyTheme accepts every palette offered by the picker", () => {
   // The labels come from the same list, so the settings button can name the theme.
   assert.equal(vm.runInContext('themeLabel("kanagawa")', ctx), "Kanagawa")
 })
+
+test("digit shortcuts map to the nine tabs", () => {
+  // 1..8 pick tabs in order and 0 opens settings; 9 has no tab.
+  const line = scripts.match(/const TAB_KEYS = \{([^}]*)\}/)[1]
+  const keys = Object.fromEntries([...line.matchAll(/"(\d)":\s*"([a-z-]+)"/g)].map((m) => [m[1], m[2]]))
+  assert.deepEqual(keys, {
+    "1": "providers", "2": "connections", "3": "integrations", "4": "chains",
+    "5": "models", "6": "images", "7": "logs", "8": "usage", "0": "settings",
+  })
+  const tabs = JSON.parse(scripts.match(/const TABS = (\[[^\]]*\])/)[1].replace(/'/g, '"'))
+  for (const name of Object.values(keys)) assert.ok(tabs.includes(name), `${name} must be a tab`)
+  assert.equal("9" in keys, false, "9 has no tab")
+})

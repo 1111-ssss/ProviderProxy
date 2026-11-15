@@ -154,6 +154,9 @@
         <div id="image-skill-path" class="skill-path">—</div>
         <div class="row">
           <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
+          <button type="button" id="image-skill-settings" class="settings-button" aria-label="Настройки skill" title="Модель по умолчанию для skill">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+          </button>
           <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
         </div>
       </div>
@@ -181,12 +184,7 @@
   <section data-tab="images">
     <div class="section-head">
       <h2>6&nbsp;·&nbsp;Генерация изображений</h2>
-      <div class="image-section-actions">
-        <span class="muted" id="ig-status"></span>
-        <button id="ig-settings-open" class="settings-button image-settings-button" type="button" aria-label="Настройки изображений" title="Настройки изображений">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-        </button>
-      </div>
+      <span class="muted" id="ig-status"></span>
     </div>
     <p class="section-sub">Использование image моделей для генерации изображений.</p>
     <div class="provider-picker">
@@ -220,15 +218,15 @@
               <option value="landscape">landscape</option>
             </select>
           </label>
-          <label><span class="image-field-heading">Размер <span class="muted">необязательно</span></span>
+          <label><span class="image-field-heading">Размер <span class="muted">(необязательно)</span></span>
             <input id="ig-size" placeholder="1024x768">
           </label>
         </div>
-        <label class="image-file-row">Файл-референс <span class="muted">необязательно, загрузится как base64</span>
+        <label class="image-file-row">Файл-референс <span class="muted">(необязательно, загрузится как base64)</span>
           <input id="ig-image-file" type="file" accept="image/*">
           <span id="ig-image-file-name" class="image-reference-name"></span>
         </label>
-        <label>Или URL/base64 референса <span class="muted">необязательно</span>
+        <label>Или URL/base64 референса <span class="muted">(необязательно)</span>
           <input id="ig-image" placeholder="https://… или data:image/png;base64,…">
         </label>
         <div class="image-form-actions">
@@ -662,8 +660,8 @@
 <dialog id="dlg-image-settings" aria-labelledby="image-settings-title" aria-describedby="image-settings-help">
   <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
     <div class="dialog-header">
-      <h3 id="image-settings-title">Настройки изображений</h3>
-      <p id="image-settings-help">Выбери провайдера и модель, которые будут использоваться по умолчанию.</p>
+      <h3 id="image-settings-title">Модель по умолчанию для skill</h3>
+      <p id="image-settings-help">Провайдер и модель, которые skill генерации изображений использует, если в задаче не указана другая модель.</p>
     </div>
     <div class="dialog-body">
       <div class="skill-card">

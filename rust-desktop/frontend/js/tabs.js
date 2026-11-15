@@ -53,3 +53,21 @@ function showTab(name) {
 }
 document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)))
 
+// Digits switch tabs while nothing else claims the keyboard: no focused input
+// and no open dialog. 1..8 pick tabs in order, 0 opens the last one (settings);
+// 9 has no tab and is ignored.
+const TAB_KEYS = { "1": "providers", "2": "connections", "3": "integrations", "4": "chains", "5": "models", "6": "images", "7": "logs", "8": "usage", "0": "settings" }
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.altKey || event.metaKey) return
+  const target = event.target
+  if (target instanceof Element) {
+    const tag = target.tagName
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return
+  }
+  if (document.querySelector("dialog[open]")) return
+  const name = TAB_KEYS[event.key]
+  if (!name) return
+  event.preventDefault()
+  showTab(name)
+})
+

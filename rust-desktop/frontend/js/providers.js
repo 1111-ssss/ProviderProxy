@@ -691,7 +691,7 @@ const dlgImageSettings = $("dlg-image-settings")
 const imageSkillStatusNode = $("image-skill-status")
 const imageSkillPathNode = $("image-skill-path")
 const imageSkillInstallButton = $("image-skill-install")
-$("ig-settings-open").onclick = () => {
+$("image-skill-settings").onclick = () => {
   dlgImageSettings.showModal()
   renderImageSettings()
 }
