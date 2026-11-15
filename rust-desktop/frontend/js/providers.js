@@ -561,8 +561,8 @@ function renderThemeDialog() {
           const active = id === current
           const dots = THEME_COLOR_KEYS.map((key) => `<span class="ts-dot" style="background:var(${key})"></span>`).join("")
           return `<button type="button" class="theme-option${active ? " active" : ""}" data-theme-id="${esc(id)}" data-theme-preview="${esc(id)}" role="option" aria-selected="${active}">
-      <span class="theme-option-swatch"><span class="ts-bar"></span><span class="ts-bar"></span><span class="ts-bar"></span></span>
-      <span class="theme-option-foot"><span class="theme-option-name">${esc(label)}</span><span class="theme-option-dots">${dots}</span></span>
+      <span class="theme-option-dots">${dots}</span>
+      <span class="theme-option-name">${esc(label)}</span>
       ${active ? '<span class="theme-option-check" aria-hidden="true">✓</span>' : ""}
     </button>`
         })

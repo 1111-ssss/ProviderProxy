@@ -695,23 +695,25 @@
           </div>
           <div id="theme-options" class="theme-options" role="listbox" aria-label="Доступные темы"></div>
         </div>
-        <!-- Decorative sample controls: they only show how the current theme
-             paints each element, so they are inert (pointer-events: none). -->
-        <aside class="theme-preview" aria-hidden="true">
+        <!-- Live sample controls: they are clickable, but act on nothing. They
+             only show how the current theme paints each element. -->
+        <aside class="theme-preview">
           <h4>Элементы</h4>
-          <span class="field-label">Текстовая метка</span>
-          <input placeholder="текстовое поле">
+          <span class="field-label">Text Label</span>
+          <input placeholder="Text Box">
           <select>
-            <option>Выпадающий список</option>
-            <option>Второй вариант</option>
+            <option>Dropdown</option>
+            <option>Option 2</option>
           </select>
           <div class="row">
-            <button class="primary" type="button">Кнопка</button>
-            <button type="button">Тихая</button>
-            <button class="danger" type="button">Удалить</button>
+            <button class="primary" type="button">Button 1</button>
+            <button type="button">Button 2</button>
+            <button class="danger" type="button">Button 3</button>
           </div>
-          <label class="chain-toggle is-on"><input type="checkbox" checked><span class="chain-switch"></span></label>
-          <label class="chain-toggle is-off"><input type="checkbox"><span class="chain-switch"></span></label>
+          <div class="row">
+            <label class="chain-toggle" title="Switch on"><input type="checkbox" checked><span class="chain-switch"></span></label>
+            <label class="chain-toggle" title="Switch off"><input type="checkbox"><span class="chain-switch"></span></label>
+          </div>
           <div class="row">
             <span class="pill">метка</span>
             <span class="pill empty">пусто</span>
