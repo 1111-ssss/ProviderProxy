@@ -361,16 +361,23 @@
   /* Left: the palette grid; right: inert sample controls painted by the theme. */
   .theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); gap: 16px; align-items: start; }
   @media (max-width: 900px) { .theme-layout { grid-template-columns: 1fr; } }
-  .theme-preview { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); align-self: stretch; }
+  .theme-preview { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); align-self: stretch; align-content: start; }
   .theme-preview h4 { margin: 0; }
   .theme-preview .row { flex-wrap: wrap; }
   /* The sample switches read their state straight from the checkbox, so a
      click toggles them even though they belong to nothing. */
   .theme-preview .chain-toggle:has(input:checked) .chain-switch { background: var(--switch-on); }
   .theme-preview .chain-toggle:has(input:checked) .chain-switch::after { transform: translateX(13px); }
+  /* Sample log line: the badge block paints like a real log card's badge. */
   .theme-preview-toast { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 12px; color: var(--muted); }
+  .theme-preview-toast .b { background: var(--surface); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 10px; }
+  /* Status words need the same scope as the real tables: a bare class would
+     inherit plain text colour here. */
+  .theme-preview .ok-cell { color: var(--success); }
+  .theme-preview .warn { color: var(--warning); }
+  .theme-preview .bad { color: var(--danger); }
   .theme-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
-  .theme-option { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 7px; padding: 9px 10px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--panel); color: var(--text); text-align: left; }
+  .theme-option { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 7px; padding: 9px 10px; padding-bottom: 20px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--panel); color: var(--text); text-align: left; }
   .theme-option:hover:not(:disabled) { border-color: var(--accent); }
   .theme-option.active { border-color: var(--accent-strong); box-shadow: 0 0 0 1px var(--accent-strong) inset; }
   /* The six key palette colours as squares, painted from the button's own
@@ -378,7 +385,7 @@
   .theme-option-dots { display: flex; gap: 4px; align-items: center; }
   .theme-option-dots .ts-dot { display: block; flex: 1 1 0; height: 22px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
   .theme-option-name { font-size: 12px; font-weight: 650; }
-  .theme-option-check { position: absolute; top: 5px; right: 7px; color: var(--accent-strong); font-weight: 700; font-size: 11px; }
+  .theme-option-check { position: absolute; bottom: 4px; right: 7px; color: var(--accent-strong); font-weight: 700; font-size: 11px; }
   /* The name gets the room the short numeric columns leave, and wraps instead
      of being cut when the window is narrow. */
   .session-name { display: block; cursor: copy; overflow-wrap: anywhere; }
