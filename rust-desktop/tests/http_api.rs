@@ -619,3 +619,123 @@ async fn fails_over_when_a_stream_stalls_after_headers() {
         "the backup answered: {usage}"
     );
 }
+
+/// Retry mode must not spin for an hour when the chain cannot ever answer:
+/// an empty chain has no upstream to retry, so the request has to fail fast.
+#[tokio::test]
+async fn retry_mode_gives_up_on_an_empty_chain() {
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "providers": {},
+        "models": {"empty": {"upstreams": []}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    let started = std::time::Instant::now();
+    let response = tokio::time::timeout(
+        Duration::from_secs(10),
+        proxy
+            .client
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&json!({"model": "empty", "messages": []}))
+            .send(),
+    )
+    .await
+    .expect("retry mode must not hang on an empty chain")
+    .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "an empty chain cannot answer, so retrying it is pointless"
+    );
+}
+
+/// A cooldown of zero (only possible through a hand-edited config) used to make
+/// the retry loop hammer the same upstream with no pause.
+#[tokio::test]
+async fn retry_mode_never_hammers_with_a_zero_cooldown() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": {"message": "boom"}})))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 0,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    // Abandon the client after a moment; the server keeps retrying for an hour,
+    // so only the request rate during the first second is meaningful.
+    let request = tokio::spawn({
+        let proxy_url = proxy.url("/v1/chat/completions");
+        let client = proxy.client.clone();
+        async move {
+            let _ = client
+                .post(proxy_url)
+                .json(&json!({"model": "chain", "messages": []}))
+                .send()
+                .await;
+        }
+    });
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    request.abort();
+    let attempts = hits.load(Ordering::SeqCst);
+    assert!(
+        attempts <= 6,
+        "a zero cooldown must be clamped, not turned into a hot loop: {attempts} attempts in 3s"
+    );
+}
+
+/// A client that hangs up must not leave the proxy retrying in the background.
+#[tokio::test]
+async fn retry_mode_stops_when_the_client_hangs_up() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": {"message": "boom"}})))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 1,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    let request = tokio::spawn({
+        let url = proxy.url("/v1/chat/completions");
+        let client = proxy.client.clone();
+        async move {
+            let _ = client.post(url).json(&json!({"model": "chain", "messages": []})).send().await;
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(2500)).await;
+    request.abort();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let after_abort = hits.load(Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    let later = hits.load(Ordering::SeqCst);
+    assert_eq!(
+        after_abort, later,
+        "the retry loop must stop once the client is gone: {after_abort} then {later}"
+    );
+}

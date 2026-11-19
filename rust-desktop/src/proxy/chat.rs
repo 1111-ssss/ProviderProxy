@@ -35,6 +35,8 @@ async fn send_with_header_timeout(
 /// the log line. Every failure path uses it, so a 400, a dead key and an empty
 /// answer are counted the same way.
 fn record_failure(state: &AppState, upstream: &Upstream, key: &str, session: &Option<String>) {
+    // A zero (only possible in a hand-edited config) would expire instantly and
+    // turn retry mode into a hot loop against the same dead upstream.
     let cooldown = Duration::from_secs(
         state
             .config
@@ -42,7 +44,8 @@ fn record_failure(state: &AppState, upstream: &Upstream, key: &str, session: &Op
             .unwrap()
             .get("errorCooldownSec")
             .and_then(Value::as_u64)
-            .unwrap_or(30),
+            .unwrap_or(30)
+            .max(1),
     );
     state
         .cooldowns
@@ -113,8 +116,8 @@ pub(super) async fn chat_completions(
     // and try the chain again. A run then ends only when an upstream answers.
     // Any non-2xx counts as a failed attempt here, not only quota/timeout/server
     // errors: a plain 400 or a dead key must not end the run either.
-    // shortcut: a client that already gave up is not detected here, so the cap
-    // below stops the loop; raise it if long unattended runs need more.
+    // The loop also stops when the client hangs up: a cancelled request must not
+    // keep the proxy retrying for the whole window in the background.
     const RETRY_WINDOW: Duration = Duration::from_secs(60 * 60);
     let started = Instant::now();
     let retry_forever = state
@@ -384,7 +387,9 @@ pub(super) async fn chat_completions(
                 }
             }
         }
-        if !retry_forever || started.elapsed() > RETRY_WINDOW {
+        // A chain with no usable upstream can never answer: retrying it would
+        // spin for the whole window while the client waits for nothing.
+        if !retry_forever || chain.is_empty() || started.elapsed() > RETRY_WINDOW {
             break;
         }
         // Sleep until the nearest upstream leaves its cooldown instead of polling:
