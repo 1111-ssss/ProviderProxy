@@ -100,6 +100,12 @@ pub(crate) struct SessionUsage {
     pub(crate) first_seen: u128,
     #[serde(rename = "lastSeen")]
     pub(crate) last_seen: u128,
+    /// Sum of the gaps between requests, where a gap longer than the idle
+    /// threshold (a paused/closed chat) is not counted. This is the "how long
+    /// the chat was actually talking to the proxy" figure the UI shows; wall
+    /// clock first-to-last would count whole nights of silence.
+    #[serde(rename = "activeMs")]
+    pub(crate) active_ms: u64,
 }
 
 /// Bump when the key shape of `Usage::models` changes.

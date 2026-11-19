@@ -343,6 +343,7 @@ function renderSettings() {
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
   $("s-stream-idle").value = cfg.streamIdleTimeoutSec ?? 90
+  $("s-session-gap").value = cfg.sessionIdleGapSec ?? 300
   $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
   $("s-version").textContent = cfg.appVersion ?? "—"
@@ -446,60 +447,66 @@ $("config-import-file").onchange = (event) => importConfigFile(event.target.file
 
 let updateInfo = null
 let updateBusy = false
-// The navigation entry above "Settings" appears only when a check found a
-// release; the bar inside it follows the download progress events.
+// The navigation entry above "Settings" is the only update surface: it shows
+// "Обновить до X", then the download bar, then "Перезапустить". Check results
+// that need no action (nothing found, errors) are plain toasts.
 const updateNavButton = $("update-nav-button")
 const updateNavLabel = $("update-nav-label")
 const updateNavProgress = $("update-progress")
 const updateNavProgressFill = $("update-progress-fill")
 function setUpdateNav(state) {
-  // state: null (hide) | { progress: [done, total] } (show with a bar)
+  // null hides it; { mode: "update" | "progress" | "restart", done?, total? }
   if (!state) {
     updateNavButton.hidden = true
     updateNavProgress.hidden = true
     updateNavProgressFill.style.width = "0%"
+    updateNavButton.dataset.mode = ""
     return
   }
-  const [done, total] = state.progress
   updateNavButton.hidden = false
-  updateNavProgress.hidden = !total
-  updateNavProgressFill.style.width = total ? `${Math.min(100, Math.round((done / total) * 100))}%` : "0%"
+  updateNavButton.dataset.mode = state.mode
+  if (state.mode === "progress") {
+    const done = Number(state.done) || 0
+    const total = Number(state.total) || 0
+    updateNavLabel.textContent = "Обновление"
+    updateNavProgress.hidden = !total
+    updateNavProgressFill.style.width = total ? `${Math.min(100, Math.round((done / total) * 100))}%` : "0%"
+    return
+  }
+  updateNavProgress.hidden = true
+  updateNavProgressFill.style.width = "0%"
+  updateNavLabel.textContent = state.mode === "restart" ? "Перезапустить" : `Обновить до ${state.version}`
+  updateNavButton.title = state.mode === "restart" ? "Перезапустить и применить обновление" : `Установить версию ${state.version}`
 }
 window.__TAURI__?.event?.listen?.("update-progress", (event) => {
   const payload = event.payload ?? {}
-  setUpdateNav({ progress: [Number(payload.done) || 0, Number(payload.total) || 0] })
+  setUpdateNav({ mode: "progress", done: payload.done, total: payload.total })
 })
-updateNavButton.onclick = () => installDesktopUpdate(true)
-function setUpdateBanner(message, actionLabel = "", action = null) {
-  const banner = $("update-banner")
-  const button = $("update-banner-action")
-  $("update-banner-message").innerHTML = message
-  button.textContent = actionLabel
-  button.disabled = !action
-  button.onclick = action
-  banner.hidden = !message
+updateNavButton.onclick = () => {
+  if (updateNavButton.dataset.mode === "restart") return restartDesktop()
+  installDesktopUpdate(appSettings().autoRestart)
 }
 function restartDesktop() {
   if (isDesktopApp()) tauriInvoke("restart_app")
 }
-async function installDesktopUpdate(restart = true) {
+async function installDesktopUpdate(restart = false) {
   if (!isDesktopApp() || updateBusy) return
   updateBusy = true
-  setUpdateBanner("<strong>Загружаю обновление…</strong>")
-  setUpdateNav({ progress: [0, 0] })
+  setUpdateNav({ mode: "progress", done: 0, total: 0 })
   try {
     const installed = await tauriInvoke("install_update", { restart })
     if (!installed) {
       updateInfo = null
-      setUpdateBanner("")
       setUpdateNav(null)
+      flash(true, "обновлений нет")
     } else if (!restart) {
-      setUpdateBanner("<strong>Обновление установлено.</strong> Перезапусти приложение, чтобы применить его.", "Перезапустить", restartDesktop)
-      setUpdateNav(null)
+      // Downloaded and staged: the app must restart for it to take effect.
+      setUpdateNav({ mode: "restart" })
+      flash(true, "обновление загружено — перезапусти приложение")
     }
   } catch (error) {
-    setUpdateBanner(`Не удалось обновить: ${esc(error.message ?? error)}`, "Повторить", () => installDesktopUpdate(restart))
-    setUpdateNav(null)
+    setUpdateNav(updateInfo ? { mode: "update", version: updateInfo.version } : null)
+    flash(false, `не удалось обновить: ${error.message ?? error}`)
   } finally {
     updateBusy = false
   }
@@ -516,8 +523,7 @@ async function checkForDesktopUpdate(manual = false) {
     if (!info) {
       updateInfo = null
       setUpdateNav(null)
-      if (manual) setUpdateBanner("<strong>Обновлений нет.</strong>", "Проверить снова", () => checkForDesktopUpdate(true))
-      else setUpdateBanner("")
+      if (manual) flash(true, "обновлений нет")
       return
     }
     updateInfo = info
@@ -526,18 +532,20 @@ async function checkForDesktopUpdate(manual = false) {
     // rollback is not silently undone.
     if (info.gated) {
       setUpdateNav(null)
-      if (manual) setUpdateBanner(`<strong>Доступна версия ${esc(info.version)},</strong> но она не выше той, с которой ты откатился.`, "Установить всё равно", () => installDesktopUpdate(true))
-      else setUpdateBanner("")
+      if (manual) flash(false, `доступна версия ${info.version}, но она не выше той, с которой ты откатился`)
       return
     }
-    if (appSettings().autoUpdate) return installDesktopUpdate(appSettings().autoRestart)
-    setUpdateNav({ progress: [0, 0] })
-    updateNavLabel.textContent = `Обновить до ${info.version}`
-    setUpdateBanner(`<strong>Доступна новая версия ${esc(info.version)}.</strong>`, "Обновить", () => installDesktopUpdate(true))
+    const settings = appSettings()
+    if (settings.autoUpdate) {
+      // Automatic download; the restart is separate, exactly like the manual path.
+      return installDesktopUpdate(settings.autoRestart)
+    }
+    setUpdateNav({ mode: "update", version: info.version })
+    if (manual) flash(true, `доступна новая версия ${info.version}`)
   } catch (error) {
     const message = error.message ?? String(error)
     debugLog("update-check-failed", { message })
-    setUpdateBanner(`Не удалось проверить обновления: ${esc(message)}`, "Повторить", checkForDesktopUpdate)
+    flash(false, `не удалось проверить обновления: ${message}`)
   } finally {
     if (manual) {
       checkButton.disabled = false
@@ -776,6 +784,12 @@ num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
 num("s-stream-idle", "streamIdleTimeoutSec")
+// A session gap under 30s would make short pauses look like activity spikes.
+$("s-session-gap").onchange = (e) => {
+  cfg.sessionIdleGapSec = Math.min(86400, Math.max(30, Number(e.target.value) || 300))
+  e.target.value = cfg.sessionIdleGapSec
+  save()
+}
 $("s-pending-buffer").onchange = (e) => {
   cfg.pendingBufferBytes = Number(e.target.value)
   save()
@@ -848,8 +862,8 @@ async function loadRollbackVersions() {
 async function startRollback(version) {
   if (!version || updateBusy) return
   updateBusy = true
-  setUpdateBanner(`<strong>Откатываю на ${esc(version)}…</strong>`)
-  setUpdateNav(null)
+  setUpdateNav({ mode: "progress", done: 0, total: 0 })
+  flash(true, `откатываю на ${version}…`)
   // The command exits the app once the swap is scheduled, so the choice must be
   // saved first: a deliberate rollback turns automatic updates off, otherwise
   // the next check would re-install the version the user just left.
@@ -861,13 +875,14 @@ async function startRollback(version) {
       appSettings().autoUpdate = previousAutoUpdate
       save()
       renderSettings()
-      setUpdateBanner("")
+      setUpdateNav(null)
     }
   } catch (error) {
     appSettings().autoUpdate = previousAutoUpdate
     save()
     renderSettings()
-    setUpdateBanner(`Не удалось откатить: ${esc(error.message ?? error)}`, "Повторить", () => startRollback(version))
+    setUpdateNav(null)
+    flash(false, `не удалось откатить: ${error.message ?? error}`)
   } finally {
     updateBusy = false
   }
@@ -944,13 +959,14 @@ function allSessions(days) {
   const merged = {}
   for (const day of days ?? []) {
     for (const [id, stat] of Object.entries(day.sessions ?? {})) {
-      const row = (merged[id] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0, firstSeen: 0, lastSeen: 0 })
+      const row = (merged[id] ??= { requests: 0, ok: 0, limits: 0, errors: 0, tokensIn: 0, tokensOut: 0, activeMs: 0, firstSeen: 0, lastSeen: 0 })
       row.requests += Number(stat.requests) || 0
       row.ok += Number(stat.ok) || 0
       row.limits += Number(stat.limits) || 0
       row.errors += Number(stat.errors) || 0
       row.tokensIn += Number(stat.tokensIn) || 0
       row.tokensOut += Number(stat.tokensOut) || 0
+      row.activeMs += Number(stat.activeMs) || 0
       const first = Number(stat.firstSeen) || 0
       const last = Number(stat.lastSeen) || 0
       if (first && (!row.firstSeen || first < row.firstSeen)) row.firstSeen = first

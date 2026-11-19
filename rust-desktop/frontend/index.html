@@ -354,10 +354,6 @@
         <p class="section-sub" style="margin-bottom:0">Параметры прокси, внешний вид приложения и обновления разделены по группам.</p>
       </div>
     </div>
-    <div id="update-banner" class="update-banner" hidden style="margin-top:16px">
-      <span id="update-banner-message" class="update-banner-message"></span>
-      <button id="update-banner-action" type="button"></button>
-    </div>
     <div class="settings-page-grid" style="margin-top:16px">
       <div class="settings-block">
         <h3>Сервер</h3>
@@ -414,6 +410,12 @@
               <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
             </span>
             <input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric">
+          </label>
+          <label>
+            <span class="field-label">Пауза сессии, сек
+              <button type="button" class="field-help" data-hint="Длительность сессии — сумма пауз между запросами. Пауза длиннее этого значения считается простоем и не входит в длительность." aria-label="Что значит «Пауза сессии»">?</button>
+            </span>
+            <input id="s-session-gap" type="number" min="30" max="86400" step="1" inputmode="numeric">
           </label>
           <label class="setting-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">

@@ -540,6 +540,7 @@ pub(super) async fn stream_upstream_response(
     let (signal_tx, signal_rx) = tokio::sync::oneshot::channel::<bool>();
     let mut upstream_stream = response.bytes_stream();
     tokio::spawn(async move {
+        let stream_started = std::time::Instant::now();
         let mut tail = String::new();
         let mut buffer = String::new();
         let mut regular_body = Vec::new();
@@ -773,6 +774,11 @@ pub(super) async fn stream_upstream_response(
         if let Some(row) = session_stat(&mut usage, session.as_deref()) {
             row.tokens_in += tokens_in;
             row.tokens_out += tokens_out;
+            // The chat handler's timer stops at handoff; the answer itself is
+            // genuine activity, so add the time this stream spent delivering it.
+            row.active_ms = row
+                .active_ms
+                .saturating_add(stream_started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64);
         }
         drop(usage);
         let mut lifetime = lifetime_state.lock().unwrap();

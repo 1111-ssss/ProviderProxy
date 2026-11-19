@@ -5,16 +5,20 @@ use axum::{
     Json,
 };
 use serde_json::Value;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 use super::{
     auth::authorized,
     handlers::json_error,
-    metrics::{hour_stat, model_stat, provider_stat, push_chat_log, session_stat},
+    metrics::{
+        hour_stat, model_stat, provider_stat, push_chat_log, session_idle_gap,
+        session_request_end, session_request_start, session_stat,
+    },
     routing::{failover_status, with_model},
     stream::stream_upstream_response,
-    types::{AppState, Upstream},
+    types::{AppState, Upstream, Usage},
 };
 
 async fn send_with_header_timeout(
@@ -79,6 +83,24 @@ fn revert_provisional_ok(state: &AppState, upstream: &Upstream, session: &Option
     }
 }
 
+/// Adds this request's duration to its session when the handler returns, on
+/// every path (success, failover, early error). It is what keeps the active
+/// time correct when "retry until answered" holds a request open for a long
+/// while: that time is real activity, not an idle gap.
+struct SessionTimer {
+    usage: Arc<std::sync::Mutex<Usage>>,
+    session: Option<String>,
+    started: Instant,
+}
+
+impl Drop for SessionTimer {
+    fn drop(&mut self) {
+        if let Ok(mut usage) = self.usage.lock() {
+            session_request_end(&mut usage, self.session.as_deref(), self.started.elapsed());
+        }
+    }
+}
+
 pub(super) async fn chat_completions(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -106,10 +128,18 @@ pub(super) async fn chat_completions(
         let mut usage = state.usage.lock().unwrap();
         usage.requests += 1;
         hour_stat(&mut usage).requests += 1;
-        if let Some(row) = session_stat(&mut usage, session.as_deref()) {
+        let idle_gap = session_idle_gap(&state);
+        // Counts the pause since the previous request while the row is fresh.
+        if let Some(row) = session_request_start(&mut usage, session.as_deref(), idle_gap) {
             row.requests += 1;
         }
     }
+    // Runs on every return path below; see its docs.
+    let _session_timer = SessionTimer {
+        usage: state.usage.clone(),
+        session: session.clone(),
+        started: Instant::now(),
+    };
     let mut last_error = "all upstreams are cooling down".to_string();
     let mut attempted = false;
     // Harness mode: instead of handing the client a 502, wait out the cooldowns

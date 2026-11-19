@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{
@@ -314,6 +314,69 @@ pub(crate) fn hour_stat<'a>(usage: &'a mut Usage) -> &'a mut HourUsage {
     }
     usage.last_activity = now;
     usage.hours.entry(key).or_default()
+}
+
+/// Default gap above which a chat is considered paused: time between two
+/// requests longer than this is not added to the session's active duration.
+const SESSION_IDLE_GAP_DEFAULT_SEC: u64 = 300;
+
+pub(crate) fn session_idle_gap(state: &AppState) -> Duration {
+    let seconds = state
+        .config
+        .read()
+        .unwrap()
+        .get("sessionIdleGapSec")
+        .and_then(Value::as_u64)
+        .unwrap_or(SESSION_IDLE_GAP_DEFAULT_SEC);
+    Duration::from_secs(seconds)
+}
+
+/// Session row for this request, counting the pause since the previous one.
+/// A gap within the idle threshold means the chat was still in use, so it adds
+/// to `active_ms`; a longer gap is a pause and adds nothing.
+pub(crate) fn session_request_start<'a>(
+    usage: &'a mut Usage,
+    session: Option<&str>,
+    idle_gap: Duration,
+) -> Option<&'a mut SessionUsage> {
+    let key = session?.trim();
+    if key.is_empty() {
+        return None;
+    }
+    let now = now_ms();
+    let entry = usage
+        .sessions
+        .entry(key.to_string())
+        .or_insert_with(|| SessionUsage {
+            first_seen: now,
+            ..SessionUsage::default()
+        });
+    if entry.last_seen > 0 {
+        let gap = now.saturating_sub(entry.last_seen) as u64;
+        if gap <= idle_gap.as_millis() as u64 {
+            entry.active_ms = entry.active_ms.saturating_add(gap);
+        }
+    }
+    entry.last_seen = now;
+    Some(entry)
+}
+
+/// Adds the time this request stayed with the proxy, so a long retry loop is
+/// counted even though it exceeds the idle gap. Called once per request.
+pub(crate) fn session_request_end(
+    usage: &mut Usage,
+    session: Option<&str>,
+    elapsed: Duration,
+) {
+    let Some(key) = session.map(str::trim).filter(|key| !key.is_empty()) else {
+        return;
+    };
+    if let Some(entry) = usage.sessions.get_mut(key) {
+        entry.active_ms = entry
+            .active_ms
+            .saturating_add(elapsed.as_millis().min(u128::from(u64::MAX)) as u64);
+        entry.last_seen = now_ms();
+    }
 }
 
 /// The session row for the id the client sent. An empty id (a client that does

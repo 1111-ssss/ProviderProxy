@@ -245,17 +245,35 @@ function sessionTitle(titles, id) {
 const SESSION_PAGE_SIZE = 20
 let sessionQuery = ""
 let sessionPage = 0
-function usageSessionRows(obj, titles) {
+// Shared sort for both session tables (statistics tab and the "all sessions"
+// dialog): clicking a header toggles asc/desc, the arrow shows the direction.
+const sessionSort = { key: "lastSeen", dir: -1 }
+const SESSION_SORT_KEYS = {
+  requests: (stat) => Number(stat.requests) || 0,
+  tokens: (stat) => Number(stat.tokensIn) || 0,
+  duration: (stat) => Number(stat.activeMs) || 0,
+  lastSeen: (stat) => Number(stat.lastSeen) || 0,
+}
+function sortSessionRows(rows) {
+  const value = SESSION_SORT_KEYS[sessionSort.key] ?? SESSION_SORT_KEYS.lastSeen
+  return rows.sort((a, b) => (value(a.stat) - value(b.stat)) * sessionSort.dir)
+}
+const sortArrow = (key) => (sessionSort.key === key ? (sessionSort.dir < 0 ? " ▾" : " ▴") : "")
+function sortSessionHeader(key, label) {
+  return `<th class="session-sort" data-sort="${key}" role="button" tabindex="0" aria-sort="${sessionSort.key === key ? (sessionSort.dir < 0 ? "descending" : "ascending") : "none"}">${label}${sortArrow(key)}</th>`
+}
+async function usageSessionRows(obj, titles) {
   const query = sessionQuery.trim().toLowerCase()
-  return Object.entries(obj ?? {})
-    .filter(([, stat]) => {
-      const outcome = (Number(stat.ok) || 0) + (Number(stat.limits) || 0) + (Number(stat.errors) || 0)
-      const tokens = (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0)
-      return outcome > 0 || tokens > 0
-    })
-    .map(([id, stat]) => ({ id, stat, title: sessionTitle(titles, id) }))
-    .filter(({ id, title }) => !query || title.toLowerCase().includes(query) || id.toLowerCase().includes(query))
-    .sort((a, b) => (Number(b.stat.lastSeen) || 0) - (Number(a.stat.lastSeen) || 0))
+  return sortSessionRows(
+    Object.entries(obj ?? {})
+      .filter(([, stat]) => {
+        const outcome = (Number(stat.ok) || 0) + (Number(stat.limits) || 0) + (Number(stat.errors) || 0)
+        const tokens = (Number(stat.tokensIn) || 0) + (Number(stat.tokensOut) || 0)
+        return outcome > 0 || tokens > 0
+      })
+      .map(([id, stat]) => ({ id, stat, title: sessionTitle(titles, id) }))
+      .filter(({ id, title }) => !query || title.toLowerCase().includes(query) || id.toLowerCase().includes(query)),
+  )
 }
 function usageSessionTable(rows, titles) {
   const all = usageSessionRows(rows, titles)
@@ -283,11 +301,28 @@ function sessionTableHtml(list) {
       <td><span class="session-name" title="${esc(title || id)}" data-session-copy="${esc(id)}">${esc(title || id)}</span></td>
       <td class="muted">${fmtNum(stat.requests)}</td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
-      <td class="muted">${esc(fmtUptime((Number(stat.lastSeen) || 0) - (Number(stat.firstSeen) || 0)))}</td>
+      <td class="muted">${esc(fmtUptime(Number(stat.activeMs) || 0))}</td>
       <td class="muted">${esc(when(stat.lastSeen))}</td>
     </tr>`
-  return `<tr><th>сессия</th><th>Req</th><th>Токены</th><th>Длительность</th><th>Последний запрос</th></tr>${list.map(cell).join("")}`
+  return `<tr><th>сессия</th>${sortSessionHeader("requests", "Req")}${sortSessionHeader("tokens", "Токены")}${sortSessionHeader("duration", "Длительность")}${sortSessionHeader("lastSeen", "Последний запрос")}</tr>${list.map(cell).join("")}`
 }
+
+// One document-level handler serves both tables, which are re-rendered often.
+document.addEventListener("click", (event) => {
+  const header = event.target.closest?.(".session-sort")
+  if (!header) return
+  const key = header.dataset.sort
+  if (!(key in SESSION_SORT_KEYS)) return
+  if (sessionSort.key === key) sessionSort.dir = -sessionSort.dir
+  else {
+    sessionSort.key = key
+    sessionSort.dir = -1
+  }
+  sessionPage = 0
+  allSessionPage = 0
+  if (usageReport) renderUsageReportKeepingScroll(usageReport)
+  if ($("dlg-all-sessions").open) renderAllSessions()
+})
 
 let usageReport = null
 let usageDay = ""

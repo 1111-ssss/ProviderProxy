@@ -739,3 +739,74 @@ async fn retry_mode_stops_when_the_client_hangs_up() {
         "the retry loop must stop once the client is gone: {after_abort} then {later}"
     );
 }
+
+/// Session duration is the sum of the gaps between requests, and a gap longer
+/// than the idle threshold is a pause that must not count.
+#[tokio::test]
+async fn session_duration_counts_gaps_and_skips_pauses() {
+    let upstream = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            Json(json!({
+                "model": body["model"],
+                "choices": [{"message": {"role": "assistant", "content": "ok"}}]
+            }))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        // 10s threshold: a 12s pause is dropped, a 1s gap is counted.
+        "sessionIdleGapSec": 10,
+        "providers": {"p": {"baseURL": upstream.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+
+    let call = || async {
+        proxy
+            .client
+            .post(proxy.url("/v1/chat/completions"))
+            .header("x-opencode-session-id", "ses_gap_test")
+            .json(&json!({"model": "chain", "messages": []}))
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+    };
+
+    call().await;
+    tokio::time::sleep(Duration::from_millis(1200)).await;
+    call().await;
+    let after_short = session_active_ms(&proxy, "ses_gap_test").await;
+    assert!(
+        (900..=3000).contains(&after_short),
+        "a 1.2s gap within the threshold must count: {after_short}ms"
+    );
+
+    // A gap well past the threshold is a pause: it must not add its length.
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    call().await;
+    let after_pause = session_active_ms(&proxy, "ses_gap_test").await;
+    assert!(
+        after_pause < after_short + 2500,
+        "a pause longer than the threshold must not be counted: {after_short} -> {after_pause}"
+    );
+}
+
+async fn session_active_ms(proxy: &TestProxy, id: &str) -> u64 {
+    // The stream tallies after the body ends, so give that task a moment.
+    for _ in 0..40 {
+        let usage = proxy.usage().await;
+        let row = &usage["days"][0]["sessions"][id];
+        if let Some(value) = row["activeMs"].as_u64() {
+            if value > 0 {
+                return value;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    0
+}
