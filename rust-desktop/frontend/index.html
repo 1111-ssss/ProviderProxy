@@ -683,6 +683,26 @@
   </form>
 </dialog>
 
+<!-- Диалог: токен доступа к прокси -->
+<dialog id="dlg-token" aria-labelledby="token-title" aria-describedby="token-help">
+  <form method="dialog" id="token-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="token-title">Токен доступа</h3>
+      <p id="token-help">Прокси защищён токеном (authToken). Введите его, чтобы открыть интерфейс. Токен хранится в настройках прокси и уже есть у того, кто его включал.</p>
+    </div>
+    <div class="dialog-body">
+      <label>Токен
+        <input id="token-input" type="password" autocomplete="off" placeholder="authToken">
+      </label>
+      <p class="muted" id="token-note"></p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="token-cancel">Отмена</button>
+      <button type="button" id="token-save" class="primary">Открыть</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Диалог: выбор темы интерфейса -->
 <dialog id="dlg-theme" aria-labelledby="theme-title">
   <form method="dialog" class="dialog-form">

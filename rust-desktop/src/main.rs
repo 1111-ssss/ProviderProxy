@@ -166,7 +166,26 @@ fn start_proxy(config_path: PathBuf) -> provider_proxy_desktop::proxy::ServerHan
     unreachable!("start_proxy always returns or exits inside the loop")
 }
 
+/// Writes panics to a file next to the exe: a Windows GUI build has no console,
+/// so a crash would otherwise leave no trace at all.
+fn install_panic_log() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        if let Some(directory) = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+        {
+            let _ = std::fs::write(
+                directory.join("provider-proxy-crash.log"),
+                format!("{} {info}\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")),
+            );
+        }
+        previous(info);
+    }));
+}
+
 fn main() {
+    install_panic_log();
     let config_path = platform::requested_config_path();
     // A second launch replaces the running window instead of failing on a busy
     // port and leaving the old copy (and its stale config) on screen.

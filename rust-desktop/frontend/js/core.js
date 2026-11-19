@@ -74,6 +74,44 @@ window.addEventListener("resize", hideFieldHint)
 
 let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" }, appSettings: { theme: "dark", autoUpdate: false, autoRestart: false, autostart: false } }
 let token = localStorage.getItem("pp_token") ?? ""
+// The browser's native prompt() cannot be styled or explained, and on a first
+// launch with a protected config it appears out of nowhere. One shared modal
+// collects the token instead; requests wait for its answer.
+let tokenRequest = null
+function askToken() {
+  if (tokenRequest) return tokenRequest
+  tokenRequest = new Promise((resolve) => {
+    const dialog = $("dlg-token")
+    const input = $("token-input")
+    const note = $("token-note")
+    input.value = ""
+    note.textContent = ""
+    const finish = (value) => {
+      dialog.close()
+      $("token-save").onclick = null
+      $("token-cancel").onclick = null
+      tokenRequest = null
+      resolve(value)
+    }
+    $("token-save").onclick = () => {
+      const value = input.value.trim()
+      if (!value) {
+        note.textContent = "Введите токен или отмените."
+        input.focus()
+        return
+      }
+      finish(value)
+    }
+    $("token-cancel").onclick = () => finish("")
+    dialog.addEventListener("close", () => {
+      // Escape or a stray close must not leave the request hanging.
+      if (tokenRequest) finish(dialog.returnValue === "save" ? input.value.trim() : "")
+    }, { once: true })
+    dialog.showModal()
+    input.focus()
+  })
+  return tokenRequest
+}
 const filters = new Map() // filter text per chips list, keyed by container id
 let providersFilter = ""
 let pmProviderFilter = ""
@@ -209,8 +247,9 @@ async function api(path, opts = {}, retried = false) {
     headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(opts.headers ?? {}) },
   })
   if (r.status === 401 && !retried) {
-    token = prompt("authToken прокси:") ?? ""
+    token = await askToken()
     localStorage.setItem("pp_token", token)
+    if (!token) return r
     return api(path, opts, true)
   }
   return r
