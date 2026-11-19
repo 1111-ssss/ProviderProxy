@@ -9,6 +9,29 @@ use std::fs;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::process::Command;
 
+/// Yes/No dialog. Returns true only when the user picks "Yes".
+#[cfg(target_os = "windows")]
+pub(crate) fn confirm(title: &str, message: &str) -> bool {
+    let script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName PresentationFramework; $r=[System.Windows.MessageBox]::Show($env:PP_MSG, $env:PP_TITLE, 'YesNo', 'Question'); if ($r -eq 'Yes') { exit 0 } else { exit 1 }";
+    Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-WindowStyle",
+            "Hidden",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ])
+        .env("PP_TITLE", title)
+        .env("PP_MSG", message)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
 /// Set when the app is started by the autostart entry. The window stays hidden
 /// and only the tray icon appears, so logging in does not open a GUI window.
 const TRAY_FLAG: &str = "--tray";

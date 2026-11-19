@@ -22,12 +22,13 @@ const fmtUptime = (ms = 0) => {
 function renderUsageCharts(u) {
   const requests = Math.max(0, Number(u.requests) || 0)
   const ok = Math.max(0, Number(u.ok) || 0)
-  const failed = Math.max(0, Number(u.failed) || 0)
-  // Requests that never reached an upstream (whole chain cooling down) are
-  // failures, and with retry mode on they are near zero anyway. One "ошибки"
-  // bucket keeps the legend readable.
-  const errors = failed
-  const other = Math.max(0, requests - ok - failed)
+  // The ring shows provider outcomes, not only what the client finally got: an
+  // upstream that failed and then failed over is an error here, even though the
+  // request ended successfully. Sum the provider error counters so the ring
+  // matches the "Err" column in the provider table below it.
+  const providerErrors = Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)
+  const errors = Math.max(0, providerErrors)
+  const other = Math.max(0, requests - ok - errors)
   const chartTotal = Math.max(1, ok + errors + other)
   const circumference = 2 * Math.PI * 43
   let offset = 0
@@ -47,14 +48,17 @@ function renderUsageCharts(u) {
   $("u-donut-skipped").style.opacity = "0"
   $("u-donut-total").textContent = fmtNum(requests)
   $("u-outcome-note").textContent = ""
+  // Percentages are relative to attempts (ok + errors), not to client requests:
+  // one request can fail over several times, so the parts can exceed 100% of it.
+  const attempts = Math.max(1, ok + errors)
   const outcomeRows = [
-    ["ok", "Успешные", ok],
-    ["failed", "Ошибки", errors],
-    ["other", "Другие", other],
+    ["ok", "Успешные ответы", ok],
+    ["failed", "Ошибки провайдеров", errors],
+    ["other", "Прочее", other],
   ]
   $("u-outcome-legend").innerHTML = outcomeRows
     .map(([kind, label, value]) => {
-      const percent = requests ? Math.round((value / requests) * 100) : 0
+      const percent = Math.round((value / attempts) * 100)
       return `<div class="legend-row"><span class="legend-dot ${kind}"></span><span class="legend-name">${label} · ${percent}%</span><span class="legend-value">${fmtNum(value)}</span></div>`
     })
     .join("")
@@ -383,7 +387,7 @@ function renderUsageReport(report) {
     tile("запросов", u.requests ?? 0) +
     tile("успешных", u.ok ?? 0) +
     tile("failover", u.failovers ?? 0) +
-    tile("ошибок", u.failed ?? 0) +
+    tile("ошибок провайдеров", Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)) +
     tile("токенов вход", fmtTok(u.tokensIn)) +
     tile("токенов выход", fmtTok(u.tokensOut))
   const lifetime = report.lifetimeTokens ?? {}

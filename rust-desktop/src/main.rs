@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use provider_proxy_desktop::proxy::{shutdown_running_instance, start_server};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
@@ -68,6 +68,80 @@ fn browser_url(url: &Url) -> Option<&str> {
     matches!(url.scheme(), "http" | "https").then(|| url.as_str())
 }
 
+/// The window could not be created (usually no WebView2). The proxy is already
+/// listening, so offer the same GUI in the system browser instead of dying mute.
+fn offer_browser_fallback(port: u16, error: &str) {
+    let url = format!("http://127.0.0.1:{port}/");
+    let reason = if webview2_installed() {
+        format!("Окно приложения не создалось: {error}")
+    } else {
+        "На этом компьютере не установлен Microsoft Edge WebView2 Runtime — без него приложение не может открыть окно.".to_string()
+    };
+    let message = format!(
+        "{reason}\n\nПрокси уже работает, и интерфейс доступен в браузере:\n{url}\n\nОткрыть браузерную версию?"
+    );
+    eprintln!("provider_proxy: {message}");
+    #[cfg(target_os = "windows")]
+    {
+        // A log next to the exe survives even if the dialog is dismissed.
+        if let Some(directory) = std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+        {
+            let _ = std::fs::write(directory.join("provider-proxy-error.log"), &message);
+        }
+        if platform::confirm("Provider Proxy: нет окна", &message) {
+            // The default-handler shim opens the URL without a console window.
+            let _ = std::process::Command::new("rundll32")
+                .args(["url.dll,FileProtocolHandler", &url])
+                .spawn();
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (reason, error);
+    }
+}
+
+/// Port named by the configuration, for messages shown before a server exists.
+fn port_hint(config_path: &Path) -> Option<u16> {
+    let raw = std::fs::read_to_string(config_path.with_extension("json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("port")
+        .and_then(serde_json::Value::as_u64)
+        .map(|port| port as u16)
+}
+
+/// WebView2 is a separate Microsoft runtime. Note that VS Code working proves
+/// nothing: VS Code ships its own Chromium (Electron) and does not use WebView2.
+/// Windows 11 and updated Windows 10 have it, but LTSC, N editions and fresh
+/// offline installs often do not.
+#[cfg(target_os = "windows")]
+fn webview2_installed() -> bool {
+    // The Evergreen runtime registers its version under this client id, either
+    // per machine (with a WOW6432Node view) or per user.
+    const CLIENT: &str = r"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+    [
+        format!(r"HKLM\SOFTWARE\WOW6432Node\{CLIENT}"),
+        format!(r"HKLM\SOFTWARE\{CLIENT}"),
+        format!(r"HKCU\SOFTWARE\{CLIENT}"),
+    ]
+    .iter()
+    .any(|key| {
+        std::process::Command::new("reg")
+            .args(["query", key, "/v", "pv"])
+            .output()
+            .map(|output| output.status.success() && !output.stdout.is_empty())
+            .unwrap_or(false)
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn webview2_installed() -> bool {
+    true
+}
+
 /// Start the local proxy, taking over the port from a previous copy. A busy port
 /// used to panic here: the window never appeared and the old instance kept
 /// running, which reads as "the app reopened".
@@ -81,9 +155,10 @@ fn start_proxy(config_path: PathBuf) -> provider_proxy_desktop::proxy::ServerHan
                 std::thread::sleep(std::time::Duration::from_millis(500));
             }
             Err(error) => {
-                // No console on Windows release builds, so the message also goes
-                // to stderr for launch.sh, which captures it into its log.
-                eprintln!("provider_proxy: не удалось запустить прокси на порту: {error}");
+                offer_browser_fallback(
+                    port_hint(&config_path).unwrap_or(8787),
+                    &format!("Не удалось занять порт прокси: {error}"),
+                );
                 std::process::exit(1);
             }
         }
@@ -188,7 +263,13 @@ fn main() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running provider_proxy desktop app");
+        .unwrap_or_else(|error| {
+            // No window means the WebView could not be created, usually because
+            // WebView2 is missing. The proxy itself is already running, so the
+            // GUI works in any browser on this machine.
+            offer_browser_fallback(port, &error.to_string());
+            std::process::exit(1);
+        });
 }
 
 #[cfg(test)]
