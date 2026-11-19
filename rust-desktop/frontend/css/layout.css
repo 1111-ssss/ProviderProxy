@@ -135,14 +135,16 @@
   .pm-autoload-body strong { font-size: 12px; font-weight: 650; }
   .pm-autoload-body small { color: var(--muted); font-size: 10px; }
   .pm-autoload input:checked ~ .pm-autoload-body strong { color: var(--success); }
-  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+  .provider-model-card { display: flex; align-items: center; gap: 8px; min-width: 0; height: 38px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
   .provider-model-card:hover { border-color: var(--border-strong); background: var(--surface-soft); }
   .provider-model-card-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
   /* The id and its ctx badge flow as inline text: the badge stays on the same
      line while there is room, and a long id wraps inside the card instead of
      being cut — full info beats a tidy ellipsis here. */
   .provider-model-card-body { display: block; flex: 1 1 auto; min-width: 0; }
-  .provider-model-card-body code { display: inline; overflow: visible; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+  /* One line per card keeps every row the same height, so the grid stays even.
+     The full id is still available: the code element keeps it in `title`. */
+  .provider-model-card-body code { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
   .provider-model-card-meta { display: inline-flex; align-items: center; gap: 7px; margin-left: 7px; vertical-align: baseline; }
   .model-settings-button { flex: 0 0 auto; min-width: 26px; min-height: 26px; margin-left: auto; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
   .model-settings-button:hover { color: var(--text); }

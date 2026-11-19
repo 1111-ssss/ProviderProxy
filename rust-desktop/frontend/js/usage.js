@@ -454,8 +454,10 @@ async function load() {
     applyTheme(appSettings().theme)
     debugLog("boot-ok", { providers: Object.keys(cfg.providers).length, chains: Object.keys(cfg.models).length })
     // Providers bookmarked "all models" refresh before anything renders, so the
-    // Connections list and the Models tab agree from the first paint.
-    syncAutoAllProviders().then(() => {
+    // Connections list and the Models tab agree from the first paint. This is a
+    // catalog refresh only: it must never tick models the user did not choose,
+    // so the saved selection stays exactly as the config has it on first launch.
+    syncAutoAllProviders({ refreshOnly: true }).then(() => {
       if (pmState.provider) loadPmModels(pmState.provider)
     })
     syncAutostartSetting()

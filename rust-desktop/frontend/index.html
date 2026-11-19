@@ -651,6 +651,14 @@
     </div>
     <div class="dialog-body">
       <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">—</strong></div>
+      <label>Тип модели
+        <select id="dms-kind">
+          <option value="auto">Определять автоматически</option>
+          <option value="chat">Обычная (chat)</option>
+          <option value="image">Изображения (image)</option>
+        </select>
+      </label>
+      <p class="muted" style="margin:-6px 0 12px">Ручной выбор перекрывает автоопределение: image-модели не попадают в цепочки, а обычные — на вкладку «Изображения».</p>
       <label>Контекст модели, токенов
         <input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000">
       </label>

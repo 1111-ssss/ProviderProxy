@@ -158,6 +158,35 @@ test("applyTheme accepts every palette offered by the picker", () => {
   assert.equal(vm.runInContext('themeLabel("kanagawa")', ctx), "Kanagawa")
 })
 
+test("a manual model type overrides the image heuristic", () => {
+  // isImageModel must respect the explicit flag from the model dialog.
+  const source = scripts.slice(scripts.indexOf("const isImageModel = (provider, id) => {"), scripts.indexOf("const directModelIds ="))
+  const sandbox = {}
+  vm.createContext(sandbox)
+  vm.runInContext(
+    `const cfg = { providers: { p: { modelInfo: {
+        auto:   {},
+        forced: { image: true },
+        plain:  { image: false, type: "image" }
+     } } } }
+     const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
+     ${source}
+     this.result = {
+       forced: isImageModel("p", "forced"),
+       plain: isImageModel("p", "plain"),
+       heuristic: isImageModel("p", "some-image-model"),
+       auto: isImageModel("p", "auto"),
+     }`,
+    sandbox,
+  )
+  // Compare field by field: the sandbox object comes from another realm, so a
+  // deepEqual would fail on prototype identity alone.
+  assert.equal(sandbox.result.forced, true, "image:true wins")
+  assert.equal(sandbox.result.plain, false, "image:false beats type=image")
+  assert.equal(sandbox.result.heuristic, true, "the name heuristic still applies")
+  assert.equal(sandbox.result.auto, false, "no flag, no image hint")
+})
+
 test("digit shortcuts map to the nine tabs", () => {
   // 1..8 pick tabs in order and 0 opens settings; 9 has no tab.
   const line = scripts.match(/const TAB_KEYS = \{([^}]*)\}/)[1]

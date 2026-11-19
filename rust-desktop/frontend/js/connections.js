@@ -61,13 +61,25 @@ function renderProviderModels() {
 // every model the provider has.
 const providerAutoAll = () => (cfg.providerAutoAll ??= {})
 const isAutoAllProvider = (name) => providerAutoAll()[name] === true
-async function syncAutoAllProvider(name) {
+async function syncAutoAllProvider(name, { refreshOnly = false } = {}) {
   const provider = cfg.providers[name]
   if (!provider) return
   const res = await fetchProviderModels(name)
   if (res.error) return
   const returned = new Set(res.ids)
   const manual = new Set((provider.manualModels ?? []).map(String))
+  // Selecting every returned model is the point of the bookmark, but on the
+  // first paint the user has chosen nothing yet: refreshOnly just records what
+  // the provider serves and leaves `models` alone.
+  if (refreshOnly) {
+    provider.modelAvailability ??= {}
+    const at = new Date().toISOString()
+    for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
+    mergeProviderModelDetails(provider, res.details)
+    pmState.ids = [...new Set([...(provider.models ?? []), ...res.ids])]
+    cleanupModelMetadata()
+    return
+  }
   provider.models = [...new Set([...res.ids, ...manual])]
   provider.modelAvailability ??= {}
   const at = new Date().toISOString()
@@ -85,11 +97,11 @@ async function syncAutoAllProvider(name) {
   renderOpencodeModels()
   renderOpenCode()
 }
-async function syncAutoAllProviders() {
+async function syncAutoAllProviders({ refreshOnly = false } = {}) {
   for (const name of Object.keys(cfg.providers ?? {})) {
     if (!isAutoAllProvider(name)) continue
     try {
-      await syncAutoAllProvider(name)
+      await syncAutoAllProvider(name, { refreshOnly })
     } catch {
       /* один провайдер не должен ломать запуск остальных */
     }
@@ -301,7 +313,7 @@ function renderPmList() {
           <label class="provider-model-card-main">
             <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}>
             <span class="provider-model-card-body">
-              <code>${esc(id)}</code>
+              <code title="${esc(id)}">${esc(id)}</code>
               <span class="provider-model-card-meta">${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}</span>
             </span>
           </label>
@@ -343,22 +355,16 @@ function renderPmList() {
 // at three. A column of full names beats three columns of cut ones.
 let pmColumnsObserver = null
 function applyPmColumns(box) {
-  const CHROME = 92 // checkbox, gaps, ⋮ and card padding
-  const gap = 6
-  const widestId = () => {
-    let widest = 0
-    for (const el of box.querySelectorAll(".provider-model-card-body code")) {
-      el.style.whiteSpace = "nowrap"
-      widest = Math.max(widest, el.getBoundingClientRect().width)
-      el.style.whiteSpace = ""
-    }
-    return widest
-  }
+  // Equal columns: `1fr` already gives every card the same width, so only the
+  // column count matters. It is chosen from a minimum usable card width, not
+  // from the widest id: sizing by the widest name made one long id collapse the
+  // grid to a single column.
+  const MIN_CARD = 210
+  const gap = 8
   const fit = () => {
     const available = box.clientWidth
     if (!available) return // hidden tab: the observer fires once it has width
-    const needed = (widestId() || 210) + CHROME
-    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (needed + gap))))
+    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (MIN_CARD + gap))))
     if (box.dataset.pmCols === String(cols)) return
     box.dataset.pmCols = String(cols)
     box.style.setProperty("--pm-cols", cols)

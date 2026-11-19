@@ -119,8 +119,11 @@ let pmProviderFilter = ""
 const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
 const isImageModel = (provider, id) => {
   const info = modelDetails(provider, id)
+  // A manual choice in the model's ⋮ dialog wins over the heuristics below.
+  if (info?.image === true) return true
+  if (info?.image === false) return false
   const endpoints = Array.isArray(info?.endpoints) ? info.endpoints : []
-  return info?.image === true || String(info?.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
+  return String(info?.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
 }
 const directModelIds = (provider, definition = cfg.opencodeModels?.[provider]) => {
   const ids = definition?.all === true ? (cfg.providers[provider]?.models ?? []) : (definition?.models ?? [])

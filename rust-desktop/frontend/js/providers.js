@@ -655,6 +655,8 @@ function openModelSettings(provider, id) {
   modelSettingsDraft = { provider, id }
   dlgModelSettings.returnValue = ""
   $("dms-model").textContent = `${provider}/${id}`
+  // The stored `image` flag is the manual override; absent means "auto".
+  $("dms-kind").value = info.image === true ? "image" : info.image === false ? "chat" : "auto"
   $("dms-context").value = values.current ? String(values.current) : ""
   $("dms-context").max = values.provider ? String(values.provider) : ""
   $("dms-context-max").disabled = !values.provider
@@ -675,6 +677,11 @@ dlgModelSettings.addEventListener("close", () => {
   if (!providerConfig) return
   const raw = $("dms-context").value.trim()
   const info = { ...(providerConfig.modelInfo?.[id] ?? {}) }
+  // Manual type override: true/false is stored, "auto" removes the flag.
+  const kind = $("dms-kind").value
+  if (kind === "image") info.image = true
+  else if (kind === "chat") info.image = false
+  else delete info.image
   const maxContext = Number(info.providerContextLength)
   if (raw) {
     const context = Number(raw)
