@@ -409,6 +409,12 @@
             </span>
             <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
           </label>
+          <label>
+            <span class="field-label">Тишина в потоке, сек
+              <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
+            </span>
+            <input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric">
+          </label>
           <label class="setting-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
             <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>

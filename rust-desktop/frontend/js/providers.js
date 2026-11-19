@@ -342,6 +342,7 @@ function renderSettings() {
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
+  $("s-stream-idle").value = cfg.streamIdleTimeoutSec ?? 90
   $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
   $("s-version").textContent = cfg.appVersion ?? "—"
@@ -774,6 +775,7 @@ num("s-port", "port")
 num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
 num("s-header", "headerTimeoutSec")
+num("s-stream-idle", "streamIdleTimeoutSec")
 $("s-pending-buffer").onchange = (e) => {
   cfg.pendingBufferBytes = Number(e.target.value)
   save()

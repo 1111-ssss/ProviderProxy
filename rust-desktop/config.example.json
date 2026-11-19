@@ -3,6 +3,7 @@
   "limitCooldownSec": 300,
   "errorCooldownSec": 30,
   "headerTimeoutSec": 120,
+  "streamIdleTimeoutSec": 90,
   "providers": {
     "anthropic": {
       "baseURL": "https://api.anthropic.com/v1",

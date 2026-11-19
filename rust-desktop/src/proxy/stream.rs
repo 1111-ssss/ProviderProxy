@@ -3,6 +3,7 @@ use futures_util::StreamExt;
 use reqwest::header::{HeaderValue, CONTENT_TYPE};
 use serde_json::Value;
 use std::collections::{BTreeSet, HashMap};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -490,6 +491,23 @@ fn pending_limit(state: &AppState) -> usize {
         .clamp(PENDING_LIMIT_MIN, PENDING_LIMIT_MAX)
 }
 
+/// How long an already-open stream may stay silent before the attempt is
+/// abandoned. Without it a 200 whose body never sends a byte left the client on
+/// "waiting for response headers" forever: no token, no [DONE], no failover.
+const STREAM_IDLE_TIMEOUT_DEFAULT_SEC: u64 = 90;
+
+fn stream_idle_timeout(state: &AppState) -> Duration {
+    let seconds = state
+        .config
+        .read()
+        .unwrap()
+        .get("streamIdleTimeoutSec")
+        .and_then(Value::as_u64)
+        .unwrap_or(STREAM_IDLE_TIMEOUT_DEFAULT_SEC)
+        .clamp(10, 3600);
+    Duration::from_secs(seconds)
+}
+
 pub(super) async fn stream_upstream_response(
     response: reqwest::Response,
     state: AppState,
@@ -500,6 +518,7 @@ pub(super) async fn stream_upstream_response(
     session: Option<String>,
 ) -> Result<Response, String> {
     let pending_limit = pending_limit(&state);
+    let idle_timeout = stream_idle_timeout(&state);
     let status = response.status();
     let mut headers = response.headers().clone();
     let (tx, rx) = mpsc::channel::<Result<bytes::Bytes, std::io::Error>>(16);
@@ -581,7 +600,16 @@ pub(super) async fn stream_upstream_response(
         // the agent stopped without any error. Catch it and report a stream
         // error instead.
         let pump = async {
-        while let Some(item) = upstream_stream.next().await {
+        loop {
+            let item = match tokio::time::timeout(idle_timeout, upstream_stream.next()).await {
+                Ok(item) => item,
+                Err(_) => {
+                    upstream_error =
+                        Some(format!("no data for {}s", idle_timeout.as_secs()));
+                    break;
+                }
+            };
+            let Some(item) = item else { break };
             match item {
                 Ok(chunk) => {
                     let text = String::from_utf8_lossy(&chunk);
@@ -773,8 +801,11 @@ pub(super) async fn stream_upstream_response(
     let response = builder
         .body(Body::from_stream(ReceiverStream::new(rx)))
         .unwrap_or_else(|_| Response::new(Body::empty()));
-    match signal_rx.await {
-        Ok(true) => Ok(response),
+    // The pump always signals (answer, empty, timeout or panic), but a hung
+    // stream must not pin the request forever: give it the idle window plus a
+    // margin, then treat it as an empty answer so the chain moves on.
+    match tokio::time::timeout(idle_timeout + Duration::from_secs(5), signal_rx).await {
+        Ok(Ok(true)) => Ok(response),
         _ => Err("upstream returned an empty answer".into()),
     }
 }

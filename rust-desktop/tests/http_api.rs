@@ -531,3 +531,91 @@ async fn keeps_error_responses_for_unknown_and_empty_chains() {
     assert_eq!(usage["requests"], 1);
     assert_eq!(usage["failed"], 1);
 }
+
+/// A 200 whose body never sends a byte used to hang the client on "waiting for
+/// response headers" forever: no token, no [DONE], no failover. The idle
+/// timeout must abandon the attempt and move to the next upstream.
+#[tokio::test]
+async fn fails_over_when_a_stream_stalls_after_headers() {
+    use axum::body::Body;
+    use std::convert::Infallible;
+
+    // Never yields a chunk and never ends: a body that hangs after headers.
+    let silent = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            let body = Body::from_stream(futures_util::stream::poll_fn(
+                |_cx| std::task::Poll::<Option<Result<bytes::Bytes, Infallible>>>::Pending,
+            ));
+            ([( "content-type", "text/event-stream")], body)
+        }),
+    ))
+    .await;
+    let answering = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            assert_eq!(body["model"], "backup-model");
+            Json(json!({
+                "model": body["model"],
+                "choices": [{"message": {"role": "assistant", "content": "готово"}}],
+                "usage": {"prompt_tokens": 2, "completion_tokens": 3}
+            }))
+        }),
+    ))
+    .await;
+
+    let proxy = TestProxy::start(json!({
+        // A short idle window keeps the test fast.
+        "streamIdleTimeoutSec": 10,
+        "errorCooldownSec": 1,
+        "providers": {
+            "stalled": {"baseURL": silent.base_url},
+            "backup": {"baseURL": answering.base_url}
+        },
+        "models": {
+            "chain": {"upstreams": [
+                {"provider": "stalled", "model": "stalled-model"},
+                {"provider": "backup", "model": "backup-model"}
+            ]}
+        },
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+
+    // The idle window is clamped to at least 10s; the test must finish well
+    // inside the harness timeout but after the timeout fires.
+    // The default test client gives up after 3s, which is shorter than the idle
+    // window this test exercises.
+    let patient = Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(45))
+        .build()
+        .unwrap();
+    let response = tokio::time::timeout(Duration::from_secs(40), async {
+        patient
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&json!({"model": "chain", "stream": true, "messages": [{"role": "user", "content": "hi"}]}))
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap()
+    })
+    .await
+    .expect("the stalled stream must not hang the request forever");
+
+    assert!(
+        response.contains("готово"),
+        "the backup upstream must answer after the stall: {response}"
+    );
+    let usage = proxy.usage().await;
+    assert_eq!(
+        usage["days"][0]["models"]["stalled/stalled-model"]["errors"], 1,
+        "the stalled attempt is an error: {usage}"
+    );
+    assert_eq!(
+        usage["days"][0]["models"]["backup/backup-model"]["ok"], 1,
+        "the backup answered: {usage}"
+    );
+}
