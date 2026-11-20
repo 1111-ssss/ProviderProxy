@@ -225,16 +225,22 @@ async fn fails_over_and_skips_a_provider_during_its_cooldown() {
             "alias": {"upstreams": [
                 {"provider": "limited", "model": "limited-model"},
                 {"provider": "available", "model": "actual-model"}
+            ]},
+            "alias-two": {"upstreams": [
+                {"provider": "limited", "model": "limited-model"},
+                {"provider": "available", "model": "actual-model"}
             ]}
         }
     }))
     .await;
 
-    for _ in 0..2 {
+    // The same provider/model pair stays blocked when reached via another
+    // exposed chain alias, not just when the original alias is called again.
+    for alias in ["alias", "alias-two"] {
         let response = proxy
             .client
             .post(proxy.url("/v1/chat/completions"))
-            .json(&json!({"model": "alias", "messages": [{"role": "user", "content": "hello"}]}))
+            .json(&json!({"model": alias, "messages": [{"role": "user", "content": "hello"}]}))
             .send()
             .await
             .unwrap();
@@ -257,6 +263,7 @@ async fn fails_over_and_skips_a_provider_during_its_cooldown() {
     assert_eq!(usage["models"]["limited/limited-model"]["failovers"], 1);
     assert_eq!(usage["models"]["available/actual-model"]["ok"], 2);
     assert_eq!(usage["cooldowns"][0]["upstream"], "limited");
+    assert_eq!(usage["cooldowns"][0]["upstreamModel"], "limited-model");
 
     let discovery: Value = proxy
         .client
@@ -621,6 +628,52 @@ async fn fails_over_when_a_stream_stalls_after_headers() {
     );
 }
 
+/// An upstream can close SSE cleanly at the transport layer while its answer is
+/// still incomplete. The proxy must report an error without appending the
+/// successful-stream marker, or clients may accept the partial answer as done.
+#[tokio::test]
+async fn truncated_stream_error_is_not_followed_by_done() {
+    let truncated = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            let body = axum::body::Body::from_stream(futures_util::stream::unfold(0, |step| async move {
+                match step {
+                    0 => Some((Ok::<_, std::io::Error>(bytes::Bytes::from_static(
+                        b"data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"partial answer\"},\"finish_reason\":null}]}\n\n",
+                    )), 1)),
+                    1 => {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        Some((Err(std::io::Error::other("upstream disconnected")), 2))
+                    }
+                    _ => None,
+                }
+            }));
+            ([("content-type", "text/event-stream")], body)
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": { "truncated": { "baseURL": truncated.base_url } },
+        "models": { "chain": { "upstreams": [{ "provider": "truncated", "model": "m" }] } }
+    }))
+    .await;
+
+    let body = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "stream": true, "messages": [{"role": "user", "content": "hi"}]}))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    assert!(body.contains("partial answer"), "the test must exercise a mid-answer cutoff: {body}");
+    assert!(body.contains("proxy_stream_error"), "truncation must be surfaced as an error: {body}");
+    assert!(!body.contains("[DONE]"), "an errored partial answer must not look complete: {body}");
+}
+
 /// Retry mode must not spin for an hour when the chain cannot ever answer:
 /// an empty chain has no upstream to retry, so the request has to fail fast.
 #[tokio::test]
@@ -741,10 +794,10 @@ async fn retry_mode_stops_when_the_client_hangs_up() {
     );
 }
 
-/// The client must see why the chain moved on. Without a notice a failover
-/// looks like a slow answer, and after an hour of retries the run just fails.
+/// Normal streaming retains the original upstream response unchanged. Retry
+/// mode is covered separately because only that path needs an open proxy stream.
 #[tokio::test]
-async fn a_failover_is_written_into_the_stream() {
+async fn normal_failover_diagnostics_stay_out_of_the_answer_stream() {
     const ANSWER: &str = "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\ndata: [DONE]\n\n";
     let broken = MockProvider::start(Router::new().route(
         "/v1/chat/completions",
@@ -783,20 +836,30 @@ async fn a_failover_is_written_into_the_stream() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let body = response.text().await.unwrap();
+    assert!(!body.contains(": proxy:"), "ordinary failover diagnostics belong in proxy logs: {body}");
+    assert!(!body.contains("\"content\":\"broken/m"), "proxy errors are not model deltas: {body}");
+    assert!(body.contains("\"content\":\"hello\""), "answer remains intact: {body}");
+    let logs: Value = proxy
+        .client
+        .get(proxy.url("/api/logs"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert!(
-        body.contains("broken/m: вернул HTTP 502") && body.contains("переключаюсь на healthy/m"),
-        "the failover must name the upstream it moves to: {body}"
-    );
-    assert!(
-        body.find("HTTP 502").unwrap() < body.find("hello").unwrap(),
-        "the notice precedes the answer: {body}"
+        logs["lines"].as_array().unwrap().iter().any(|line| {
+            line.as_str().unwrap_or_default().contains("broken/m заблокирован (HTTP 502 Bad Gateway)")
+        }),
+        "details stay in the proxy logs, not the assistant response: {logs}"
     );
 }
 
-/// In retry mode the answer may be minutes away, so the notices must arrive on
-/// an already open stream — a silent connection is what a client gives up on.
+/// In retry mode the answer may be minutes away. Keep the connection alive
+/// without sending upstream diagnostics into the model's stream.
 #[tokio::test]
-async fn retry_mode_writes_its_wait_into_the_stream() {
+async fn retry_mode_sends_only_keepalive_comments_until_answer() {
     let failing = MockProvider::start(Router::new().route(
         "/v1/chat/completions",
         post(|| async { (StatusCode::INTERNAL_SERVER_ERROR, "boom") }),
@@ -830,23 +893,11 @@ async fn retry_mode_writes_its_wait_into_the_stream() {
         .unwrap();
     let first = String::from_utf8_lossy(&first);
     assert!(
-        first.contains("HTTP 500") && first.contains("p/m"),
-        "first frame explains the failed attempt: {first}"
+        first.contains(": keepalive\n\n"),
+        "retry mode keeps the connection alive using an ignored SSE comment: {first}"
     );
-    assert!(
-        !first.contains("переключаюсь на"),
-        "the last upstream in the chain must not promise a switch: {first}"
-    );
-    let second = tokio::time::timeout(Duration::from_secs(5), frames.next())
-        .await
-        .expect("the retry wait must be written out")
-        .unwrap()
-        .unwrap();
-    let second = String::from_utf8_lossy(&second);
-    assert!(
-        second.contains("все апстримы недоступны") && second.contains("повторяю через"),
-        "the wait is announced before it starts: {second}"
-    );
+    assert!(!first.contains("вернул HTTP"), "upstream diagnostics stay out of the model stream: {first}");
+    assert!(!first.contains("повторяю через"), "retry status stays out of the model stream: {first}");
     drop(frames);
 }
 

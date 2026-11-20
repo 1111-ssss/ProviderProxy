@@ -452,16 +452,16 @@ pub(crate) fn tally_usage(
 pub(crate) fn cooldown_snapshot(state: &AppState) -> Vec<Value> {
     let now = std::time::Instant::now();
     let mut cooldowns = state.cooldowns.lock().unwrap();
-    // Drop entries that expired or whose chain was removed: they were only
-    // filtered here and would otherwise stay in the map for the process lifetime.
+    // Drop expired entries; their provider/model pair may remain blocked through
+    // another configured chain, so membership in a specific alias is irrelevant.
     cooldowns.retain(|_, until| *until > now);
     cooldowns
         .iter()
         .map(|(key, until)| {
             let mut parts = key.split('|');
             json!({
-                "model": parts.next().unwrap_or_default(),
                 "upstream": parts.next().unwrap_or_default(),
+                "upstreamModel": parts.next().unwrap_or_default(),
                 "until": now_ms() + until.saturating_duration_since(now).as_millis()
             })
         })

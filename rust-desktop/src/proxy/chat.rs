@@ -7,6 +7,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::StreamExt;
+use std::collections::HashMap;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -22,7 +23,7 @@ use super::{
         session_request_end, session_request_start, session_stat,
     },
     routing::{failover_status, with_model},
-    stream::{notice_event, stream_upstream_response},
+    stream::stream_upstream_response,
     types::{AppState, Upstream, Usage},
 };
 
@@ -72,6 +73,12 @@ fn record_failure(state: &AppState, upstream: &Upstream, key: &str, session: &Op
     }
 }
 
+fn cooldown_key(upstream: &Upstream) -> String {
+    // A cooldown belongs to the provider/model, not a chain alias. This keeps
+    // another alias from immediately retrying the same failed model.
+    format!("{}|{}", upstream.name, upstream.model)
+}
+
 /// Undo the provisional "ok" counted when the upstream answered with headers:
 /// the body turned out empty, so the attempt is a failure after all.
 fn revert_provisional_ok(state: &AppState, upstream: &Upstream, session: &Option<String>) {
@@ -98,6 +105,59 @@ struct SessionTimer {
     started: Instant,
 }
 
+fn nearest_cooldown_wait(
+    chain: &[Upstream],
+    cooldowns: &HashMap<String, Instant>,
+    now: Instant,
+) -> Option<Duration> {
+    chain
+        .iter()
+        .filter_map(|upstream| {
+            cooldowns
+                .get(&cooldown_key(upstream))
+                .map(|until| until.saturating_duration_since(now))
+        })
+        .filter(|remaining| !remaining.is_zero())
+        .min()
+}
+
+#[cfg(test)]
+mod cooldown_tests {
+    use super::*;
+
+    fn upstream(name: &str, model: &str) -> Upstream {
+        Upstream {
+            name: name.into(),
+            base_url: String::new(),
+            model: model.into(),
+            api_key: String::new(),
+            headers: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn retry_wait_ignores_expired_cooldowns() {
+        let now = Instant::now();
+        let chain = [upstream("p", "expired"), upstream("p", "blocked")];
+        let cooldowns = HashMap::from([
+            ("p|expired".into(), now - Duration::from_secs(1)),
+            ("p|blocked".into(), now + Duration::from_secs(42)),
+        ]);
+        assert_eq!(
+            nearest_cooldown_wait(&chain, &cooldowns, now),
+            Some(Duration::from_secs(42))
+        );
+    }
+
+    #[test]
+    fn retry_wait_uses_fallback_when_no_model_is_blocked() {
+        let now = Instant::now();
+        let chain = [upstream("p", "m")];
+        let cooldowns = HashMap::new();
+        assert_eq!(nearest_cooldown_wait(&chain, &cooldowns, now), None);
+    }
+}
+
 impl Drop for SessionTimer {
     fn drop(&mut self) {
         if let Ok(mut usage) = self.usage.lock() {
@@ -106,37 +166,16 @@ impl Drop for SessionTimer {
     }
 }
 
-/// Proxy messages the client actually shows. Failovers used to be invisible in
-/// a harness: it saw only the final answer, or a 502 after an hour of retrying,
-/// so nobody could tell why the reply was slow or empty. The answer stream is
-/// the one place a client renders proxy-side text, so notices ride inside it.
-struct Notices {
-    /// Open when the response already streams (retry mode), so a notice can be
-    /// written the moment an upstream fails.
+/// The retry stream connection lets the retry loop stop when its client leaves.
+struct RetryStream {
     sink: Option<mpsc::Sender<Result<Bytes, std::io::Error>>>,
-    /// Held until the answer starts: the response is only committed then.
-    pending: Vec<String>,
 }
 
-impl Notices {
+impl RetryStream {
     fn silent() -> Self {
         Self {
             sink: None,
-            pending: Vec::new(),
         }
-    }
-
-    fn push(&mut self, text: String) {
-        if let Some(sink) = &self.sink {
-            // Never stall the retry loop on a slow reader.
-            let _ = sink.try_send(Ok(Bytes::from(notice_event(&text))));
-        } else {
-            self.pending.push(text);
-        }
-    }
-
-    fn take_pending(&mut self) -> Vec<String> {
-        std::mem::take(&mut self.pending)
     }
 
     /// True once the client hung up, so the retry loop can stop.
@@ -145,24 +184,9 @@ impl Notices {
     }
 }
 
-/// Wording for a failover notice. It names the next upstream when there is one:
-/// "переключаюсь на следующего" on the last entry promised a switch that could
-/// not happen.
-fn failover_notice(chain: &[Upstream], index: usize, reason: &str) -> String {
-    let current = &chain[index];
-    match chain.get(index + 1) {
-        Some(next) => format!(
-            "{}/{}: {reason}, переключаюсь на {}/{}",
-            current.name, current.model, next.name, next.model
-        ),
-        None => format!("{}/{}: {reason}", current.name, current.model),
-    }
-}
-
-/// Opens the SSE answer before the first success, then forwards whatever the
-/// chain finally produces. Retry mode is the only path that needs it: it can
-/// wait for an hour, and a client that sees an idle connection drops the run.
-fn stream_with_notices(
+/// Opens the SSE connection before the first success, then forwards the answer.
+/// Keepalives are SSE comments, never model content.
+fn retry_stream_response(
     state: AppState,
     body: Value,
     chain: Vec<Upstream>,
@@ -173,9 +197,30 @@ fn stream_with_notices(
     let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     let forward = tx.clone();
     tokio::spawn(async move {
-        let notices = Notices {
+        // Comments keep intermediaries and clients from treating a long retry
+        // cooldown as a dead connection; OpenAI stream parsers ignore them.
+        let heartbeat_tx = tx.clone();
+        let _ = heartbeat_tx
+            .send(Ok(Bytes::from_static(b": keepalive\n\n")))
+            .await;
+        let heartbeat = tokio::spawn(async move {
+            let mut interval = tokio::time::interval_at(
+                tokio::time::Instant::now() + Duration::from_secs(15),
+                Duration::from_secs(15),
+            );
+            loop {
+                interval.tick().await;
+                if heartbeat_tx
+                    .send(Ok(Bytes::from_static(b": keepalive\n\n")))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        });
+        let retry_stream = RetryStream {
             sink: Some(tx.clone()),
-            pending: Vec::new(),
         };
         let response = run_chain(
             state,
@@ -187,9 +232,10 @@ fn stream_with_notices(
             // The body is already SSE, so the answer is adapted to it: a plain
             // JSON completion cannot be written into an open event stream.
             true,
-            notices,
+            retry_stream,
         )
         .await;
+        heartbeat.abort();
         if response.status().is_success() {
             let mut frames = response.into_body().into_data_stream();
             while let Some(frame) = frames.next().await {
@@ -202,16 +248,18 @@ fn stream_with_notices(
             }
             return;
         }
-        // The retry window closed without an answer. Report it as text so the
-        // client keeps a usable session instead of dying on a 502.
+        // Retry exhaustion is an error, not a successful completion.
         let reason = response_error_text(response).await;
         let _ = forward
-            .send(Ok(Bytes::from(notice_event(&format!(
-                "прокси: все апстримы недоступны — {reason}"
-            )))))
-            .await;
-        let _ = forward
-            .send(Ok(Bytes::from("data: [DONE]\n\n")))
+            .send(Ok(Bytes::from(format!(
+                "data: {}\n\n",
+                serde_json::json!({
+                    "error": {
+                        "message": reason,
+                        "type": "proxy_retry_exhausted"
+                    }
+                })
+            ))))
             .await;
     });
     Response::builder()
@@ -236,31 +284,6 @@ async fn response_error_text(response: Response) -> String {
                 .map(str::to_string)
         })
         .unwrap_or(raw)
-}
-
-/// Prepends collected notices to the answer the client is about to read. Only
-/// an SSE body can carry them: a JSON answer must stay valid JSON.
-fn prepend_notices(response: Response, notices: Vec<String>) -> Response {
-    if notices.is_empty() {
-        return response;
-    }
-    let is_sse = response
-        .headers()
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.to_ascii_lowercase().contains("text/event-stream"));
-    if !is_sse {
-        return response;
-    }
-    let (parts, body) = response.into_parts();
-    let head = notices
-        .into_iter()
-        .map(|text| Ok(Bytes::from(notice_event(&text))));
-    let stream = futures_util::stream::iter(head).chain(
-        body.into_data_stream()
-            .map(|frame| frame.map_err(std::io::Error::other)),
-    );
-    Response::from_parts(parts, Body::from_stream(stream))
 }
 
 pub(super) async fn chat_completions(
@@ -295,10 +318,9 @@ pub(super) async fn chat_completions(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     // Retry mode can wait for an hour, so its stream must open before the first
-    // success. Ordinary streaming keeps the upstream response untouched: it
-    // carries real headers, and only its body gets notices prepended.
+    // success. Ordinary streaming keeps the upstream response untouched.
     if stream_requested && retry_forever {
-        return stream_with_notices(state, body, chain, exposed, session, retry_forever);
+        return retry_stream_response(state, body, chain, exposed, session, retry_forever);
     }
     run_chain(
         state,
@@ -308,7 +330,7 @@ pub(super) async fn chat_completions(
         session,
         retry_forever,
         stream_requested,
-        Notices::silent(),
+        RetryStream::silent(),
     )
     .await
 }
@@ -322,7 +344,7 @@ async fn run_chain(
     session: Option<String>,
     retry_forever: bool,
     stream_requested: bool,
-    mut notices: Notices,
+    retry_stream: RetryStream,
 ) -> Response {
     {
         let mut usage = state.usage.lock().unwrap();
@@ -349,11 +371,11 @@ async fn run_chain(
     const RETRY_WINDOW: Duration = Duration::from_secs(60 * 60);
     let started = Instant::now();
     loop {
-        if notices.client_gone() {
+        if retry_stream.client_gone() {
             break;
         }
-        for (index, upstream) in chain.iter().enumerate() {
-            let key = format!("{exposed}|{}|{}", upstream.name, upstream.model);
+        for upstream in &chain {
+            let key = cooldown_key(upstream);
             if state
                 .cooldowns
                 .lock()
@@ -398,7 +420,6 @@ async fn run_chain(
                         session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
-                    notices.push(failover_notice(&chain, index, &err.to_string()));
                     continue;
                 }
             };
@@ -463,11 +484,6 @@ async fn run_chain(
                         upstream.name, upstream.model
                     ),
                 );
-                notices.push(failover_notice(
-                    &chain,
-                    index,
-                    &format!("вернул HTTP {status}"),
-                ));
                 continue;
             }
             if status == StatusCode::BAD_REQUEST {
@@ -482,11 +498,6 @@ async fn run_chain(
                         session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
-                    notices.push(failover_notice(
-                        &chain,
-                        index,
-                        "не принял содержимое (HTTP 400)",
-                    ));
                     continue;
                 }
                 // A plain 400 is passed through as-is, but it is still an
@@ -539,11 +550,6 @@ async fn run_chain(
                     session.as_deref(),
                     format!("{exposed} → свитч: {last_error}, пробую следующего"),
                 );
-                notices.push(failover_notice(
-                    &chain,
-                    index,
-                    &format!("вернул HTTP {status}"),
-                ));
                 continue;
             }
 
@@ -610,9 +616,7 @@ async fn run_chain(
                             ),
                         );
                     }
-                    // Failover messages were collected while the chain moved
-                    // on; the client reads them as the opening of the answer.
-                    return prepend_notices(response, notices.take_pending());
+                    return response;
                 }
                 Err(err) => {
                     // The 200 status already counted a provisional "ok"; the
@@ -625,11 +629,6 @@ async fn run_chain(
                         session.as_deref(),
                         format!("{exposed} → свитч: {last_error}, пробую следующего"),
                     );
-                    notices.push(failover_notice(
-                        &chain,
-                        index,
-                        &format!("не ответил ({err})"),
-                    ));
                 }
             }
         }
@@ -641,20 +640,9 @@ async fn run_chain(
         // Sleep until the nearest upstream leaves its cooldown instead of polling:
         // a 5-minute limit cooldown would otherwise log a retry every two seconds.
         let now = Instant::now();
-        let wait = chain
-            .iter()
-            .filter_map(|upstream| {
-                state
-                    .cooldowns
-                    .lock()
-                    .unwrap()
-                    .get(&format!("{exposed}|{}|{}", upstream.name, upstream.model))
-                    .copied()
-            })
-            .map(|until| until.saturating_duration_since(now))
-            .min()
+        let wait = nearest_cooldown_wait(&chain, &state.cooldowns.lock().unwrap(), now)
             .unwrap_or(Duration::from_secs(2))
-            .clamp(Duration::from_secs(1), Duration::from_secs(60));
+            .max(Duration::from_secs(1));
         push_chat_log(
             &state,
             session.as_deref(),
@@ -663,10 +651,6 @@ async fn run_chain(
                 wait.as_secs()
             ),
         );
-        notices.push(format!(
-            "все апстримы недоступны, повторяю через {} с",
-            wait.as_secs()
-        ));
         tokio::time::sleep(wait).await;
     } // end retry loop
     let mut usage = state.usage.lock().unwrap();

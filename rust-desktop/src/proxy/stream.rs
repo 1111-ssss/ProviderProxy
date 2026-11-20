@@ -295,26 +295,11 @@ fn keep_tail(tail: &mut String, limit: usize) {
     tail.drain(..cut);
 }
 
-/// One assistant-text chunk the proxy writes itself (a failover notice). The
-/// answer stream is the only surface a harness renders, so proxy messages go
-/// here instead of being lost in a log the user never opens.
-pub(super) fn notice_event(text: &str) -> String {
+fn stream_error_event(message: &str) -> String {
+    // An error is not a successful stream terminator; [DONE] here can make a
+    // client treat a truncated answer as complete.
     format!(
         "data: {}\n\n",
-        serde_json::json!({
-            "object": "chat.completion.chunk",
-            "choices": [{
-                "index": 0,
-                "delta": { "role": "assistant", "content": format!("{text}\n") },
-                "finish_reason": null
-            }]
-        })
-    )
-}
-
-fn stream_error_event(message: &str) -> String {
-    format!(
-        "data: {}\n\ndata: [DONE]\n\n",
         serde_json::json!({
             "error": {
                 "message": message,
