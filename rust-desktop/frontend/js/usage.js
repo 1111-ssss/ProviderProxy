@@ -29,7 +29,10 @@ function renderUsageCharts(u) {
   const providerErrors = Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)
   const errors = Math.max(0, providerErrors)
   const other = Math.max(0, requests - ok - errors)
-  const chartTotal = Math.max(1, ok + errors + other)
+  // One request can touch several upstreams, so the ring is measured in
+  // attempts; the center number must match the segments instead of requests.
+  const attempts = ok + errors + other
+  const chartTotal = Math.max(1, attempts)
   const circumference = 2 * Math.PI * 43
   let offset = 0
   const segments = [
@@ -46,11 +49,10 @@ function renderUsageCharts(u) {
     offset += length
   }
   $("u-donut-skipped").style.opacity = "0"
-  $("u-donut-total").textContent = fmtNum(requests)
-  $("u-outcome-note").textContent = ""
-  // Percentages are relative to attempts (ok + errors), not to client requests:
-  // one request can fail over several times, so the parts can exceed 100% of it.
-  const attempts = Math.max(1, ok + errors)
+  $("u-donut-total").textContent = fmtNum(attempts)
+  $("u-outcome-note").textContent = `${fmtNum(requests)} запросов`
+  // Percentages are relative to attempts, not to client requests: one request
+  // can fail over several times, so the parts can exceed 100% of requests.
   const outcomeRows = [
     ["ok", "Успешные ответы", ok],
     ["failed", "Ошибки провайдеров", errors],
@@ -58,7 +60,7 @@ function renderUsageCharts(u) {
   ]
   $("u-outcome-legend").innerHTML = outcomeRows
     .map(([kind, label, value]) => {
-      const percent = Math.round((value / attempts) * 100)
+      const percent = Math.round((value / chartTotal) * 100)
       return `<div class="legend-row"><span class="legend-dot ${kind}"></span><span class="legend-name">${label} · ${percent}%</span><span class="legend-value">${fmtNum(value)}</span></div>`
     })
     .join("")
@@ -385,8 +387,8 @@ function renderUsageReport(report) {
   const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
   $("u-tiles").innerHTML =
     tile("запросов", u.requests ?? 0) +
-    tile("успешных", u.ok ?? 0) +
-    tile("failover", u.failovers ?? 0) +
+    tile("успешных ответов", u.ok ?? 0) +
+    tile("сбоев апстримов", u.failovers ?? 0) +
     tile("ошибок провайдеров", Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)) +
     tile("токенов вход", fmtTok(u.tokensIn)) +
     tile("токенов выход", fmtTok(u.tokensOut))

@@ -672,18 +672,21 @@ function openModelSettings(provider, id) {
   $("dms-model").textContent = `${provider}/${id}`
   // The stored `image` flag is the manual override; absent means "auto".
   $("dms-kind").value = info.image === true ? "image" : info.image === false ? "chat" : "auto"
-  $("dms-context").value = values.current ? String(values.current) : ""
+  $("dms-context").value = values.manual ? String(values.manual) : ""
   $("dms-context").max = values.provider ? String(values.provider) : ""
-  $("dms-context-max").disabled = !values.provider
-  $("dms-context-max").textContent = values.provider ? `Максимальный (${formatContext(values.provider)})` : "Максимальный"
+  // Auto is always available so a stale/manual value can be cleared even when
+  // the provider did not return a context_length for this model.
+  $("dms-context-max").disabled = false
+  $("dms-context-max").textContent = "Авто"
   dlgModelSettings.showModal()
   $("dms-context").focus()
 }
 $("dms-cancel").onclick = () => dlgModelSettings.close()
 $("dms-context-max").onclick = () => {
-  const { provider, id } = modelSettingsDraft ?? {}
-  const values = contextValues(modelDetails(provider, id))
-  if (values.provider) $("dms-context").value = String(values.provider)
+  // Saving an empty field drops the manual value, so the next /v1/models
+  // refresh sets the context again on its own.
+  $("dms-context").value = ""
+  $("dms-context").focus()
 }
 dlgModelSettings.addEventListener("close", () => {
   if (dlgModelSettings.returnValue !== "save" || !modelSettingsDraft) return
@@ -1054,4 +1057,3 @@ function renderAll() {
   renderOpenCode()
   renderSettings()
 }
-

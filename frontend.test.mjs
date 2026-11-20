@@ -233,3 +233,25 @@ test("update progress survives late events and missing content length", () => {
   assert.equal(label.textContent, "Перезапустить")
   assert.equal(bar.hidden, true)
 })
+
+test("log pages keep newest records on page one and append fresh lines at bottom", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("function logPageSlice"), logs.indexOf("\n\nfunction logMatches"))
+  const sandbox = { lines: Array.from({ length: 5 }, (_, i) => `line-${i + 1}`) }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 0, 3))', sandbox)), ["line-3", "line-2", "line-1"])
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 1, 3))', sandbox)), ["line-5", "line-4"])
+})
+
+test("model context Auto clears the manual value", () => {
+  const source = scripts.slice(scripts.indexOf('$("dms-context-max").onclick ='), scripts.indexOf("dlgModelSettings.addEventListener"))
+  const field = { value: "128000", focus() { this.focused = true } }
+  const button = {}
+  const sandbox = { $: (id) => id === "dms-context" ? field : button }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  button.onclick()
+  assert.equal(field.value, "", "Auto leaves /v1/models in control")
+  assert.equal(field.focused, true)
+})

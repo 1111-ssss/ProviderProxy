@@ -3,6 +3,12 @@ let logQuery = ""
 let logFilter = "all"
 let logPage = 0
 let logLines = []
+let logHasRenderedRecords = false
+
+function logPageSlice(lines, page, size = LOG_PAGE_SIZE) {
+  const start = page * size
+  return lines.slice(start, start + size).reverse()
+}
 
 function logMatches(line) {
   const text = String(line).toLowerCase()
@@ -15,22 +21,40 @@ function logMatches(line) {
 
 function renderLogs() {
   const box = $("logbox")
+  // Desktop scrolls the whole Logs section; narrow layouts constrain logbox.
+  // Anchor the first visible card in whichever element actually scrolls so a
+  // three-second refresh doesn't make the records jump under the pointer.
+  const boxOverflow = getComputedStyle(box).overflowY
+  const host = /auto|scroll/.test(boxOverflow) ? box : box.closest("section")
   const matching = logLines.filter(logMatches)
   const pages = Math.max(1, Math.ceil(matching.length / LOG_PAGE_SIZE))
   if (logPage >= pages) logPage = pages - 1
-  const slice = matching.slice(logPage * LOG_PAGE_SIZE, (logPage + 1) * LOG_PAGE_SIZE)
-  const atTop = box.scrollTop <= 60
-  const previous = box.scrollTop
+  // Page zero is newest, but entries within each page are chronological so
+  // fresh lines arrive at the bottom and can be followed without rearranging
+  // the older cards.
+  const slice = logPageSlice(matching, logPage)
+  const hostTop = host.getBoundingClientRect().top
+  const visible = [...box.querySelectorAll(".log-card")].find((card) => card.getBoundingClientRect().bottom > hostTop)
+  const anchorText = visible?.dataset.logLine
+  const anchorOffset = visible ? visible.getBoundingClientRect().top - hostTop : 0
+  const atBottom = !logHasRenderedRecords || host.scrollHeight - host.clientHeight - host.scrollTop <= 60
   box.replaceChildren(...(slice.length ? slice.map(logCard) : [logEmpty()]))
-  box.scrollTop = atTop ? 0 : previous
+  if (atBottom) {
+    host.scrollTop = host.scrollHeight
+  } else if (anchorText) {
+    const anchor = [...box.querySelectorAll(".log-card")].find((card) => card.dataset.logLine === anchorText)
+    if (anchor) host.scrollTop += anchor.getBoundingClientRect().top - host.getBoundingClientRect().top - anchorOffset
+  }
+  if (slice.length) logHasRenderedRecords = true
   $("log-pager").innerHTML = pages > 1
-    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
+    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Новее</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Старее</button>`
     : ""
   $("log-pager").querySelectorAll("[data-page]").forEach((button) => {
     button.onclick = () => {
       logPage = Number(button.dataset.page) || 0
       renderLogs()
-      box.scrollTop = 0
+      const host = /auto|scroll/.test(getComputedStyle(box).overflowY) ? box : box.closest("section")
+      host.scrollTop = host.scrollHeight
     }
   })
 }
@@ -73,6 +97,7 @@ const logCard = (line) => {
   const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
   const card = document.createElement("div")
   card.className = "log-card" + (cls ? ` ${cls}` : "")
+  card.dataset.logLine = String(line)
   const top = document.createElement("div")
   top.className = "t"
   const tm = document.createElement("span")
@@ -125,4 +150,3 @@ const logEmpty = () => {
   p.textContent = "Ничего не найдено."
   return p
 }
-

@@ -284,7 +284,7 @@
           <div class="chart-head">
             <div>
               <h3>Результаты запросов</h3>
-              <p>Соотношение успешных ответов и ошибок</p>
+              <p>Успешные ответы и ошибки по попыткам апстримов</p>
             </div>
             <span class="muted" id="u-outcome-note"></span>
           </div>
@@ -297,7 +297,7 @@
                 <circle id="u-donut-skipped" class="donut-segment skipped" cx="60" cy="60" r="43"></circle>
                 <circle id="u-donut-other" class="donut-segment other" cx="60" cy="60" r="43"></circle>
               </svg>
-              <div class="donut-center"><strong id="u-donut-total">0</strong><span>запросов</span></div>
+              <div class="donut-center"><strong id="u-donut-total">0</strong><span>попыток</span></div>
             </div>
             <div class="chart-legend" id="u-outcome-legend"></div>
           </div>
@@ -643,11 +643,10 @@
 </dialog>
 
 <!-- Диалог: параметры модели провайдера -->
-<dialog id="dlg-model-settings" aria-labelledby="dms-title" aria-describedby="dms-help">
+<dialog id="dlg-model-settings" aria-labelledby="dms-title">
   <form method="dialog" id="dms-form" class="dialog-form">
     <div class="dialog-header">
       <h3 id="dms-title">Параметры модели</h3>
-      <p id="dms-help">Параметры сохраняются для выбранных, локально добавленных и доступных у провайдера моделей.</p>
     </div>
     <div class="dialog-body">
       <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">—</strong></div>
@@ -658,12 +657,11 @@
           <option value="image">Изображения (image)</option>
         </select>
       </label>
-      <p class="muted" style="margin:-6px 0 12px">Ручной выбор перекрывает автоопределение: image-модели не попадают в цепочки, а обычные — на вкладку «Изображения».</p>
       <label>Контекст модели, токенов
         <input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000">
       </label>
-      <button type="button" id="dms-context-max">Максимальный</button>
-      <p class="muted" style="margin:0 0 10px">Оставь поле пустым, чтобы убрать ручное значение и использовать данные провайдера.</p>
+      <button type="button" id="dms-context-max">Авто</button>
+      <p class="muted" style="margin:0 0 10px">«Авто» берёт значение из <code>/v1/models</code>. Своё число в поле перекрывает его до следующего обновления списка.</p>
     </div>
     <div class="dialog-actions">
       <button type="button" id="dms-cancel">Отмена</button>
