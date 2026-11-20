@@ -93,6 +93,52 @@ fn desktop_exec(path: &Path) -> String {
     )
 }
 
+/// String values (Path, Icon) take no quotes: the spec only allows them in Exec.
+/// A quoted Path made GTK look for a directory literally named `"/home/..."` and
+/// refuse to start the app from the menu.
+#[cfg(target_os = "linux")]
+fn desktop_value(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+/// The icon ships inside the binary: an installed copy has no icons directory
+/// next to it, and the AppImage mount disappears when the app exits.
+#[cfg(target_os = "linux")]
+const APP_ICON_PNG: &[u8] = include_bytes!("../icons/icon.png");
+
+#[cfg(target_os = "linux")]
+fn install_linux_icon() -> Result<PathBuf, String> {
+    let data_dir = dirs::data_dir()
+        .ok_or_else(|| "не удалось определить каталог данных пользователя".to_string())?;
+    let path = data_dir.join("icons/hicolor/32x32/apps/provider-proxy.png");
+    let directory = path
+        .parent()
+        .ok_or_else(|| "не удалось определить каталог иконок".to_string())?;
+    fs::create_dir_all(directory).map_err(|error| error.to_string())?;
+    fs::write(&path, APP_ICON_PNG).map_err(|error| error.to_string())?;
+    Ok(path)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_desktop_entry(command: &str, working_directory: &Path, icon: Option<&Path>) -> String {
+    let mut entry = String::from(
+        "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\n",
+    );
+    entry.push_str(&format!("Exec={command}\n"));
+    entry.push_str(&format!("Path={}\n", desktop_value(working_directory)));
+    if let Some(icon) = icon {
+        entry.push_str(&format!("Icon={}\n", desktop_value(icon)));
+    }
+    entry.push_str(
+        "Terminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+    );
+    entry
+}
+
 #[cfg(target_os = "linux")]
 fn autostart_executable() -> Result<PathBuf, String> {
     // When an AppImage is running, current_exe() points into its temporary
@@ -270,10 +316,10 @@ pub(crate) fn set_autostart(enabled: bool, tray: bool) -> Result<bool, String> {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|error| error.to_string())?;
             }
-            let desktop = format!(
-                "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\nExec={}\nPath={}\nTerminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
-                autostart_command(&executable, &config, tray),
-                desktop_exec(executable.parent().unwrap_or_else(|| Path::new(".")))
+            let desktop = linux_desktop_entry(
+                &autostart_command(&executable, &config, tray),
+                executable.parent().unwrap_or_else(|| Path::new(".")),
+                install_linux_icon().ok().as_deref(),
             );
             fs::write(&path, desktop).map_err(|error| error.to_string())?;
             let _ = write_autostart_preference(tray);
@@ -365,26 +411,15 @@ fn create_linux_shortcut(desktop: bool) -> Result<String, String> {
     let executable = autostart_executable()?;
     let config = autostart_config_path()?;
     let working_directory = executable.parent().unwrap_or_else(|| Path::new("."));
-    // The binary lives in target/release, but the icon ships next to the crate
-    // sources (rust-desktop/icons); check both so the entry gets a real icon.
-    let icon = ["icons/icon.png", "../../icons/icon.png"]
-        .iter()
-        .map(|rel| working_directory.join(rel))
-        .find(|path| path.is_file());
-    let mut entry = String::from(
-        "[Desktop Entry]\nType=Application\nName=Provider Proxy\nComment=Provider Proxy desktop application\n",
-    );
-    entry.push_str(&format!(
-        "Exec={} {}\n",
-        desktop_exec(&executable),
-        desktop_exec(&config)
-    ));
-    entry.push_str(&format!("Path={}\n", desktop_exec(working_directory)));
-    if let Some(icon) = icon {
-        entry.push_str(&format!("Icon={}\n", desktop_exec(&icon)));
-    }
-    entry.push_str(
-        "Terminal=false\nCategories=Development;Utility;\nStartupWMClass=provider-proxy-desktop\n",
+    let icon = install_linux_icon().ok();
+    let entry = linux_desktop_entry(
+        &format!(
+            "{} {}",
+            desktop_exec(&executable),
+            desktop_exec(&config)
+        ),
+        working_directory,
+        icon.as_deref(),
     );
     fs::write(&shortcut, entry).map_err(|error| error.to_string())?;
     // GNOME/KDE only treat a desktop file as launchable when it is executable.
@@ -450,5 +485,23 @@ mod tests {
         assert_eq!(from_arg, PathBuf::from("/real/config.db"));
         let from_env = pick_config_path(None, Some(OsString::from("/env/config.db")));
         assert_eq!(from_env, PathBuf::from("/env/config.db"));
+    }
+
+    /// A quoted Path made GTK chdir into a directory literally named `"/dir"`,
+    /// so the menu entry existed but never started. Exec is the only key that
+    /// takes quotes.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn desktop_entry_quotes_only_the_command() {
+        let entry = linux_desktop_entry(
+            "\"/opt/PP/app\" \"/home/u/config.db\"",
+            Path::new("/opt/PP"),
+            Some(Path::new("/home/u/.icons/pp.png")),
+        );
+        assert!(entry.contains("Exec=\"/opt/PP/app\" \"/home/u/config.db\"\n"));
+        assert!(entry.contains("Path=/opt/PP\n"));
+        assert!(entry.contains("Icon=/home/u/.icons/pp.png\n"));
+        assert!(!entry.contains("Path=\"/"));
+        assert!(!entry.contains("Icon=\"/"));
     }
 }
