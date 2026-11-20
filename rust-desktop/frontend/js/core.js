@@ -325,7 +325,7 @@ function save(silent = false) {
     const r = await api("/api/config", { method: "PUT", body: JSON.stringify(cfg) })
     if (!r.ok) {
       debugLog("save-failed", { status: r.status })
-      return flash(false, (await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`)
+      return flash(false, apiErrorMessage(await r.json().catch(() => ({})), `HTTP ${r.status}`))
     }
     if (seq === saveSeq) configDirty = false
     const j = await r.json().catch(() => ({}))

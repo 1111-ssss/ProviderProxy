@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use futures_util::StreamExt;
 use provider_proxy_desktop::proxy::start_server;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -738,6 +739,115 @@ async fn retry_mode_stops_when_the_client_hangs_up() {
         after_abort, later,
         "the retry loop must stop once the client is gone: {after_abort} then {later}"
     );
+}
+
+/// The client must see why the chain moved on. Without a notice a failover
+/// looks like a slow answer, and after an hour of retries the run just fails.
+#[tokio::test]
+async fn a_failover_is_written_into_the_stream() {
+    const ANSWER: &str = "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\ndata: [DONE]\n\n";
+    let broken = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async { (StatusCode::BAD_GATEWAY, Json(json!({"error": {"message": "boom"}}))) }),
+    ))
+    .await;
+    let healthy = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            (
+                [("content-type", "text/event-stream")],
+                axum::body::Body::from_stream(futures_util::stream::iter([Ok::<_, std::io::Error>(
+                    bytes::Bytes::from_static(ANSWER.as_bytes()),
+                )])),
+            )
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {
+            "broken": {"baseURL": broken.base_url},
+            "healthy": {"baseURL": healthy.base_url}
+        },
+        "models": {"chain": {"upstreams": [
+            {"provider": "broken", "model": "m"},
+            {"provider": "healthy", "model": "m"}
+        ]}}
+    }))
+    .await;
+    let response = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "stream": true, "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.text().await.unwrap();
+    assert!(
+        body.contains("broken/m: вернул HTTP 502") && body.contains("переключаюсь на healthy/m"),
+        "the failover must name the upstream it moves to: {body}"
+    );
+    assert!(
+        body.find("HTTP 502").unwrap() < body.find("hello").unwrap(),
+        "the notice precedes the answer: {body}"
+    );
+}
+
+/// In retry mode the answer may be minutes away, so the notices must arrive on
+/// an already open stream — a silent connection is what a client gives up on.
+#[tokio::test]
+async fn retry_mode_writes_its_wait_into_the_stream() {
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async { (StatusCode::INTERNAL_SERVER_ERROR, "boom") }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 1,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}}
+    }))
+    .await;
+    // The shared test client has a 3s timeout, and this response never ends.
+    let client = Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap();
+    let response = client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "stream": true, "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let mut frames = response.bytes_stream();
+    let first = tokio::time::timeout(Duration::from_secs(5), frames.next())
+        .await
+        .expect("the stream must open while the proxy is still retrying")
+        .unwrap()
+        .unwrap();
+    let first = String::from_utf8_lossy(&first);
+    assert!(
+        first.contains("HTTP 500") && first.contains("p/m"),
+        "first frame explains the failed attempt: {first}"
+    );
+    assert!(
+        !first.contains("переключаюсь на"),
+        "the last upstream in the chain must not promise a switch: {first}"
+    );
+    let second = tokio::time::timeout(Duration::from_secs(5), frames.next())
+        .await
+        .expect("the retry wait must be written out")
+        .unwrap()
+        .unwrap();
+    let second = String::from_utf8_lossy(&second);
+    assert!(
+        second.contains("все апстримы недоступны") && second.contains("повторяю через"),
+        "the wait is announced before it starts: {second}"
+    );
+    drop(frames);
 }
 
 /// Session duration is the sum of the gaps between requests, and a gap longer

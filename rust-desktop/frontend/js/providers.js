@@ -461,6 +461,7 @@ function setUpdateNav(state) {
     updateNavProgress.hidden = true
     updateNavProgressFill.style.width = "0%"
     updateNavButton.dataset.mode = ""
+    updateNavButton.title = ""
     return
   }
   updateNavButton.hidden = false
@@ -468,17 +469,31 @@ function setUpdateNav(state) {
   if (state.mode === "progress") {
     const done = Number(state.done) || 0
     const total = Number(state.total) || 0
-    updateNavLabel.textContent = "Обновление"
-    updateNavProgress.hidden = !total
-    updateNavProgressFill.style.width = total ? `${Math.min(100, Math.round((done / total) * 100))}%` : "0%"
+    const percent = total ? Math.min(100, Math.round((done / total) * 100)) : 0
+    // A server that sends no Content-Length leaves no percentage to show, so
+    // report the downloaded size instead of an empty bar with no feedback.
+    updateNavLabel.textContent = total
+      ? `Обновление ${percent}%`
+      : done
+        ? `Обновление ${(done / 1048576).toFixed(1)} МБ`
+        : "Обновление"
+    updateNavProgress.hidden = false
+    updateNavProgress.classList.toggle("is-indeterminate", !total)
+    updateNavProgressFill.style.width = total ? `${percent}%` : "0%"
+    updateNavButton.title = "Идёт загрузка обновления"
     return
   }
   updateNavProgress.hidden = true
+  updateNavProgress.classList.remove("is-indeterminate")
   updateNavProgressFill.style.width = "0%"
   updateNavLabel.textContent = state.mode === "restart" ? "Перезапустить" : `Обновить до ${state.version}`
   updateNavButton.title = state.mode === "restart" ? "Перезапустить и применить обновление" : `Установить версию ${state.version}`
 }
+// Events emitted during a download can still land after the command resolved.
+// Without this guard a late frame flipped "Перезапустить" back to "Обновление"
+// and left it that way.
 window.__TAURI__?.event?.listen?.("update-progress", (event) => {
+  if (!updateBusy) return
   const payload = event.payload ?? {}
   setUpdateNav({ mode: "progress", done: payload.done, total: payload.total })
 })

@@ -199,3 +199,37 @@ test("digit shortcuts map to the nine tabs", () => {
   for (const name of Object.values(keys)) assert.ok(tabs.includes(name), `${name} must be a tab`)
   assert.equal("9" in keys, false, "9 has no tab")
 })
+
+test("update progress survives late events and missing content length", () => {
+  // Two real bugs: an event arriving after the download finished flipped
+  // "Перезапустить" back to "Обновление", and a server without Content-Length
+  // showed an empty bar with no feedback at all.
+  const source = scripts.slice(
+    scripts.indexOf("let updateInfo = null"),
+    scripts.indexOf("updateNavButton.onclick"),
+  )
+  const sandbox = { $: element, window: {} }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const button = element("update-nav-button")
+  button.dataset = {}
+  const label = element("update-nav-label")
+  const bar = element("update-progress")
+  bar.classList = { toggle() {}, remove() {} }
+  bar.style = {}
+  element("update-progress-fill").style = {}
+
+  vm.runInContext('setUpdateNav({ mode: "progress", done: 50, total: 100 })', sandbox)
+  assert.equal(label.textContent, "Обновление 50%")
+  assert.equal(bar.hidden, false, "the bar is shown while downloading")
+
+  // No Content-Length: report the size instead of an empty bar.
+  vm.runInContext('setUpdateNav({ mode: "progress", done: 2097152, total: 0 })', sandbox)
+  assert.equal(label.textContent, "Обновление 2.0 МБ")
+  assert.equal(bar.hidden, false, "an unknown total must still show a bar")
+
+  // Finished: the entry offers a restart.
+  vm.runInContext('setUpdateNav({ mode: "restart" })', sandbox)
+  assert.equal(label.textContent, "Перезапустить")
+  assert.equal(bar.hidden, true)
+})

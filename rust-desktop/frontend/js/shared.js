@@ -31,6 +31,6 @@ async function fetchProviderModels(name) {
   const j = await r.json().catch(() => ({}))
   return r.ok
     ? { provider: name, ids: j.models ?? [], details: j.details ?? {} }
-    : { provider: name, ids: [], details: {}, error: j.error ?? `HTTP ${r.status}` }
+    : { provider: name, ids: [], details: {}, error: apiErrorMessage(j, `HTTP ${r.status}`) }
 }
 

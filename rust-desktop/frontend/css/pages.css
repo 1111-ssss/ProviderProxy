@@ -89,7 +89,13 @@
     body { overflow: hidden; }
     main { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
     main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
-    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; }
+    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+    /* Only a rail that actually overflows scrolls; the bar itself appears on
+       hover so a full-height menu looks still. */
+    .tabs::-webkit-scrollbar { width: 8px; }
+    .tabs::-webkit-scrollbar-track { background: transparent; }
+    .tabs::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
+    .tabs:hover::-webkit-scrollbar-thumb { background: var(--border-strong); }
     main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
     section[data-tab="logs"] { height: 100%; overflow: auto; }
     section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
