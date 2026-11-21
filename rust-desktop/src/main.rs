@@ -217,11 +217,22 @@ fn main() {
             // leave the window hidden until the user asks for it.
             let in_tray = platform::started_in_tray();
             let browser = app.handle().clone();
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            let window_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("Provider Proxy")
                 .inner_size(1240.0, 900.0)
                 .min_inner_size(900.0, 620.0)
-                .visible(!in_tray)
+                .visible(!in_tray);
+            // The GUI draws its own caption bar, so Windows drops the native
+            // frame; the shadow keeps the rounded corners Windows 11 gives an
+            // undecorated window. Other platforms keep their native title bar.
+            // The init script flags the page before its own scripts run, so the
+            // caption bar is laid out even if the Tauri JS API is unavailable.
+            #[cfg(target_os = "windows")]
+            let window_builder = window_builder
+                .decorations(false)
+                .shadow(true)
+                .initialization_script("document.documentElement.dataset.frame = 'custom'");
+            let window = window_builder
                 .on_new_window(move |url, _features| {
                     if let Some(url) = browser_url(&url) {
                         if let Err(error) = browser.opener().open_url(url, None::<&str>) {

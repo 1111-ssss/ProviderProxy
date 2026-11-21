@@ -335,3 +335,23 @@ function save(silent = false) {
   }, 300)
 }
 
+// The Windows window is undecorated (see main.rs): these buttons are the only
+// way to minimize, maximize and close it, so they are wired before any tab
+// renders. The bar itself is hidden unless the page was flagged as a custom frame.
+const appWindow = window.__TAURI__?.window?.getCurrentWindow?.()
+if (appWindow) {
+  $("titlebar-minimize").onclick = () => appWindow.minimize()
+  $("titlebar-maximize").onclick = () => appWindow.toggleMaximize()
+  $("titlebar-close").onclick = () => appWindow.close()
+  // Swap the maximize glyph for "restore" and keep the label honest.
+  const syncFrameState = async () => {
+    const maximized = await appWindow.isMaximized()
+    document.body.classList.toggle("is-maximized", maximized)
+    const label = maximized ? "Восстановить окно" : "Развернуть окно"
+    $("titlebar-maximize").setAttribute("aria-label", label)
+    $("titlebar-maximize").title = label
+  }
+  appWindow.onResized(syncFrameState)
+  syncFrameState()
+}
+
