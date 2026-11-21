@@ -15,33 +15,33 @@
       <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"></path></svg></button>
     </div>
     <div class="tab-group" role="group" aria-label="Провайдеры">
-      <button class="tab-group-toggle" type="button" data-group="providers" aria-expanded="true"><span>Провайдеры</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
+      <button class="tab-group-toggle" type="button" data-group="providers" aria-expanded="true"><span>Провайдеры</span><span class="tab-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="tab-group-tabs">
         <button data-tab="providers"><span class="tab-index">01</span><span class="tab-label">Провайдеры</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Подключения">
-      <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
+      <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span><span class="tab-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="tab-group-tabs">
         <button data-tab="connections"><span class="tab-index">02</span><span class="tab-label">Подключения</span></button>
         <button data-tab="integrations"><span class="tab-index">03</span><span class="tab-label">Интеграции</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Модели">
-      <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
+      <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span><span class="tab-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="tab-group-tabs">
         <button data-tab="chains"><span class="tab-index">04</span><span class="tab-label">Цепочки</span></button>
         <button data-tab="models"><span class="tab-index">05</span><span class="tab-label">Модели</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Инструменты">
-      <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
+      <button class="tab-group-toggle" type="button" data-group="tools" aria-expanded="true"><span>Инструменты</span><span class="tab-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="tab-group-tabs">
         <button data-tab="images"><span class="tab-index">06</span><span class="tab-label">Изображения</span></button>
       </div>
     </div>
     <div class="tab-group" role="group" aria-label="Статистика и логи">
-      <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true"></span></button>
+      <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span><span class="tab-group-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span></button>
       <div class="tab-group-tabs">
         <button data-tab="logs"><span class="tab-index">07</span><span class="tab-label">Логи</span></button>
         <button data-tab="usage"><span class="tab-index">08</span><span class="tab-label">Статистика</span></button>
@@ -54,12 +54,12 @@
   <section data-tab="providers">
     <div class="section-head">
       <h2>1&nbsp;·&nbsp;Провайдеры</h2>
+      <button type="button" class="field-help" data-hint="Подключение внешних провайдеров." aria-label="Что на вкладке «Провайдеры»">?</button>
       <div class="row">
         <button id="p-checkins" style="display:none">Открыть все чекины</button>
         <button class="primary" id="p-add">+ Добавить провайдера</button>
       </div>
     </div>
-    <p class="section-sub">Подключение внешних провайдеров.</p>
     <div class="filter-bar">
       <label class="search-field">
         <span class="sr-only">Поиск провайдеров</span>
@@ -74,9 +74,9 @@
   <section data-tab="connections">
     <div class="section-head">
       <h2>2&nbsp;·&nbsp;Модели провайдеров</h2>
+      <button type="button" class="field-help" data-hint="Включение моделей провайдера. Только включенные модели могут быть использованы в дальнейшем." aria-label="Что на вкладке «Подключения»">?</button>
       <span class="muted" id="pm-status"></span>
     </div>
-    <p class="section-sub">Включение моделей провайдера. Только включенные модели могут быть использованы в дальнейшем.</p>
     <div class="provider-picker">
       <div class="filter-bar">
         <label class="search-field">
@@ -114,8 +114,8 @@
   <section data-tab="integrations">
     <div class="section-head">
       <h2>3&nbsp;·&nbsp;Интеграции</h2>
+      <button type="button" class="field-help" data-hint="Подключения к внешним инструментам." aria-label="Что на вкладке «Интеграции»">?</button>
     </div>
-    <p class="section-sub">Подключения к внешним инструментам.</p>
     <div class="opencode-panel integration-card">
       <div class="opencode-panel-head">
         <div>
@@ -166,27 +166,27 @@
   <section data-tab="chains">
     <div class="section-head">
       <h2>4&nbsp;·&nbsp;Цепочки</h2>
+      <button type="button" class="field-help" data-hint="Цепочка пробует модели по очереди: если первая не ответила, берётся следующая." aria-label="Что на вкладке «Цепочки»">?</button>
       <button class="primary" id="m-add">+ Добавить цепочку</button>
     </div>
-    <p class="section-sub">Цепочка пробует модели по очереди: если первая не ответила, берётся следующая.</p>
     <div id="models"></div>
   </section>
 
   <section data-tab="models">
     <div class="section-head">
       <h2>5&nbsp;·&nbsp;Модели</h2>
+      <button type="button" class="field-help" data-hint="Выбор провайдера и его моделей, которые нужно использовать без цепочки." aria-label="Что на вкладке «Модели»">?</button>
       <button class="primary" id="om-add">+ Добавить модель</button>
     </div>
-    <p class="section-sub">Выбор провайдера и его моделей, которые нужно использовать без цепочки</p>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
   <section data-tab="images">
     <div class="section-head">
       <h2>6&nbsp;·&nbsp;Генерация изображений</h2>
+      <button type="button" class="field-help" data-hint="Использование image моделей для генерации изображений." aria-label="Что на вкладке «Изображения»">?</button>
       <span class="muted" id="ig-status"></span>
     </div>
-    <p class="section-sub">Использование image моделей для генерации изображений.</p>
     <div class="provider-picker">
       <div class="filter-bar">
         <label class="search-field">
@@ -249,6 +249,7 @@
   <section data-tab="logs">
     <div class="section-head">
         <h2>7&nbsp;·&nbsp;Логи</h2>
+      <button type="button" class="field-help" data-hint="Записи прокси: переключения между провайдерами, ошибки апстримов и ответы моделей." aria-label="Что на вкладке «Логи»">?</button>
       <span class="muted" id="log-info"></span>
     </div>
     <div class="log-controls">
@@ -267,6 +268,7 @@
   <section data-tab="usage">
     <div class="section-head">
         <h2>8&nbsp;·&nbsp;Статистика</h2>
+      <button type="button" class="field-help" data-hint="Запросы, провайдеры и сессии за выбранный день и за всё время." aria-label="Что на вкладке «Статистика»">?</button>
       <span class="muted" id="u-info"></span>
     </div>
     <p class="muted" id="u-lifetime" style="margin:8px 0 0"></p>
@@ -349,23 +351,21 @@
 
   <section data-tab="settings" class="settings-page">
     <div class="section-head">
-      <div>
-        <h2>9&nbsp;·&nbsp;Настройки</h2>
-        <p class="section-sub" style="margin-bottom:0">Параметры прокси, внешний вид приложения и обновления разделены по группам.</p>
-      </div>
+      <h2>9&nbsp;·&nbsp;Настройки</h2>
+      <button type="button" class="field-help" data-hint="Параметры прокси, внешний вид приложения и обновления разделены по группам." aria-label="Что на вкладке «Настройки»">?</button>
     </div>
-    <div class="settings-page-grid" style="margin-top:16px">
+    <div class="settings-page-grid">
       <div class="settings-block">
         <h3>Сервер</h3>
         <p>Основные параметры локального прокси.</p>
         <div class="settings-grid">
-          <label>
+          <label for="s-port">
             <span class="field-label">Порт
               <button type="button" class="field-help" data-hint="Локальный порт прокси. Смена применится после перезапуска приложения." aria-label="Что делает настройка «Порт»">?</button>
             </span>
             <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
           </label>
-          <label>
+          <label for="s-auth">
             <span class="field-label">Токен доступа
               <button type="button" class="field-help" data-hint="Необязательный Bearer-токен. Если задан, клиент должен присылать его в заголовке Authorization." aria-label="Что делает настройка «Токен доступа»">?</button>
             </span>
@@ -376,42 +376,42 @@
       <div class="settings-block">
         <h3>Подключение</h3>
         <p>Используй этот адрес в клиенте или другом инструменте.</p>
-        <label>
+        <div class="field-group">
           <span class="field-label">Base URL прокси
             <button type="button" class="field-help" data-hint="Этот адрес вписывается в клиент как OpenAI-совместимый endpoint." aria-label="Что такое Base URL прокси">?</button>
           </span>
           <code id="s-base-url" class="settings-value">—</code>
-        </label>
+        </div>
       </div>
       <div class="settings-block wide">
         <h3>Защита от сбоев</h3>
         <p>Время блокировки upstream после лимита или временной ошибки.</p>
         <div class="settings-grid">
-          <label>
+          <label for="s-limit">
             <span class="field-label">Блокировка после лимита, сек
               <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты." aria-label="Что значит «Блокировка после лимита»">?</button>
             </span>
             <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
           </label>
-          <label>
+          <label for="s-error">
             <span class="field-label">Блокировка после ошибки, сек
               <button type="button" class="field-help" data-hint="Сколько не отправлять запросы после сетевой ошибки или ответа 5xx." aria-label="Что значит «Блокировка после ошибки»">?</button>
             </span>
             <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
           </label>
-          <label>
+          <label for="s-header">
             <span class="field-label">Таймаут ответа, сек
               <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
             </span>
             <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
           </label>
-          <label>
+          <label for="s-stream-idle">
             <span class="field-label">Тишина в потоке, сек
               <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
             </span>
             <input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric">
           </label>
-          <label>
+          <label for="s-session-gap">
             <span class="field-label">Пауза сессии, сек
               <button type="button" class="field-help" data-hint="Длительность сессии — сумма пауз между запросами. Пауза длиннее этого значения считается простоем и не входит в длительность." aria-label="Что значит «Пауза сессии»">?</button>
             </span>
@@ -421,7 +421,7 @@
             <input id="s-retry-forever" type="checkbox">
             <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>
           </label>
-          <label>
+          <label for="s-pending-buffer">
             <span class="field-label">Буфер размышлений
               <button type="button" class="field-help" data-hint="Сколько модель может думать вслух, прежде чем прокси сочтёт попытку пустой и перейдёт к следующей. Больше — терпимее к долгим размышлениям, но больше памяти на активный запрос." aria-label="Что значит «Буфер размышлений»">?</button>
             </span>
@@ -441,7 +441,7 @@
         <h3>Внешний вид и запуск</h3>
         <p>Настрой интерфейс и запуск приложения.</p>
         <div class="settings-grid">
-          <label>
+          <label for="s-theme-open">
             <span class="field-label">Тема интерфейса
               <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола. Остальные темы — фиксированные палитры." aria-label="Что значит «Тема интерфейса»">?</button>
             </span>

@@ -9,8 +9,7 @@
   h3 { font-size: 15px; margin: 0 0 14px; }
   h4 { font-size: 13px; margin: 0; }
   section { background: var(--section-background); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .08); }
-  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .section-sub { color: var(--muted); font-size: 12px; margin: 7px 0 16px; max-width: 760px; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; }
   input, select, textarea, button { font: inherit; background: var(--control-background); color: inherit; border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; min-height: 38px; }
   /* Match the input surface: a grey select next to white inputs made the
      light theme look patchy. */

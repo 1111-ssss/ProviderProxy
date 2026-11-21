@@ -34,6 +34,17 @@ test("every element id the scripts look up exists in the markup", () => {
   assert.deepEqual(missing, [], "these ids are used by JS but absent from index.html")
 })
 
+test("a '?' inside a settings label never steals the label from its input", () => {
+  // Chromium highlights a label's control on hover. Without an explicit `for`,
+  // the first labelable element inside <label> is the "?" button, so hovering
+  // the field name lit the "?" and a click opened its hint instead of the input.
+  const labels = [...indexHtml.matchAll(/<label\b([^>]*)>([\s\S]*?)<\/label>/g)]
+  const withHelp = labels.filter(([, , body]) => body.includes('class="field-help"'))
+  assert.ok(withHelp.length >= 8, "settings fields still carry their help buttons")
+  const broken = withHelp.filter(([, attrs]) => !/\bfor="/.test(attrs)).map(([, attrs]) => attrs.trim())
+  assert.deepEqual(broken, [], "a label that contains a help button needs an explicit for=")
+})
+
 test("the concatenated scripts parse", () => {
   new vm.Script(scripts)
 })
@@ -119,6 +130,18 @@ test("removing connection models cleans chains and direct models", () => {
 
   run('removeProviderReferences("unselected")')
   assert.equal(run("cfg.opencodeModels.unselected"), undefined)
+})
+
+test("provider model grid drops columns instead of cutting ids", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(connections.indexOf("function pmColumnCount"), connections.indexOf("let pmColumnsObserver"))
+  const sandbox = vm.createContext({})
+  vm.runInContext(source, sandbox)
+  const cols = (available, card) => vm.runInContext(`pmColumnCount(${available}, ${card})`, sandbox)
+  assert.equal(cols(940, 220), 4, "narrow cards still fit four columns")
+  assert.equal(cols(940, 300), 3, "wider cards drop a column rather than truncate")
+  assert.equal(cols(460, 300), 1, "a narrow window shows one card per row")
+  assert.equal(cols(2000, 120), 4, "four columns is the ceiling")
 })
 
 test("a chat log line shows the full session id and the chain under the date", () => {
@@ -234,14 +257,16 @@ test("update progress survives late events and missing content length", () => {
   assert.equal(bar.hidden, true)
 })
 
-test("log pages keep newest records on page one and append fresh lines at bottom", () => {
+test("log pages keep newest records on page one and prepend fresh lines at top", () => {
+  // Page zero is the newest. Entries are shown newest-first within the page,
+  // so fresh lines arrive at the top without rearranging older ones.
   const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
   const source = logs.slice(logs.indexOf("function logPageSlice"), logs.indexOf("\n\nfunction logMatches"))
   const sandbox = { lines: Array.from({ length: 5 }, (_, i) => `line-${i + 1}`) }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
-  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 0, 3))', sandbox)), ["line-3", "line-2", "line-1"])
-  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 1, 3))', sandbox)), ["line-5", "line-4"])
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 0, 3))', sandbox)), ["line-1", "line-2", "line-3"])
+  assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 1, 3))', sandbox)), ["line-4", "line-5"])
 })
 
 test("model context Auto clears the manual value", () => {

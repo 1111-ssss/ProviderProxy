@@ -101,24 +101,6 @@
     section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
   }
 
-  /* A CSS chevron has a stable box and a real rotation center. The text
-     glyph used before had a font-dependent baseline and looked off-center. */
-  .tab-group-chevron {
-    display: block;
-    flex: 0 0 8px;
-    width: 8px;
-    height: 8px;
-    margin-left: auto;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    font-size: 0;
-    line-height: 0;
-    transform: rotate(45deg);
-    transform-origin: 50% 50%;
-    transition: transform .16s ease;
-  }
-  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-45deg); }
-
   /* Use theme surfaces instead of dark-only rgba backgrounds. */
   .card,
   .chart-card,

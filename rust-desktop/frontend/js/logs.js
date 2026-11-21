@@ -7,7 +7,7 @@ let logHasRenderedRecords = false
 
 function logPageSlice(lines, page, size = LOG_PAGE_SIZE) {
   const start = page * size
-  return lines.slice(start, start + size).reverse()
+  return lines.slice(start, start + size)
 }
 
 function logMatches(line) {
@@ -37,10 +37,10 @@ function renderLogs() {
   const visible = [...box.querySelectorAll(".log-card")].find((card) => card.getBoundingClientRect().bottom > hostTop)
   const anchorText = visible?.dataset.logLine
   const anchorOffset = visible ? visible.getBoundingClientRect().top - hostTop : 0
-  const atBottom = !logHasRenderedRecords || host.scrollHeight - host.clientHeight - host.scrollTop <= 60
+  const atTop = !logHasRenderedRecords || host.scrollTop <= 60
   box.replaceChildren(...(slice.length ? slice.map(logCard) : [logEmpty()]))
-  if (atBottom) {
-    host.scrollTop = host.scrollHeight
+  if (atTop) {
+    host.scrollTop = 0
   } else if (anchorText) {
     const anchor = [...box.querySelectorAll(".log-card")].find((card) => card.dataset.logLine === anchorText)
     if (anchor) host.scrollTop += anchor.getBoundingClientRect().top - host.getBoundingClientRect().top - anchorOffset
@@ -54,7 +54,7 @@ function renderLogs() {
       logPage = Number(button.dataset.page) || 0
       renderLogs()
       const host = /auto|scroll/.test(getComputedStyle(box).overflowY) ? box : box.closest("section")
-      host.scrollTop = host.scrollHeight
+      host.scrollTop = 0
     }
   })
 }

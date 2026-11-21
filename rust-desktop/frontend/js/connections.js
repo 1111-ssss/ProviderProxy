@@ -351,20 +351,33 @@ function renderPmList() {
   applyPmColumns($("pm-list"))
 }
 
-// Cards per row: as many as the widest model id still fits on one line, capped
-// at three. A column of full names beats three columns of cut ones.
+// Cards per row: as many as the widest card needs, so a model id is not cut in
+// half. Too few columns waste space, so the count follows the real card width
+// instead of a guessed minimum and stays between 1 and 4.
+function pmColumnCount(available, cardWidth, gap = 8) {
+  return Math.max(1, Math.min(4, Math.floor((available + gap) / (cardWidth + gap))))
+}
 let pmColumnsObserver = null
 function applyPmColumns(box) {
-  // Equal columns: `1fr` already gives every card the same width, so only the
-  // column count matters. It is chosen from a minimum usable card width, not
-  // from the widest id: sizing by the widest name made one long id collapse the
-  // grid to a single column.
-  const MIN_CARD = 210
-  const gap = 8
+  // Measured once per render: a max-content copy reports the width the card
+  // wants, ellipsis and all. One pathologically long id must not collapse the
+  // grid to a single column, hence the cap.
+  const MAX_CARD = 320
+  const probe = document.createElement("div")
+  probe.className = "provider-model-card"
+  probe.style.cssText = "position:absolute;visibility:hidden;left:-9999px;top:0;width:max-content"
+  document.body.append(probe)
+  let widest = 0
+  for (const card of box.querySelectorAll(".provider-model-card")) {
+    probe.replaceChildren(...[...card.childNodes].map((node) => node.cloneNode(true)))
+    widest = Math.max(widest, Math.ceil(probe.getBoundingClientRect().width))
+  }
+  probe.remove()
+  const needed = Math.max(210, Math.min(MAX_CARD, widest))
   const fit = () => {
     const available = box.clientWidth
     if (!available) return // hidden tab: the observer fires once it has width
-    const cols = Math.max(1, Math.min(4, Math.floor((available + gap) / (MIN_CARD + gap))))
+    const cols = pmColumnCount(available, needed)
     if (box.dataset.pmCols === String(cols)) return
     box.dataset.pmCols = String(cols)
     box.style.setProperty("--pm-cols", cols)
