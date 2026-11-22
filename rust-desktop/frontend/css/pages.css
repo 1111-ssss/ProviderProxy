@@ -54,9 +54,10 @@
   .image-model-select { display: grid; gap: 6px; }
   .app-header, main > section { grid-column: 2; }
   @media (max-width: 700px) {
-    main, main.nav-collapsed { grid-template-columns: 1fr; }
+    main, main.nav-collapsed { grid-template-columns: 1fr; grid-template-rows: auto; }
     .app-header, main > section { grid-column: 1; }
-    .tabs { grid-column: 1; grid-row: auto; position: static; height: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: calc(var(--frame-offset) + 5px) 5px 5px; }
+    .titlebar { grid-column: 1; grid-row: auto; padding: 0 16px; }
+    .tabs { grid-column: 1; grid-row: auto; height: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; border-right: 0; border-bottom: 1px solid var(--border); }
     .tabs-scroll { display: flex; flex-wrap: wrap; gap: 5px; overflow: visible; min-width: 0; }
     /* The splitter only groups a vertical rail; in the top row it is noise. */
     .tabs-splitter { display: none; }
@@ -65,7 +66,8 @@
     .tabs-brand { display: none; }
     main.nav-collapsed .tabs-brand { display: flex; }
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
-    main > section { padding: 16px; }    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
+    main > section { padding: 16px; }
+    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
     .dialog-actions { padding-left: 16px; padding-right: 16px; }
     .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
     .model-card-head { align-items: flex-start; flex-wrap: wrap; }
@@ -89,11 +91,6 @@
      work area scroll independently instead of moving the whole page. */
   @media (min-width: 701px) {
     body { overflow: hidden; }
-    main { height: 100vh; height: 100dvh; min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
-    /* The section fills the row; its own padding keeps the text clear of the
-       window edge and the drag strip without reserving an outer margin. */
-    main > section { grid-row: 1; min-height: 0; overflow: auto; }
-    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow: hidden; }
     .tabs-scroll { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
     /* Only a rail that actually overflows scrolls; the bar itself appears on
        hover so a full-height menu looks still. */
@@ -101,7 +98,6 @@
     .tabs-scroll::-webkit-scrollbar-track { background: transparent; }
     .tabs-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
     .tabs-scroll:hover::-webkit-scrollbar-thumb { background: var(--border-strong); }
-    main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
     section[data-tab="logs"] { overflow: auto; }
     section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
   }
@@ -140,7 +136,7 @@
 
   @media (max-width: 700px) {
     body { overflow: auto; }
-    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: calc(100dvh - clamp(32px, 6vw, 64px)); align-items: start; align-content: start; grid-template-rows: none; }
+    main { height: auto; min-height: 100vh; min-height: 100dvh; align-content: start; }
     main > section { grid-row: auto; height: auto; max-height: none; overflow: visible; }
     .tabs { grid-row: auto; height: auto; max-height: none; overflow: visible; align-self: start; }
     section[data-tab="logs"] { height: auto; overflow: visible; }

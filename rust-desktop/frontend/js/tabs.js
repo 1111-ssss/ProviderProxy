@@ -3,6 +3,8 @@ let tab = localStorage.getItem("pp_tab") ?? "providers"
 
 const navigation = document.querySelector("main")
 const navigationCollapseButton = $("tabs-collapse")
+const titlebarTitle = $("titlebar-title")
+const titlebarHelp = $("titlebar-help")
 const navigationCollapsed = localStorage.getItem("pp_navigation_collapsed") === "1"
 function setNavigationCollapsed(collapsed) {
   navigation.classList.toggle("nav-collapsed", collapsed)
@@ -46,6 +48,17 @@ function showTab(name) {
     group.classList.toggle("is-active", Boolean(group.querySelector("button.active")))
   })
   document.querySelectorAll("main > section[data-tab]").forEach((s) => (s.style.display = s.dataset.tab === name ? "" : "none"))
+  // The active tab's heading and hint live in the caption strip; the section
+  // keeps them hidden so its markup stays the single source of the text.
+  const activeSection = document.querySelector(`main > section[data-tab="${name}"]`)
+  const heading = activeSection?.querySelector(".section-head h2")
+  const hint = activeSection?.querySelector(".section-head .field-help")
+  titlebarTitle.textContent = heading?.textContent ?? ""
+  titlebarHelp.hidden = !hint
+  if (hint) {
+    titlebarHelp.dataset.hint = hint.dataset.hint
+    titlebarHelp.setAttribute("aria-label", hint.getAttribute("aria-label"))
+  }
   if (name === "settings") renderSettings()
   if (name === "integrations") loadImageSkillStatus()
   if (name === "logs") loadLogs()
