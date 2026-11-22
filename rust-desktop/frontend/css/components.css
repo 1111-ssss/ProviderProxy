@@ -73,19 +73,20 @@
   .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid color-mix(in srgb, var(--success) 34%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--success) 16%, var(--panel)); color: var(--text); display: none; z-index: 10; box-shadow: var(--shadow); }
   .status.err { background: color-mix(in srgb, var(--danger) 16%, var(--panel)); color: var(--text); border-color: color-mix(in srgb, var(--danger) 34%, transparent); }
   details summary { cursor: pointer; color: var(--muted); }
-  .tabs { grid-column: 2; grid-row: 1 / span 100; position: sticky; top: var(--frame-offset); display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; height: calc(100dvh - var(--frame-offset)); min-height: 0; padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border-left: 1px solid var(--border); }
+  /* The rail runs the full window height, under the transparent drag strip, so
+     the menu reads as part of the frame. */
+  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 0; display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; height: 100dvh; min-height: 0; padding: calc(var(--frame-offset) + 10px) 8px 10px; background: color-mix(in srgb, var(--panel) 84%, transparent); border-right: 1px solid var(--border); }
   /* Only the tab list scrolls when the groups overflow; the splitter and the
      settings entry stay pinned at the bottom of the rail. */
-  .tabs-scroll { display: grid; align-content: start; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; scrollbar-gutter: stable; }
-  .tabs-splitter { flex: 0 0 auto; height: 2px; margin: 2px 6px; border-radius: 2px; background: var(--border-strong); }
+  .tabs-scroll { display: grid; align-content: start; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .tabs-splitter { flex: 0 0 auto; height: 0; margin: 0; border-top: 1px solid var(--border); }
   .tabs-brand { display: flex; align-items: center; gap: 9px; padding: 3px 5px 12px; border-bottom: 1px solid var(--border); }
   /* The logo PNG is already a dark tile, so an extra accent border drew a
      second frame around it. Keep only the image, softly rounded. */
   .tabs-brand-mark { display: block; flex: 0 0 auto; width: 30px; height: 30px; border: 0; border-radius: 8px; object-fit: cover; box-shadow: 0 0 0 1px rgba(0, 0, 0, .28); }
-  .tabs-brand strong { display: block; font-size: 13px; line-height: 1.2; }
-  .tabs-brand-text { min-width: 0; }
   .tabs button.tabs-collapse { display: grid; place-items: center; width: auto; min-width: 30px; min-height: 30px; flex: 0 0 auto; margin-left: auto; padding: 5px; background: transparent; border-color: transparent; color: var(--muted); }
-  .tabs-collapse svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+  .tabs-collapse svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs-collapse-arrow { transform-origin: 14.5px 13.5px; transition: transform .2s ease; }
   .tab-group { display: grid; gap: 5px; padding: 7px 6px 8px; border: 1px solid rgba(67, 84, 106, .55); border-radius: 11px; background: var(--surface-soft); transition: background .16s ease, border-color .16s ease, box-shadow .16s ease; }
   .tabs .tab-group-toggle { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 20px; padding: 0 4px; border: 0; border-radius: 5px; background: transparent; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-align: left; text-transform: uppercase; }
   /* The whole group answers the pointer, not just its header: the header is a
@@ -96,18 +97,18 @@
   .tab-group.is-active { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 48%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent); }
   .tab-group-tabs { display: grid; gap: 4px; padding-top: 2px; }
   .tabs button { display: flex; width: 100%; align-items: center; justify-content: flex-start; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 36px; padding: 8px 10px; text-align: left; }
-  .tabs button.active { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 58%, transparent); color: var(--text); font-weight: 650; box-shadow: inset -3px 0 0 var(--accent), 0 4px 12px rgba(0, 0, 0, .14); }
+  .tabs button.active { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 58%, transparent); color: var(--text); font-weight: 650; box-shadow: inset 3px 0 0 var(--accent), 0 4px 12px rgba(0, 0, 0, .14); }
   .tab-icon { display: inline-flex; flex: 0 0 auto; color: var(--faint); }
   .tab-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .tabs button.active .tab-icon { color: var(--accent); }
   .settings-nav-button { border-color: var(--border); background: var(--surface-soft) !important; color: var(--text) !important; font-weight: 650; }
   .settings-nav-icon { display: inline-flex; color: var(--accent); }
   .settings-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: 6px; }
+  main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: calc(var(--frame-offset) + 6px) 6px 6px; }
   main.nav-collapsed .tabs-brand { width: 100%; justify-content: center; padding: 0; border-bottom: 0; }
-  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tabs-scroll, main.nav-collapsed .tabs-splitter, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
+  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-scroll, main.nav-collapsed .tabs-splitter, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
   main.nav-collapsed .tabs button.tabs-collapse { margin: 0; padding: 5px; }
-  main.nav-collapsed .tabs-collapse svg { transform: rotate(180deg); }
+  main.nav-collapsed .tabs-collapse-arrow { transform: rotate(180deg); }
   /* Update entry above "Settings" in the navigation. Appears only when the
      automatic or manual check found a release; the bar shows the download. */
   .update-nav-button { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent) !important; color: var(--text) !important; font-weight: 650; flex-wrap: wrap; row-gap: 6px; }
@@ -120,7 +121,7 @@
   @keyframes update-indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
   @media (prefers-reduced-motion: reduce) { .update-nav-button .update-progress.is-indeterminate .update-progress-fill { animation: none; width: 100%; opacity: .45; } }
   .update-nav-button[hidden] { display: none; }
-  section[data-tab="logs"] { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; display: flex; flex-direction: column; }
+  section[data-tab="logs"] { min-height: 0; display: flex; flex-direction: column; }
    /* The filter is one control row: the select matches the search height and
    keeps its width, so switching options never shifts the layout. */
   .log-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 10px; }

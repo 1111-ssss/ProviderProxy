@@ -8,10 +8,6 @@
 </head>
 <body>
 <header id="titlebar" class="titlebar" data-tauri-drag-region="deep">
-  <div class="titlebar-brand">
-    <img class="titlebar-mark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAARklEQVR42mMQk5D9P5CYYdA4QE3LmK541AGjDiDaAbZVwRThUQeMOmDUAaMOGHXAqANGHTDqgKHvgNE24agD6OaAEds7BgDTgWu7q0wBGgAAAABJRU5ErkJggg==" alt="">
-    <span>Provider Proxy</span>
-  </div>
   <div class="titlebar-controls">
     <button id="titlebar-minimize" class="titlebar-button" type="button" aria-label="Свернуть окно" title="Свернуть">
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5h8"/></svg>
@@ -29,8 +25,7 @@
   <nav class="tabs" aria-label="Разделы приложения">
     <div class="tabs-brand">
       <img class="tabs-brand-mark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAARklEQVR42mMQk5D9P5CYYdA4QE3LmK541AGjDiDaAbZVwRThUQeMOmDUAaMOGHXAqANGHTDqgKHvgNE24agD6OaAEds7BgDTgWu7q0wBGgAAAABJRU5ErkJggg==" alt="Provider Proxy">
-      <span class="tabs-brand-text"><strong>Provider Proxy</strong></span>
-      <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"></path></svg></button>
+      <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path class="tabs-collapse-arrow" d="m16 15-3-3 3-3"/></svg></button>
     </div>
     <div class="tabs-scroll">
       <div class="tab-group" role="group" aria-label="Провайдеры">
@@ -49,7 +44,7 @@
       <div class="tab-group" role="group" aria-label="Модели">
         <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span></button>
         <div class="tab-group-tabs">
-          <button data-tab="chains"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg></span><span class="tab-label">Цепочки</span></button>
+          <button data-tab="chains"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span><span class="tab-label">Цепочки</span></button>
           <button data-tab="models"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span><span class="tab-label">Модели</span></button>
         </div>
       </div>

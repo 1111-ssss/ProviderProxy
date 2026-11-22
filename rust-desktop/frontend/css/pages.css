@@ -52,11 +52,11 @@
   .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
   .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
   .image-model-select { display: grid; gap: 6px; }
-  .app-header, main > section { grid-column: 1; }
+  .app-header, main > section { grid-column: 2; }
   @media (max-width: 700px) {
     main, main.nav-collapsed { grid-template-columns: 1fr; }
     .app-header, main > section { grid-column: 1; }
-    .tabs { grid-column: 1; grid-row: auto; position: static; height: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    .tabs { grid-column: 1; grid-row: auto; position: static; height: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: calc(var(--frame-offset) + 5px) 5px 5px; }
     .tabs-scroll { display: flex; flex-wrap: wrap; gap: 5px; overflow: visible; min-width: 0; }
     /* The splitter only groups a vertical rail; in the top row it is noise. */
     .tabs-splitter { display: none; }
@@ -65,8 +65,7 @@
     .tabs-brand { display: none; }
     main.nav-collapsed .tabs-brand { display: flex; }
     .app-header { align-items: flex-start; flex-direction: column; gap: 12px; }
-    section { padding: 16px; }
-    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
+    main > section { padding: 16px; }    .dialog-header, .dialog-body { padding-left: 16px; padding-right: 16px; }
     .dialog-actions { padding-left: 16px; padding-right: 16px; }
     .chain-row, .dialog-add-row { grid-template-columns: 24px 1fr; }
     .model-card-head { align-items: flex-start; flex-wrap: wrap; }
@@ -87,12 +86,12 @@
   }
 
   /* Keep the desktop shell inside the viewport: navigation and the active
-     work card scroll independently instead of moving the whole page. */
+     work area scroll independently instead of moving the whole page. */
   @media (min-width: 701px) {
     body { overflow: hidden; }
-    main { height: calc(100vh - var(--frame-offset)); height: calc(100dvh - var(--frame-offset)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
-    /* Stretch fills the row minus the outer margin; height:100% ignored the
-       margin and pushed the card 32px past the viewport. */
+    main { height: 100vh; height: 100dvh; min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+    /* The section fills the row; its own padding keeps the text clear of the
+       window edge and the drag strip without reserving an outer margin. */
     main > section { grid-row: 1; min-height: 0; overflow: auto; }
     .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow: hidden; }
     .tabs-scroll { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
@@ -141,7 +140,7 @@
 
   @media (max-width: 700px) {
     body { overflow: auto; }
-    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: calc(100dvh - clamp(32px, 6vw, 64px)); align-items: start; grid-template-rows: none; }
+    main { height: auto; min-height: calc(100vh - clamp(32px, 6vw, 64px)); min-height: calc(100dvh - clamp(32px, 6vw, 64px)); align-items: start; align-content: start; grid-template-rows: none; }
     main > section { grid-row: auto; height: auto; max-height: none; overflow: visible; }
     .tabs { grid-row: auto; height: auto; max-height: none; overflow: visible; align-self: start; }
     section[data-tab="logs"] { height: auto; overflow: visible; }
