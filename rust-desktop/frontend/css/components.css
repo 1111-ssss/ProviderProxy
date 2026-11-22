@@ -73,7 +73,11 @@
   .status { position: fixed; right: 16px; bottom: 16px; padding: 9px 13px; border: 1px solid color-mix(in srgb, var(--success) 34%, transparent); border-radius: 9px; background: color-mix(in srgb, var(--success) 16%, var(--panel)); color: var(--text); display: none; z-index: 10; box-shadow: var(--shadow); }
   .status.err { background: color-mix(in srgb, var(--danger) 16%, var(--panel)); color: var(--text); border-color: color-mix(in srgb, var(--danger) 34%, transparent); }
   details summary { cursor: pointer; color: var(--muted); }
-  .tabs { grid-column: 1; grid-row: 1 / span 100; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; min-height: 0; padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border: 1px solid var(--border); border-radius: 12px; }
+  .tabs { grid-column: 2; grid-row: 1 / span 100; position: sticky; top: var(--frame-offset); display: flex; flex-direction: column; gap: 8px; align-items: stretch; align-self: start; height: calc(100dvh - var(--frame-offset)); min-height: 0; padding: 10px 8px; background: color-mix(in srgb, var(--panel) 84%, transparent); border-left: 1px solid var(--border); }
+  /* Only the tab list scrolls when the groups overflow; the splitter and the
+     settings entry stay pinned at the bottom of the rail. */
+  .tabs-scroll { display: grid; align-content: start; gap: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; scrollbar-gutter: stable; }
+  .tabs-splitter { flex: 0 0 auto; height: 2px; margin: 2px 6px; border-radius: 2px; background: var(--border-strong); }
   .tabs-brand { display: flex; align-items: center; gap: 9px; padding: 3px 5px 12px; border-bottom: 1px solid var(--border); }
   /* The logo PNG is already a dark tile, so an extra accent border drew a
      second frame around it. Keep only the image, softly rounded. */
@@ -88,35 +92,25 @@
      small target and highlighting it alone made the card look inert. */
   .tab-group:hover { border-color: color-mix(in srgb, var(--accent) 34%, transparent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-soft)); }
   .tab-group-toggle:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--accent); }
-  .tab-group-chevron { display: inline-flex; flex: 0 0 14px; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: auto; color: inherit; transition: transform .16s ease; }
-  .tab-group-chevron svg { display: block; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .tab-group.is-collapsed .tab-group-chevron { transform: rotate(-90deg); }
   .tab-group.is-collapsed .tab-group-tabs { display: none; }
   .tab-group.is-active { background: color-mix(in srgb, var(--accent) 8%, transparent); border-color: color-mix(in srgb, var(--accent) 48%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent); }
   .tab-group-tabs { display: grid; gap: 4px; padding-top: 2px; }
   .tabs button { display: flex; width: 100%; align-items: center; justify-content: flex-start; gap: 8px; background: transparent; border-color: transparent; color: var(--muted); min-height: 36px; padding: 8px 10px; text-align: left; }
-  .tabs button.active { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 58%, transparent); color: var(--text); font-weight: 650; box-shadow: inset 3px 0 0 var(--accent), 0 4px 12px rgba(0, 0, 0, .14); }
-  .tab-index { color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-  .tabs button.active .tab-index { color: var(--accent); }
-  /* Settings sits at the bottom of the rail. The update entry, when present,
-     takes the auto margin instead so it lands right above Settings. */
-  .settings-nav-button { margin-top: auto; border-color: var(--border); background: var(--surface-soft) !important; color: var(--text) !important; font-weight: 650; }
-  .tabs .update-nav-button:not([hidden]) ~ .settings-nav-button { margin-top: 8px; }
+  .tabs button.active { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 58%, transparent); color: var(--text); font-weight: 650; box-shadow: inset -3px 0 0 var(--accent), 0 4px 12px rgba(0, 0, 0, .14); }
+  .tab-icon { display: inline-flex; flex: 0 0 auto; color: var(--faint); }
+  .tab-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs button.active .tab-icon { color: var(--accent); }
+  .settings-nav-button { border-color: var(--border); background: var(--surface-soft) !important; color: var(--text) !important; font-weight: 650; }
   .settings-nav-icon { display: inline-flex; color: var(--accent); }
   .settings-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   main.nav-collapsed .tabs { align-items: center; min-height: 0; height: fit-content; padding: 6px; }
   main.nav-collapsed .tabs-brand { width: 100%; justify-content: center; padding: 0; border-bottom: 0; }
-  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tab-group, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
+  main.nav-collapsed .tabs-brand-mark, main.nav-collapsed .tabs-brand-text, main.nav-collapsed .tabs-scroll, main.nav-collapsed .tabs-splitter, main.nav-collapsed .settings-nav-button, main.nav-collapsed .update-nav-button { display: none; }
   main.nav-collapsed .tabs button.tabs-collapse { margin: 0; padding: 5px; }
   main.nav-collapsed .tabs-collapse svg { transform: rotate(180deg); }
-  main.nav-collapsed .tab-group { padding: 3px 0; border-bottom: 0; }
-  main.nav-collapsed .tab-group-tabs { display: grid; }
-  main.nav-collapsed .tabs button { justify-content: center; padding: 8px 4px; }
-  main.nav-collapsed .tabs button > span:not(.tab-index):not(.settings-nav-icon) { display: none; }
-  main.nav-collapsed .tab-index { font-weight: 700; }
   /* Update entry above "Settings" in the navigation. Appears only when the
      automatic or manual check found a release; the bar shows the download. */
-  .update-nav-button { margin-top: auto; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent) !important; color: var(--text) !important; font-weight: 650; flex-wrap: wrap; row-gap: 6px; }
+  .update-nav-button { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 16%, transparent) !important; color: var(--text) !important; font-weight: 650; flex-wrap: wrap; row-gap: 6px; }
   .update-nav-button .update-nav-icon { display: inline-flex; color: var(--accent-strong); }
   .update-nav-button .update-nav-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .update-nav-button .update-progress { flex-basis: 100%; height: 6px; border-radius: 4px; background: var(--surface); overflow: hidden; }

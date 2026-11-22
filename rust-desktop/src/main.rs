@@ -222,6 +222,14 @@ fn main() {
                 .inner_size(1240.0, 900.0)
                 .min_inner_size(900.0, 620.0)
                 .visible(!in_tray)
+                // Every platform drops the native frame: the page draws its own
+                // caption bar. The shadow keeps the rounded corners Windows 11
+                // gives an undecorated window and is a no-op elsewhere. The init
+                // script flags the page before its own scripts run, so the bar is
+                // laid out even if the Tauri JS API is unavailable.
+                .decorations(false)
+                .shadow(true)
+                .initialization_script("document.documentElement.dataset.frame = 'custom'")
                 .on_new_window(move |url, _features| {
                     if let Some(url) = browser_url(&url) {
                         if let Err(error) = browser.opener().open_url(url, None::<&str>) {

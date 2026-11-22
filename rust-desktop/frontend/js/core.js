@@ -5,6 +5,26 @@ const plural = (n, one, few, many) =>
   `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : n % 10 > 1 && n % 10 < 5 && (n % 100 < 10 || n % 100 > 20) ? few : many}`
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
 
+// The webview window is undecorated (see main.rs): these buttons are the only
+// way to minimize, maximize and close it. The bar stays hidden in a browser,
+// where getCurrentWindow is absent.
+const appWindow = window.__TAURI__?.window?.getCurrentWindow?.()
+if (appWindow) {
+  $("titlebar-minimize").onclick = () => appWindow.minimize()
+  $("titlebar-maximize").onclick = () => appWindow.toggleMaximize()
+  $("titlebar-close").onclick = () => appWindow.close()
+  // Swap the maximize glyph for "restore" and keep the label honest.
+  const syncFrameState = async () => {
+    const maximized = await appWindow.isMaximized()
+    document.body.classList.toggle("is-maximized", maximized)
+    const label = maximized ? "Восстановить окно" : "Развернуть окно"
+    $("titlebar-maximize").setAttribute("aria-label", label)
+    $("titlebar-maximize").title = label
+  }
+  appWindow.onResized(syncFrameState)
+  syncFrameState()
+}
+
 // The settings cards scroll, so the "?" hint is a fixed layer placed next to
 // the button and clamped to the viewport. It opens only for the button itself:
 // hovering the label used to cover the input and block typing.

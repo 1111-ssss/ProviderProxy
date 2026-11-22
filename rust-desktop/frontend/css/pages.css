@@ -52,11 +52,14 @@
   .image-preview a { color: var(--accent); word-break: break-all; padding: 18px; }
   .image-empty { color: var(--muted); font-size: 12px; text-align: center; padding: 24px; }
   .image-model-select { display: grid; gap: 6px; }
-  .app-header, main > section { grid-column: 2; }
+  .app-header, main > section { grid-column: 1; }
   @media (max-width: 700px) {
     main, main.nav-collapsed { grid-template-columns: 1fr; }
     .app-header, main > section { grid-column: 1; }
-    .tabs { grid-column: 1; grid-row: auto; position: static; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    .tabs { grid-column: 1; grid-row: auto; position: static; height: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; padding: 5px; }
+    .tabs-scroll { display: flex; flex-wrap: wrap; gap: 5px; overflow: visible; min-width: 0; }
+    /* The splitter only groups a vertical rail; in the top row it is noise. */
+    .tabs-splitter { display: none; }
     section[data-tab="logs"] { height: auto; }
     section[data-tab="logs"] .logbox { flex: 0 1 auto; max-height: calc(100vh - 260px); min-height: 240px; }
     .tabs-brand { display: none; }
@@ -87,17 +90,20 @@
      work card scroll independently instead of moving the whole page. */
   @media (min-width: 701px) {
     body { overflow: hidden; }
-    main { height: calc(100vh - clamp(32px, 6vw, 64px)); height: calc(100dvh - clamp(32px, 6vw, 64px)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
-    main > section { grid-row: 1; height: 100%; min-height: 0; overflow: auto; }
-    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+    main { height: calc(100vh - var(--frame-offset)); height: calc(100dvh - var(--frame-offset)); min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+    /* Stretch fills the row minus the outer margin; height:100% ignored the
+       margin and pushed the card 32px past the viewport. */
+    main > section { grid-row: 1; min-height: 0; overflow: auto; }
+    .tabs { grid-row: 1; height: 100%; max-height: none; min-height: 0; align-self: stretch; overflow: hidden; }
+    .tabs-scroll { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
     /* Only a rail that actually overflows scrolls; the bar itself appears on
        hover so a full-height menu looks still. */
-    .tabs::-webkit-scrollbar { width: 8px; }
-    .tabs::-webkit-scrollbar-track { background: transparent; }
-    .tabs::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
-    .tabs:hover::-webkit-scrollbar-thumb { background: var(--border-strong); }
+    .tabs-scroll::-webkit-scrollbar { width: 8px; }
+    .tabs-scroll::-webkit-scrollbar-track { background: transparent; }
+    .tabs-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: transparent; }
+    .tabs-scroll:hover::-webkit-scrollbar-thumb { background: var(--border-strong); }
     main.nav-collapsed .tabs { align-self: start; height: fit-content; max-height: none; overflow: visible; }
-    section[data-tab="logs"] { height: 100%; overflow: auto; }
+    section[data-tab="logs"] { overflow: auto; }
     section[data-tab="logs"] .logbox { flex: 0 0 auto; align-content: start; overflow: visible; }
   }
 

@@ -223,6 +223,23 @@ test("digit shortcuts map to the nine tabs", () => {
   assert.equal("9" in keys, false, "9 has no tab")
 })
 
+test("a quick second digit reaches tabs 11..19", () => {
+  const source = scripts.slice(
+    scripts.indexOf("const TAB_KEYS"),
+    scripts.indexOf('document.addEventListener("keydown"'),
+  )
+  const sandbox = { TABS: ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "settings", "ten", "eleven"] }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  assert.equal(sandbox.digitTab("1", 0), "providers", "first press goes to tab 1")
+  assert.equal(sandbox.digitTab("1", 100), "eleven", "second press within 200ms goes to tab 11")
+  assert.equal(sandbox.digitTab("1", 400), "providers", "a slow press starts over")
+  assert.equal(sandbox.digitTab("2", 450), "connections")
+  // Only nine tabs exist in the app, so tab 11 falls back to the first one.
+  assert.equal(sandbox.digitTab("5", 500), "models")
+  assert.equal(sandbox.digitTab("5", 550), "providers", "missing tab 15 falls back to the first")
+})
+
 test("update progress survives late events and missing content length", () => {
   // Two real bugs: an event arriving after the download finished flipped
   // "Перезапустить" back to "Обновление", and a server without Content-Length
