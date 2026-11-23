@@ -25,7 +25,9 @@ pub(crate) async fn get_logs(State(state): State<AppState>, headers: HeaderMap) 
         .filter(|line| !line.contains("gui:"))
         .cloned()
         .collect();
-    Json(json!({ "lines": lines, "max": state.log_max })).into_response()
+    // Titles travel with the lines so hovering an id can name the session and
+    // the search can match that name without a second request.
+    Json(json!({ "lines": lines, "max": state.log_max, "sessionTitles": session_titles(&state) })).into_response()
 }
 
 /// Titles for every session the seven-day window knows, so the GUI can show a

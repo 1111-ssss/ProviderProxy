@@ -164,6 +164,15 @@ async fn protects_api_and_redacts_config_but_serves_the_gui() {
     assert_eq!(config["authToken"], "");
     assert_eq!(config["authTokenConfigured"], true);
     assert_eq!(config["appVersion"], env!("CARGO_PKG_VERSION"));
+    // The GUI compares the path against this to decide when reset is offered.
+    assert!(config["opencodeConfigDefault"]
+        .as_str()
+        .unwrap_or_default()
+        .ends_with("opencode.json")
+        || config["opencodeConfigDefault"]
+            .as_str()
+            .unwrap_or_default()
+            .ends_with("opencode.jsonc"));
     assert_eq!(config["providers"]["one"]["apiKey"], "");
     assert_eq!(config["providers"]["one"]["apiKeyConfigured"], true);
     assert!(config["providers"]["one"]["headers"]
@@ -850,7 +859,7 @@ async fn normal_failover_diagnostics_stay_out_of_the_answer_stream() {
         .unwrap();
     assert!(
         logs["lines"].as_array().unwrap().iter().any(|line| {
-            line.as_str().unwrap_or_default().contains("broken/m заблокирован (HTTP 502 Bad Gateway)")
+            line.as_str().unwrap_or_default().contains("chain (m) — HTTP 502, заблокирован")
         }),
         "details stay in the proxy logs, not the assistant response: {logs}"
     );

@@ -9,6 +9,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
     metrics::{hour_stat, push_chat_log, session_stat, tally_usage},
+    routing::model_label,
     types::AppState,
 };
 
@@ -535,7 +536,7 @@ pub(super) async fn stream_upstream_response(
             &state,
             session.as_deref(),
             format!(
-                "{exposed} → {provider}/{upstream_model}: upstream вернул обычный JSON вместо SSE, адаптирую поток"
+                "{exposed} → адаптирую поток: upstream вернул обычный JSON вместо SSE"
             ),
         );
     }
@@ -649,7 +650,7 @@ pub(super) async fn stream_upstream_response(
                                 &state,
                                 session.as_deref(),
                                 format!(
-                                    "{exposed} → пропущен SSE кадр {provider}/{upstream_model}: {reason}"
+                                    "{exposed} → пропущен кадр потока: {reason}"
                                 ),
                             ),
                         }
@@ -684,7 +685,7 @@ pub(super) async fn stream_upstream_response(
                         &state,
                         session.as_deref(),
                         format!(
-                            "{exposed} → пропущен SSE кадр {provider}/{upstream_model}: {reason}"
+                            "{exposed} → пропущен кадр потока: {reason}"
                         ),
                     ),
                 }
@@ -695,7 +696,10 @@ pub(super) async fn stream_upstream_response(
             push_chat_log(
                 &state,
                 session.as_deref(),
-                format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+                format!(
+                    "{exposed} → ошибка: {} — ошибка потока: {message}",
+                    model_label(&exposed, &upstream_model)
+                ),
             );
             if released && stream_requested {
                 let _ = tx
@@ -710,7 +714,10 @@ pub(super) async fn stream_upstream_response(
                 push_chat_log(
                     &state,
                     session.as_deref(),
-                    format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+                    format!(
+                        "{exposed} → ошибка: {} — ошибка потока: {message}",
+                        model_label(&exposed, &upstream_model)
+                    ),
                 );
                 if released && stream_requested {
                     let _ = tx
@@ -729,7 +736,10 @@ pub(super) async fn stream_upstream_response(
             push_chat_log(
                 &state,
                 session.as_deref(),
-                format!("{exposed} → свитч: {provider}/{upstream_model} ответил пусто"),
+                format!(
+                    "{exposed} → свитч: {} — ответил пусто",
+                    model_label(&exposed, &upstream_model)
+                ),
             );
             if let Some(sender) = signal.take() {
                 let _ = sender.send(false);
@@ -744,7 +754,10 @@ pub(super) async fn stream_upstream_response(
             push_chat_log(
                 &state,
                 session.as_deref(),
-                format!("{exposed} → ошибка потока {provider}/{upstream_model}: {message}"),
+                format!(
+                    "{exposed} → ошибка: {} — ошибка потока: {message}",
+                    model_label(&exposed, &upstream_model)
+                ),
             );
             // The task that owned `tx` is gone, so report through the sender we
             // kept. Without this the client simply sees the body end.
@@ -756,7 +769,12 @@ pub(super) async fn stream_upstream_response(
                 let _ = tx.send(Err(std::io::Error::other(message))).await;
             }
         }
+        let stream_ms = stream_started
+            .elapsed()
+            .as_millis()
+            .min(u128::from(u64::MAX)) as u64;
         let mut usage = usage_state.lock().unwrap();
+        usage.stream_ms = usage.stream_ms.saturating_add(stream_ms);
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
         let (tokens_in, tokens_out) = tally_usage(&tail, &mut usage, &mut provider_stat);
         {
@@ -778,15 +796,14 @@ pub(super) async fn stream_upstream_response(
             row.tokens_out += tokens_out;
             // The chat handler's timer stops at handoff; the answer itself is
             // genuine activity, so add the time this stream spent delivering it.
-            row.active_ms = row
-                .active_ms
-                .saturating_add(stream_started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64);
+            row.active_ms = row.active_ms.saturating_add(stream_ms);
         }
         drop(usage);
         let mut lifetime = lifetime_state.lock().unwrap();
         lifetime.tokens_in += tokens_in;
         lifetime.tokens_out += tokens_out;
         lifetime.requests += 1;
+        lifetime.stream_ms = lifetime.stream_ms.saturating_add(stream_ms);
     });
     if stream_requested && !is_sse {
         headers.insert(

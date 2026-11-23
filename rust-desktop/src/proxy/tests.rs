@@ -3,7 +3,7 @@ use super::config::{
     open_storage, public_config,
 };
 use super::metrics::{hour_stat, load_usage, model_stat, now_ms, tally_usage, USAGE_RETENTION_DAYS};
-use super::routing::{build_chains, with_model};
+use super::routing::{build_chains, model_label, with_model};
 use super::server::{shutdown_running_instance, start_server};
 use super::types::{AppState, ProviderUsage, Usage};
 use reqwest::Client;
@@ -69,6 +69,14 @@ fn builds_chain_and_direct_models_from_config() {
     assert_eq!(chains["proxy-model"][0].model, "a-model");
     assert_eq!(chains["a/direct"][0].base_url, "https://a.example/v1");
     assert_eq!(chains["a/new"][0].model, "new");
+}
+
+#[test]
+fn log_labels_name_the_model_only_when_the_chain_hides_it() {
+    assert_eq!(model_label("aquadevs", "kimi-k3.1-pro"), "aquadevs (kimi-k3.1-pro)");
+    assert_eq!(model_label("a/direct", "direct"), "a/direct");
+    assert_eq!(model_label("a/new", "new"), "a/new");
+    assert_eq!(model_label("a/meta-llama/model", "meta-llama/model"), "a/meta-llama/model");
 }
 
 #[test]

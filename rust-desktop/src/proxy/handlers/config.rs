@@ -14,6 +14,12 @@ pub(crate) async fn get_config(State(state): State<AppState>, headers: HeaderMap
         }
     }
     if let Some(object) = exposed.as_object_mut() {
+        // The GUI must tell a saved override from the effective default, which
+        // depends on whether opencode.jsonc or opencode.json exists on disk.
+        object.insert(
+            "opencodeConfigDefault".into(),
+            Value::String(default_opencode_config_setting()),
+        );
         object.insert(
             "appVersion".into(),
             Value::String(env!("CARGO_PKG_VERSION").into()),

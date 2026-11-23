@@ -144,6 +144,17 @@ pub(crate) fn build_chains(config: &Value) -> HashMap<String, Vec<Upstream>> {
     result
 }
 
+/// The name a log shows for one attempt: the requested chain, with the real
+/// model in parentheses when they differ. A direct "provider/model" entry
+/// already names its model, so it stays as is.
+pub(crate) fn model_label(exposed: &str, model: &str) -> String {
+    if exposed == model || exposed.ends_with(&format!("/{model}")) {
+        exposed.to_string()
+    } else {
+        format!("{exposed} ({model})")
+    }
+}
+
 pub(crate) fn with_model(body: &Value, model: &str) -> Value {
     let mut body = body.clone();
     if let Value::Object(object) = &mut body {

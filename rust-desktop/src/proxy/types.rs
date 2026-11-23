@@ -137,6 +137,11 @@ pub(crate) struct Usage {
     pub(crate) tokens_in: u64,
     #[serde(rename = "tokensOut")]
     pub(crate) tokens_out: u64,
+    /// Wall time the proxy spent delivering answers. Token speed is derived from
+    /// it: the handler returns at handoff, so only the stream knows how long the
+    /// model was actually talking.
+    #[serde(rename = "streamMs")]
+    pub(crate) stream_ms: u64,
     #[serde(rename = "imagesGenerated")]
     pub(crate) images_generated: u64,
     pub(crate) providers: HashMap<String, ProviderUsage>,
@@ -170,6 +175,7 @@ impl Default for Usage {
             failovers: 0,
             tokens_in: 0,
             tokens_out: 0,
+            stream_ms: 0,
             images_generated: 0,
             providers: HashMap::new(),
             models: HashMap::new(),
@@ -185,11 +191,14 @@ impl Default for Usage {
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub(crate) struct LifetimeTokens {
     pub(crate) tokens_in: u64,
     pub(crate) tokens_out: u64,
     pub(crate) requests: u64,
+    /// Same meaning as `Usage::stream_ms`; `serde(default)` keeps totals saved
+    /// before this field existed.
+    pub(crate) stream_ms: u64,
 }
 
 #[derive(Clone)]

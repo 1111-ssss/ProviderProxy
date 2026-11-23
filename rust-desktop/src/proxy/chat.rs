@@ -22,10 +22,27 @@ use super::{
         hour_stat, model_stat, provider_stat, push_chat_log, session_idle_gap,
         session_request_end, session_request_start, session_stat,
     },
-    routing::{failover_status, with_model},
+    routing::{failover_status, model_label, with_model},
     stream::stream_upstream_response,
     types::{AppState, Upstream, Usage},
 };
+
+/// reqwest's Display text is a debug string ("error sending request for url
+/// (https://…)"), which repeats the provider and the endpoint the log already
+/// names. Keep the cause in words a user can act on.
+fn describe_send_error(err: &reqwest::Error) -> String {
+    if err.is_timeout() {
+        "таймаут ответа".into()
+    } else if err.is_connect() {
+        "нет соединения".into()
+    } else if err.is_body() || err.is_decode() {
+        "повреждённый ответ".into()
+    } else if err.is_request() {
+        "не удалось отправить запрос".into()
+    } else {
+        "ошибка сети".into()
+    }
+}
 
 async fn send_with_header_timeout(
     request: reqwest::RequestBuilder,
@@ -33,12 +50,33 @@ async fn send_with_header_timeout(
 ) -> Result<reqwest::Response, String> {
     let request = request.send();
     if header_timeout_sec == 0 {
-        return request.await.map_err(|err| err.to_string());
+        return request.await.map_err(|err| describe_send_error(&err));
     }
     timeout(Duration::from_secs(header_timeout_sec), request)
         .await
-        .map_err(|_| "header timeout".to_string())?
-        .map_err(|err| err.to_string())
+        .map_err(|_| "апстрим не прислал ответ вовремя".to_string())?
+        .map_err(|err| describe_send_error(&err))
+}
+
+/// ", пробую следующего" only when a next upstream actually exists: on a
+/// single-model chain the next attempt is the same model after its cooldown.
+fn has_next_upstream(chain: &[Upstream], upstream: &Upstream) -> bool {
+    chain
+        .iter()
+        .position(|candidate| std::ptr::eq(candidate, upstream))
+        .is_some_and(|index| index + 1 < chain.len())
+}
+
+fn failover_note(chain: &[Upstream], upstream: &Upstream) -> &'static str {
+    if has_next_upstream(chain, upstream) {
+        ", пробую следующего"
+    } else {
+        ""
+    }
+}
+
+fn attempt_log_kind(chain: &[Upstream], upstream: &Upstream) -> &'static str {
+    if has_next_upstream(chain, upstream) { "свитч" } else { "ошибка" }
 }
 
 /// Counts one failed attempt: cooldown for that exact model, error counters and
@@ -133,6 +171,28 @@ mod cooldown_tests {
             api_key: String::new(),
             headers: HashMap::new(),
         }
+    }
+
+    #[test]
+    fn retry_note_only_says_next_when_there_is_another_upstream() {
+        let chain = [upstream("one", "m"), upstream("two", "m")];
+        assert!(has_next_upstream(&chain, &chain[0]));
+        assert!(!has_next_upstream(&chain, &chain[1]));
+        let duplicate = [upstream("one", "m"), upstream("one", "m")];
+        assert!(!has_next_upstream(&duplicate, &duplicate[1]));
+    }
+
+    #[tokio::test]
+    async fn send_errors_are_written_as_actionable_russian() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        drop(listener);
+        let error = reqwest::Client::new()
+            .get(format!("http://{address}"))
+            .send()
+            .await
+            .unwrap_err();
+        assert_eq!(describe_send_error(&error), "нет соединения");
     }
 
     #[test]
@@ -418,7 +478,12 @@ async fn run_chain(
                     push_chat_log(
                         &state,
                         session.as_deref(),
-                        format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                        format!(
+                            "{exposed} → {}: {} — {err}{}",
+                            attempt_log_kind(&chain, upstream),
+                            model_label(&exposed, &upstream.model),
+                            failover_note(&chain, upstream)
+                        ),
                     );
                     continue;
                 }
@@ -480,8 +545,11 @@ async fn run_chain(
                     &state,
                     session.as_deref(),
                     format!(
-                        "{exposed} → свитч: {}/{} заблокирован (HTTP {status}), пробую следующего",
-                        upstream.name, upstream.model
+                        "{exposed} → {}: {} — HTTP {}, заблокирован{}",
+                        attempt_log_kind(&chain, upstream),
+                        model_label(&exposed, &upstream.model),
+                        status.as_u16(),
+                        failover_note(&chain, upstream)
                     ),
                 );
                 continue;
@@ -492,11 +560,16 @@ async fn run_chain(
                     || text.to_ascii_lowercase().contains("not support")
                 {
                     record_failure(&state, upstream, &key, &session);
-                    last_error = format!("{}: HTTP 400, unsupported content", upstream.name);
+                    last_error = format!("{}: HTTP 400, запрос не поддерживается", upstream.name);
                     push_chat_log(
                         &state,
                         session.as_deref(),
-                        format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                        format!(
+                            "{exposed} → {}: {} — HTTP 400, запрос не поддерживается{}",
+                            attempt_log_kind(&chain, upstream),
+                            model_label(&exposed, &upstream.model),
+                            failover_note(&chain, upstream)
+                        ),
                     );
                     continue;
                 }
@@ -519,8 +592,8 @@ async fn run_chain(
                         &state,
                         session.as_deref(),
                         format!(
-                            "{exposed} → ошибка: {}/{} (HTTP 400)",
-                            upstream.name, upstream.model
+                            "{exposed} → ошибка: {} — HTTP 400",
+                            model_label(&exposed, &upstream.model)
                         ),
                     );
                     return (
@@ -535,7 +608,17 @@ async fn run_chain(
                 push_chat_log(
                     &state,
                     session.as_deref(),
-                    format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                    format!(
+                        "{exposed} → {}: {} — HTTP 400{}{}",
+                        attempt_log_kind(&chain, upstream),
+                        model_label(&exposed, &upstream.model),
+                        if text.trim().is_empty() {
+                            String::new()
+                        } else {
+                            format!(": {}", text.trim())
+                        },
+                        failover_note(&chain, upstream)
+                    ),
                 );
                 continue;
             }
@@ -548,7 +631,13 @@ async fn run_chain(
                 push_chat_log(
                     &state,
                     session.as_deref(),
-                    format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                    format!(
+                        "{exposed} → {}: {} — HTTP {}{}",
+                        attempt_log_kind(&chain, upstream),
+                        model_label(&exposed, &upstream.model),
+                        status.as_u16(),
+                        failover_note(&chain, upstream)
+                    ),
                 );
                 continue;
             }
@@ -586,8 +675,9 @@ async fn run_chain(
                     &state,
                     session.as_deref(),
                     format!(
-                        "{exposed} → ошибка: {}/{} (HTTP {status})",
-                        upstream.name, upstream.model
+                        "{exposed} → ошибка: {} — HTTP {}",
+                        model_label(&exposed, &upstream.model),
+                        status.as_u16()
                     ),
                 );
             }
@@ -611,8 +701,8 @@ async fn run_chain(
                             &state,
                             session.as_deref(),
                             format!(
-                                "{exposed} → ответ: {}/{} (HTTP {status})",
-                                upstream.name, upstream.model
+                                "{exposed} → ответ: {}",
+                                model_label(&exposed, &upstream.model)
                             ),
                         );
                     }
@@ -627,7 +717,12 @@ async fn run_chain(
                     push_chat_log(
                         &state,
                         session.as_deref(),
-                        format!("{exposed} → свитч: {last_error}, пробую следующего"),
+                        format!(
+                            "{exposed} → {}: {} — {err}{}",
+                            attempt_log_kind(&chain, upstream),
+                            model_label(&exposed, &upstream.model),
+                            failover_note(&chain, upstream)
+                        ),
                     );
                 }
             }
