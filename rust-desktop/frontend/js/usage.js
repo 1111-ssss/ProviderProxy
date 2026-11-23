@@ -19,24 +19,60 @@ const fmtUptime = (ms = 0) => {
   return s < 60 ? `${s} с` : s < 3600 ? `${Math.round(s / 60)} мин` : `${(s / 3600).toFixed(1)} ч`
 }
 
+// Provider outcome totals. The ring and the tables must agree, so every block
+// that needs a limit/error count asks for it here.
+function providerOutcomes(obj) {
+  const stats = Object.values(obj ?? {})
+  return {
+    limits: stats.reduce((sum, stat) => sum + (Number(stat.limits) || 0), 0),
+    errors: stats.reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0),
+  }
+}
+
+// One icon per tile, drawn in the same 24px stroke as the rest of the UI.
+const TILE_ICONS = {
+  requests: '<path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/>',
+  ok: '<circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.6-5"/>',
+  limit: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  errors: '<path d="M12 4.5 21 19H3Z"/><path d="M12 9.5v4M12 16.5h.01"/>',
+  failover: '<path d="M16 4h4v4M4 20 20 4M20 16v4h-4M15 15l5 5M4 4l4 4"/>',
+  input: '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/>',
+  output: '<path d="M12 15V5m0 0 4 4m-4-4L8 9M5 19h14"/>',
+  speed: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 18 4-6"/>',
+  latency: '<circle cx="12" cy="13" r="7.5"/><path d="M12 13V9M9.5 3h5"/>',
+  uptime: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  images: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="m5 17 5-5 4 4 3-2.5 2.5 2"/>',
+}
+function statTile(kind, value, label) {
+  return `<div class="tile tile-${kind}"><span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${TILE_ICONS[kind] ?? ""}</svg></span><div class="tile-body"><span class="v">${value}</span><span class="k">${label}</span></div></div>`
+}
+
+// Output tokens per second of real answer time; a dash when nothing streamed.
+const fmtSpeed = (tokens, ms) => {
+  const seconds = (Number(ms) || 0) / 1000
+  if (!(seconds > 0)) return "—"
+  return fmtTok((Number(tokens) || 0) / seconds)
+}
+
 function renderUsageCharts(u) {
   const requests = Math.max(0, Number(u.requests) || 0)
   const ok = Math.max(0, Number(u.ok) || 0)
   // The ring shows provider outcomes, not only what the client finally got: an
   // upstream that failed and then failed over is an error here, even though the
-  // request ended successfully. Sum the provider error counters so the ring
-  // matches the "Err" column in the provider table below it.
-  const providerErrors = Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)
-  const errors = Math.max(0, providerErrors)
-  const other = Math.max(0, requests - ok - errors)
+  // request ended successfully. Sum the provider counters so the ring matches
+  // the columns of the provider table below it.
+  const { limits, errors } = providerOutcomes(u.providers)
+  const skipped = Math.max(0, Number(u.skipped) || 0)
+  const other = skipped + Math.max(0, requests - ok - limits - errors - skipped)
   // One request can touch several upstreams, so the ring is measured in
   // attempts; the center number must match the segments instead of requests.
-  const attempts = ok + errors + other
+  const attempts = ok + limits + errors + other
   const chartTotal = Math.max(1, attempts)
   const circumference = 2 * Math.PI * 43
   let offset = 0
   const segments = [
     ["u-donut-ok", ok],
+    ["u-donut-limit", limits],
     ["u-donut-failed", errors],
     ["u-donut-other", other],
   ]
@@ -48,14 +84,15 @@ function renderUsageCharts(u) {
     circle.style.opacity = value > 0 ? "1" : "0"
     offset += length
   }
-  $("u-donut-skipped").style.opacity = "0"
-  $("u-donut-total").textContent = fmtNum(attempts)
-  $("u-outcome-note").textContent = `${fmtNum(requests)} запросов`
+  // The center shows client requests (k/m), not attempts: the legend still
+  // describes provider attempts, which can exceed the request count.
+  $("u-donut-total").textContent = fmtTok(requests)
   // Percentages are relative to attempts, not to client requests: one request
   // can fail over several times, so the parts can exceed 100% of requests.
   const outcomeRows = [
-    ["ok", "Успешные ответы", ok],
-    ["failed", "Ошибки провайдеров", errors],
+    ["ok", "Успех", ok],
+    ["limit", "Рейт-лимит", limits],
+    ["failed", "Ошибка", errors],
     ["other", "Прочее", other],
   ]
   $("u-outcome-legend").innerHTML = outcomeRows
@@ -93,11 +130,10 @@ function renderProviderProblemChart(obj) {
         .map((row) => {
           const bad = row.limits + row.errors
           const problemRate = Math.round((bad / row.requests) * 100)
-          const details = `${fmtNum(row.requests)} попыток: Ok ${fmtNum(row.ok)}, RateLimit ${fmtNum(row.limits)}, Err ${fmtNum(row.errors)}${row.other ? `, переключено ${fmtNum(row.other)}` : ""}`
-          return `<div class="token-row" title="${esc(`${row.name} — ${details}`)}">
+          return `<div class="token-row">
             <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate"><b style="color:${problemColor(problemRate)}">${problemRate}%</b> проблем</span></div>
             <div class="token-track"><span class="token-fill success" style="width:${width(row, row.ok)}%"></span><span class="token-fill limit" style="width:${width(row, row.limits)}%"></span><span class="token-fill error" style="width:${width(row, row.errors)}%"></span><span class="token-fill other" style="width:${width(row, row.other)}%"></span></div>
-            <div class="token-row-foot"><span>Ok: ${fmtNum(row.ok)}</span><span>RateLimit: ${fmtNum(row.limits)}</span><span>Err: ${fmtNum(row.errors)}</span></div>
+            <div class="token-row-foot"><span>Успех: ${fmtNum(row.ok)}</span><span>Рейт-лимит: ${fmtNum(row.limits)}</span><span>Ошибки: ${fmtNum(row.errors)}</span></div>
           </div>`
         })
         .join("")
@@ -202,7 +238,7 @@ function renderUsageHourChart(u, report, today) {
 
 // Compact two-row-per-record table: Имя | Req | OK/429/Err | вход/выход.
 // Errors hide inside one cell so a long list stays readable without a scroll
-// bar; the title attribute still spells the exact counts out.
+// bar.
 function usageCompactTable(obj) {
   const rows = Object.entries(obj ?? {})
     // A row needs a recorded outcome to say anything. Requests without ok, limit
@@ -217,19 +253,18 @@ function usageCompactTable(obj) {
   if (!rows.length) return `<tr><td class="muted">данных пока нет</td></tr>`
   const cell = (name, stat) => {
     const requests = Number(stat.requests) || 0
-    const ok = Number(stat.ok) || 0
     const limits = Number(stat.limits) || 0
     const errors = Number(stat.errors) || 0
-    const bad = limits + errors
-    const problemRate = requests ? Math.round((bad / requests) * 100) : 0
+    const problemRate = requests ? Math.round(((limits + errors) / requests) * 100) : 0
+    const tip = `успех ${fmtNum(stat.ok)}, рейт-лимит ${fmtNum(limits)}, ошибки ${fmtNum(errors)}`
     return `<tr>
       <td>${esc(name)}</td>
       <td class="muted">${fmtNum(requests)}</td>
-      <td class="muted"><span class="${ok ? "ok-cell" : ""}">${fmtNum(ok)}</span><span class="sep">/</span><span class="${limits ? "warn" : ""}">${fmtNum(limits)}</span><span class="sep">/</span><span class="${errors ? "bad" : ""}">${fmtNum(errors)}</span>${bad ? `<small class="problem-rate" style="color:${problemColor(problemRate)}">${problemRate}%</small>` : ""}</td>
+      <td class="muted"><span class="problem-rate" style="color:${problemColor(problemRate)}" data-tip="${esc(tip)}">${problemRate}%</span></td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
     </tr>`
   }
-  return `<tr><th>Имя</th><th>Req</th><th>OK<span class="sep">/</span>ratelimit<span class="sep">/</span>Err</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
+  return `<tr><th>Имя</th><th>Запросы</th><th>Проблемность</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
 }
 
 function usageTable(obj, cols) {
@@ -251,8 +286,8 @@ function sessionTitle(titles, id) {
 const SESSION_PAGE_SIZE = 20
 let sessionQuery = ""
 let sessionPage = 0
-// Shared sort for both session tables (statistics tab and the "all sessions"
-// dialog): clicking a header toggles asc/desc, the arrow shows the direction.
+// Shared sort for both session tables (the day and the lifetime panel):
+// clicking a header toggles asc/desc, the arrow shows the direction.
 const sessionSort = { key: "lastSeen", dir: -1 }
 const SESSION_SORT_KEYS = {
   requests: (stat) => Number(stat.requests) || 0,
@@ -264,12 +299,14 @@ function sortSessionRows(rows) {
   const value = SESSION_SORT_KEYS[sessionSort.key] ?? SESSION_SORT_KEYS.lastSeen
   return rows.sort((a, b) => (value(a.stat) - value(b.stat)) * sessionSort.dir)
 }
-const sortArrow = (key) => (sessionSort.key === key ? (sessionSort.dir < 0 ? " ▾" : " ▴") : "")
+// The arrow keeps its own slot even when the column is not sorted: otherwise
+// the header text shifts by a glyph on every sort and the columns jump.
+const sortArrow = (key) => `<span class="sort-arrow">${sessionSort.key === key ? (sessionSort.dir < 0 ? "▾" : "▴") : ""}</span>`
 function sortSessionHeader(key, label) {
   return `<th class="session-sort" data-sort="${key}" role="button" tabindex="0" aria-sort="${sessionSort.key === key ? (sessionSort.dir < 0 ? "descending" : "ascending") : "none"}">${label}${sortArrow(key)}</th>`
 }
-async function usageSessionRows(obj, titles) {
-  const query = sessionQuery.trim().toLowerCase()
+function usageSessionRows(obj, titles, query = sessionQuery) {
+  const normalizedQuery = query.trim().toLowerCase()
   return sortSessionRows(
     Object.entries(obj ?? {})
       .filter(([, stat]) => {
@@ -278,7 +315,7 @@ async function usageSessionRows(obj, titles) {
         return outcome > 0 || tokens > 0
       })
       .map(([id, stat]) => ({ id, stat, title: sessionTitle(titles, id) }))
-      .filter(({ id, title }) => !query || title.toLowerCase().includes(query) || id.toLowerCase().includes(query)),
+      .filter(({ id, title }) => !normalizedQuery || title.toLowerCase().includes(normalizedQuery) || id.toLowerCase().includes(normalizedQuery)),
   )
 }
 function usageSessionTable(rows, titles) {
@@ -286,8 +323,7 @@ function usageSessionTable(rows, titles) {
   const pages = Math.max(1, Math.ceil(all.length / SESSION_PAGE_SIZE))
   if (sessionPage >= pages) sessionPage = pages - 1
   const list = all.slice(sessionPage * SESSION_PAGE_SIZE, (sessionPage + 1) * SESSION_PAGE_SIZE)
-  $("u-session-count").textContent = all.length ? `${all.length} сессий` : ""
-  // Pages appear only past one page worth of sessions.
+  $("u-session-count").textContent = ""
   $("u-session-pager").innerHTML = pages > 1
     ? `<button type="button" data-page="${sessionPage - 1}"${sessionPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${sessionPage + 1} / ${pages}</span><button type="button" data-page="${sessionPage + 1}"${sessionPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
     : ""
@@ -301,16 +337,16 @@ function usageSessionTable(rows, titles) {
 }
 
 function sessionTableHtml(list) {
-  if (!list.length) return `<tr><td class="muted">${sessionQuery ? "ничего не найдено" : "сессий пока нет"}</td></tr>`
+  if (!list.length) return emptyStateHtml("ничего не найдено")
   const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
   const cell = ({ id, stat, title }) => `<tr>
-      <td><span class="session-name" title="${esc(title || id)}" data-session-copy="${esc(id)}">${esc(title || id)}</span></td>
+      <td><span class="session-name" data-tip="${esc(title || id)}" data-session-copy="${esc(id)}">${esc(title || id)}</span></td>
       <td class="muted">${fmtNum(stat.requests)}</td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
       <td class="muted">${esc(fmtUptime(Number(stat.activeMs) || 0))}</td>
       <td class="muted">${esc(when(stat.lastSeen))}</td>
     </tr>`
-  return `<tr><th>сессия</th>${sortSessionHeader("requests", "Req")}${sortSessionHeader("tokens", "Токены")}${sortSessionHeader("duration", "Длительность")}${sortSessionHeader("lastSeen", "Последний запрос")}</tr>${list.map(cell).join("")}`
+  return `<table><tr><th>сессия</th>${sortSessionHeader("requests", "Запросы")}${sortSessionHeader("tokens", "Токены")}${sortSessionHeader("duration", "Длительность")}${sortSessionHeader("lastSeen", "Последний запрос")}</tr>${list.map(cell).join("")}</table>`
 }
 
 // One document-level handler serves both tables, which are re-rendered often.
@@ -333,7 +369,7 @@ document.addEventListener("click", (event) => {
 let usageReport = null
 let usageDay = ""
 let usageGroup = "overview"
-const usageGroups = ["overview", "providers", "sessions", "images"]
+const usageGroups = ["overview", "providers", "sessions", "images", "lifetime"]
 const renderUsageGroups = () => {
   $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
     const active = button.dataset.group === usageGroup
@@ -343,6 +379,23 @@ const renderUsageGroups = () => {
   document.querySelectorAll(".usage-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.panel === usageGroup)
   })
+  // The lifetime panel is not tied to a day, so the day strip would only offer
+  // a choice that changes nothing there.
+  $("u-days").hidden = usageGroup === "lifetime"
+  if (usageGroup === "lifetime") renderLifetimePanel(usageReport)
+}
+
+/// "За всё время": totals that outlive the seven-day window. Sessions live on
+/// the Sessions tab, behind its "За все дни" dialog.
+function renderLifetimePanel(report) {
+  const lifetime = report?.lifetimeTokens ?? {}
+  const speed = fmtSpeed(lifetime.tokensOut, lifetime.streamMs)
+  $("u-lifetime-tiles").innerHTML =
+    statTile("requests", fmtNum(lifetime.requests), "запросов") +
+    statTile("input", fmtTok(lifetime.tokensIn), "токенов вход") +
+    statTile("output", fmtTok(lifetime.tokensOut), "токенов выход") +
+    statTile("speed", speed, "токенов в секунду") +
+    statTile("uptime", fmtUptime(report?.uptimeMs ?? 0), "время работы")
 }
 const usageDayLabel = (date, today) => {
   if (date === today) return "Сегодня"
@@ -354,6 +407,13 @@ function renderUsageReport(report) {
   const days = Array.isArray(report.days) && report.days.length ? report.days : [{ date: report.today ?? "", ...report }]
   const today = report.today ?? days[0]?.date ?? ""
   if (!usageDay || !days.some((day) => day.date === usageDay)) usageDay = today
+  $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
+    button.onclick = () => {
+      usageGroup = button.dataset.group
+      renderUsageGroups()
+    }
+  })
+  renderUsageGroups()
   $("u-days").innerHTML = days
     .map((day) => `<button type="button" class="usage-day${day.date === usageDay ? " active" : ""}${usageDayHasData(day) ? "" : " empty"}" data-date="${esc(day.date)}" role="tab" aria-selected="${day.date === usageDay}"><strong>${usageDayLabel(day.date, today)}</strong><small>${usageDayHasData(day) ? `${fmtNum(day.requests ?? 0)} запросов` : "нет запросов"}</small></button>`)
     .join("")
@@ -379,39 +439,24 @@ function renderUsageReport(report) {
     cooldowns: selected.date === today ? report.cooldowns ?? [] : [],
     uptimeMs: selected.date === today ? report.uptimeMs ?? 0 : 0,
   }
-  $("u-info").textContent = selected.date === today
-    ? `запущено: ${fmtUptime(u.uptimeMs)}`
-    : (Number(selected.lastActivity) || 0) > (Number(selected.firstActivity) || 0)
-      ? `работало: ${fmtUptime(Number(selected.lastActivity) - Number(selected.firstActivity))}`
-      : ""
-  const tile = (k, v) => `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div></div>`
+  const { limits, errors } = providerOutcomes(u.providers)
   $("u-tiles").innerHTML =
-    tile("запросов", u.requests ?? 0) +
-    tile("успешных ответов", u.ok ?? 0) +
-    tile("сбоев апстримов", u.failovers ?? 0) +
-    tile("ошибок провайдеров", Object.values(u.providers ?? {}).reduce((sum, stat) => sum + (Number(stat.errors) || 0), 0)) +
-    tile("токенов вход", fmtTok(u.tokensIn)) +
-    tile("токенов выход", fmtTok(u.tokensOut))
-  const lifetime = report.lifetimeTokens ?? {}
-  if (lifetime.tokensIn || lifetime.tokensOut) {
-    $("u-lifetime").textContent = `за всё время: ${fmtTok(lifetime.tokensIn)} вход · ${fmtTok(lifetime.tokensOut)} выход · ${fmtNum(lifetime.requests)} запросов`
-  } else {
-    $("u-lifetime").textContent = "за всё время: пока нет данных"
-  }
+    statTile("requests", fmtNum(u.requests ?? 0), "запросов") +
+    statTile("ok", fmtNum(u.ok ?? 0), "успех") +
+    statTile("limit", fmtNum(limits), "рейт-лимит") +
+    statTile("errors", fmtNum(errors), "ошибки") +
+    statTile("failover", fmtNum(u.failovers ?? 0), "сбоев апстримов") +
+    statTile("input", fmtTok(u.tokensIn), "токенов вход") +
+    statTile("output", fmtTok(u.tokensOut), "токенов выход") +
+    statTile("speed", fmtSpeed(u.tokensOut, u.streamMs), "токенов в секунду")
   renderUsageCharts(u)
   renderUsageHourChart(u, report, today)
   renderUsageGroups()
-  $("u-groups").querySelectorAll("[data-group]").forEach((button) => {
-    button.onclick = () => {
-      usageGroup = button.dataset.group
-      renderUsageGroups()
-    }
-  })
   $("u-providers").innerHTML = usageCompactTable(u.providers)
   $("u-models").innerHTML = usageCompactTable(u.models)
   $("u-sessions").innerHTML = usageSessionTable(u.sessions, report.sessionTitles)
   const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
-  $("u-image-tiles").innerHTML = tile("запросов", imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)) + tile("сгенерировано", u.imagesGenerated ?? 0) + tile("успешных", imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)) + tile("ошибок", imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0))
+  $("u-image-tiles").innerHTML = statTile("images", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)), "запросов") + statTile("output", fmtNum(u.imagesGenerated ?? 0), "сгенерировано") + statTile("ok", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)), "успешных") + statTile("errors", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0)), "ошибок")
   const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"
   const recent = (u.recentImages ?? []).slice().reverse()
   $("u-image-recent").innerHTML = `<strong>Последние модели</strong><div class="muted" style="margin-top:6px">Последняя: ${esc(last(u.lastImageModel))} · последняя edit: ${esc(last(u.lastEditImageModel))}</div>${recent.length ? `<div class="provider-model-list" style="margin-top:10px">${recent.slice(0, 10).map((item) => `<span class="opencode-model"><strong>${esc(item.provider)}/${esc(item.model)}</strong><span>${esc(item.mode ?? "generate")} · ${esc(item.status ?? "pending")} · ${esc(item.at ?? "")}</span></span>`).join("")}</div>` : `<div class="muted" style="margin-top:6px">Изображений ещё не запускали.</div>`}`
@@ -447,6 +492,8 @@ async function load() {
     const r = await api("/api/config")
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     cfg = await r.json()
+    opencodeConfigDefault = cfg.opencodeConfigDefault ?? DEFAULT_OPENCODE_CONFIG
+    delete cfg.opencodeConfigDefault
     cfg.providers ??= {}
     cfg.models ??= {}
     cfg.opencodeModels ??= {}

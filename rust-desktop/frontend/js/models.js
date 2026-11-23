@@ -6,8 +6,9 @@ function openOpenCodeModelDialog(provider = null) {
   const selectedProvider = provider ?? names[0] ?? ""
    const definition = cfg.opencodeModels?.[selectedProvider]
    const current = directModelIds(selectedProvider, definition)
-   directDraft = { provider: selectedProvider, models: [...current], all: definition?.all === true, filter: "", providerFilter: "" }
+  directDraft = { provider: selectedProvider, models: [...current], all: definition?.all === true, filter: "", providerFilter: "", filters: new Set(), editMode: Boolean(provider) }
   dlgOpenCodeModel.returnValue = ""
+  $("dom-delete").hidden = !directDraft.editMode || !cfg.opencodeModels?.[selectedProvider]
   renderOpenCodeModelDialog()
   dlgOpenCodeModel.showModal()
 }
@@ -16,19 +17,9 @@ function renderOpenCodeModelDialog() {
   const names = Object.keys(cfg.providers)
   const providerQuery = directDraft.providerFilter.trim().toLowerCase()
   const shownProviders = providerQuery ? names.filter((name) => name.toLowerCase().includes(providerQuery)) : names
-  $("dom-provider-result").textContent = providerQuery
-    ? `${shownProviders.length} из ${names.length}`
-    : `${names.length} ${names.length === 1 ? "провайдер" : "провайдеров"}`
   $("dom-provider-options").innerHTML = shownProviders.length
-    ? shownProviders
-        .map(
-          (name) => `<button type="button" class="provider-option ${name === directDraft.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === directDraft.provider}">
-            <strong>${esc(name)}</strong><small>${plural((cfg.providers[name].models ?? []).length, "модель", "модели", "моделей")}</small>
-          </button>`,
-        )
-        .join("")
-    : `<span class="muted">${names.length ? "провайдер не найден — измени запрос" : "провайдеров пока нет — добавь их на вкладке «Провайдеры»"}</span>`
-  $("dom-provider-current").innerHTML = directDraft.provider ? `<strong>${esc(directDraft.provider)}</strong>` : "<strong>—</strong>"
+    ? providerOptionsHtml(shownProviders, directDraft.provider)
+    : emptyInlineHtml(names.length ? "ничего не найдено" : "провайдеров пока нет — добавь их на вкладке «Провайдеры»")
   $("dom-provider-filter").value = directDraft.providerFilter
   $("dom-provider-filter").oninput = (e) => {
     directDraft.providerFilter = e.target.value
@@ -45,44 +36,42 @@ function renderOpenCodeModelDialog() {
   $("dom-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
       directDraft.provider = button.dataset.provider
-       const definition = cfg.opencodeModels?.[directDraft.provider]
-       directDraft.models = directModelIds(directDraft.provider, definition)
-       directDraft.all = definition?.all === true
+      const definition = cfg.opencodeModels?.[directDraft.provider]
+      directDraft.models = directModelIds(directDraft.provider, definition)
+      directDraft.all = definition?.all === true
+      $("dom-delete").hidden = !directDraft.editMode || !definition
       directDraft.filter = ""
       renderOpenCodeModelDialog()
     }
   })
-  const p = cfg.providers[directDraft.provider]
-   const all = directModelIds(directDraft.provider, { models: p?.models ?? [], all: true })
-   if (directDraft.all) directDraft.models = [...all]
+
+  const provider = cfg.providers[directDraft.provider]
+  const all = directModelIds(directDraft.provider, { models: provider?.models ?? [], all: true })
+  if (directDraft.all) directDraft.models = [...all]
   const filter = directDraft.filter.trim().toLowerCase()
-  const ids = all.filter((id) => id.toLowerCase().includes(filter))
-  $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
-  const selectAll = $("dom-select-all")
-   selectAll.checked = all.length > 0 && directDraft.all === true
-   selectAll.indeterminate = directDraft.all !== true && directDraft.models.length > 0 && directDraft.models.length < all.length
-   selectAll.onchange = () => {
-     directDraft.all = selectAll.checked
-     directDraft.models = selectAll.checked ? [...all] : []
-    renderOpenCodeModelDialog()
-  }
+  const ids = all.filter((id) => {
+    if (!id.toLowerCase().includes(filter)) return false
+    // Both boxes on means "either", i.e. no restriction.
+    const picked = directDraft.models.includes(id)
+    if (directDraft.filters.has("selected") && !directDraft.filters.has("unselected") && !picked) return false
+    if (directDraft.filters.has("unselected") && !directDraft.filters.has("selected") && picked) return false
+    return true
+  })
+  syncFilterButton("dom-filter-tick", directDraft.filters)
+  $("dom-provider-current").innerHTML = `<strong>${esc(directDraft.provider || "—")}</strong>`
   $("dom-model-list").innerHTML = ids.length
-    ? ids
-        .map(
-            (id) => `<label class="check"><input type="checkbox" data-id="${esc(id)}" ${directDraft.models.includes(id) ? "checked" : ""}><code>${esc(id)}</code>${isImageModel(directDraft.provider, id) ? imageIcon() : ""}${contextBadge(directDraft.provider, id)}${availabilityBadge(directDraft.provider, id)}</label>`,
-        )
-        .join("")
-    : `<span class="muted">${all.length ? "ничего не найдено" : "у провайдера нет выбранных моделей — добавь их на вкладке «Подключения»"}</span>`
+    ? modelCardsHtml(directDraft.provider, ids, { checked: (id) => directDraft.models.includes(id) })
+    : emptyInlineHtml(all.length ? "ничего не найдено" : "у провайдера нет выбранных моделей — добавь их на вкладке «Подключения»")
   $("dom-model-list").querySelectorAll("input[data-id]").forEach((cb) => {
     cb.onchange = () => {
-       const id = cb.dataset.id
-       const i = directDraft.models.indexOf(id)
-       directDraft.all = false
-      if (cb.checked && i < 0) directDraft.models.push(id)
-      if (!cb.checked && i >= 0) directDraft.models.splice(i, 1)
-      $("dom-count").textContent = `${directDraft.models.length} выбрано из ${all.length}`
+      const id = cb.dataset.id
+      const index = directDraft.models.indexOf(id)
+      directDraft.all = false
+      if (cb.checked && index < 0) directDraft.models.push(id)
+      if (!cb.checked && index >= 0) directDraft.models.splice(index, 1)
     }
   })
+  applyPmColumns($("dom-model-list"))
   $("dom-filter").value = directDraft.filter
   $("dom-filter").oninput = (e) => {
     directDraft.filter = e.target.value
@@ -91,10 +80,42 @@ function renderOpenCodeModelDialog() {
     input.focus()
     input.setSelectionRange(input.value.length, input.value.length)
   }
+  $("dom-filter-clear").onclick = () => {
+    directDraft.filter = ""
+    directDraft.filters.clear()
+    renderOpenCodeModelDialog()
+    $("dom-filter").focus()
+  }
+  $("dom-filter-tick").onclick = () => openSearchMenu($("dom-filter-tick"), [
+    { label: "Выбранные", toggle: true, stayOpen: true, checked: directDraft.filters.has("selected"), action: () => { toggleFilter("dom-filter-tick", directDraft.filters, "selected"); renderOpenCodeModelDialog() } },
+    { label: "Не выбранные", toggle: true, stayOpen: true, checked: directDraft.filters.has("unselected"), action: () => { toggleFilter("dom-filter-tick", directDraft.filters, "unselected"); renderOpenCodeModelDialog() } },
+  ])
+  $("dom-filter-menu").onclick = () => openSearchMenu($("dom-filter-menu"), [
+    // Auto mode follows the provider catalog, so it is a switch, not an action.
+    { label: "Выбрать все доступные", toggle: true, stayOpen: true, checked: directDraft.all, action: (on) => {
+      directDraft.all = on
+      directDraft.models = on ? all.filter((id) => cfg.providers[directDraft.provider]?.modelAvailability?.[id]?.available !== false) : []
+      renderOpenCodeModelDialog()
+    } },
+    { label: "Выбрать все", action: () => {
+      directDraft.models = [...all]
+      directDraft.all = false
+      renderOpenCodeModelDialog()
+    } },
+    { label: "Снять выбор", action: () => { directDraft.models = []; directDraft.all = false; renderOpenCodeModelDialog() } },
+  ])
 }
 
 $("om-add").onclick = () => openOpenCodeModelDialog()
 $("dom-cancel").onclick = () => dlgOpenCodeModel.close()
+$("dom-delete").onclick = async () => {
+  const provider = directDraft?.provider
+  if (!provider || !cfg.opencodeModels?.[provider]) return
+  if (!(await askConfirm(`Удалить прямые модели провайдера «${provider}»?`, { title: "Удалить модели", okLabel: "Удалить", danger: true }))) return
+  delete cfg.opencodeModels[provider]
+  save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
+  dlgOpenCodeModel.close()
+}
 $("dom-form").addEventListener("submit", (e) => {
   if (!directDraft?.provider || !directDraft.models.length) {
     e.preventDefault()
@@ -111,4 +132,3 @@ dlgOpenCodeModel.addEventListener("close", () => {
    cfg.opencodeModels[directDraft.provider] = next
   save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
 })
-

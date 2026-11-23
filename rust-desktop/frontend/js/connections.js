@@ -1,4 +1,30 @@
 let pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
+// Active model filters. Empty means "show everything"; every checkbox is
+// independent, so the user can pick any combination.
+let pmFilters = new Set()
+function pmFilterActive() { return pmFilters.size > 0 }
+function syncPmFilterButton() {
+  const button = $("pm-filter-menu")
+  if (!button) return
+  button.classList.toggle("is-active", pmFilterActive())
+  button.dataset.tip = pmFilterActive() ? "Фильтр моделей (включён)" : "Фильтр моделей"
+}
+function togglePmFilter(value) {
+  if (pmFilters.has(value)) pmFilters.delete(value)
+  else pmFilters.add(value)
+  syncPmFilterButton()
+  renderPmList()
+}
+
+function pmCurrentLine() {
+  const name = pmState.provider ?? "—"
+  const status = pmState.loading
+    ? "загружаю список моделей..."
+    : pmState.error
+      ? "не удалось загрузить список моделей, показаны сохранённые"
+      : ""
+  $("pm-provider-current").innerHTML = `<strong>${esc(name)}</strong>${status ? `<span class="pm-current-status${pmState.error ? " is-error" : ""}"> — ${esc(status)}</span>` : ""}`
+}
 
 function renderProviderModels() {
   const allNames = Object.keys(cfg.providers)
@@ -6,30 +32,17 @@ function renderProviderModels() {
   const names = query ? allNames.filter((name) => name.toLowerCase().includes(query)) : allNames
   if (!allNames.length) {
     pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
-    $("pm-provider").innerHTML = ""
-    $("pm-provider").disabled = true
-    $("pm-provider-current").innerHTML = "<strong>—</strong>"
-    $("pm-provider-result").textContent = ""
-    $("pm-status").textContent = ""
-    $("pm-provider-options").innerHTML = `<span class="muted">провайдеров пока нет — добавь в шаге 1</span>`
+    pmCurrentLine()
+    $("pm-provider-options").innerHTML = emptyStateHtml("провайдеров пока нет — добавь на вкладке «Провайдеры»")
     $("pm-list").innerHTML = ""
     return
   }
   if (!allNames.includes(pmState.provider))
     pmState = { provider: allNames[0], ids: [...(cfg.providers[allNames[0]].models ?? [])], filter: "", loading: false, error: null }
-  $("pm-provider").disabled = false
-  $("pm-provider").innerHTML = allNames.map((name) => `<option ${name === pmState.provider ? "selected" : ""}>${esc(name)}</option>`).join("")
-  $("pm-provider-current").innerHTML = `<strong>${esc(pmState.provider)}</strong>`
-  $("pm-provider-result").textContent = query ? `${names.length} из ${allNames.length}` : `${allNames.length} ${allNames.length === 1 ? "провайдер" : "провайдеров"}`
+  pmCurrentLine()
   $("pm-provider-options").innerHTML = names.length
-    ? names
-        .map(
-          (name) => `<button type="button" class="provider-option ${name === pmState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === pmState.provider}">
-            <strong>${esc(name)}</strong><small>${plural((cfg.providers[name].models ?? []).length, "модель", "модели", "моделей")}</small>
-          </button>`,
-        )
-        .join("")
-    : `<span class="muted">провайдер не найден — измени запрос</span>`
+    ? providerOptionsHtml(names, pmState.provider)
+    : emptyStateHtml("ничего не найдено")
   $("pm-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
       const name = button.dataset.provider
@@ -41,15 +54,6 @@ function renderProviderModels() {
     }
   })
   $("pm-filter").value = pmState.filter
-  $("pm-autoload").checked = isAutoAllProvider(pmState.provider)
-  const saved = cfg.providers[pmState.provider].models ?? []
-  $("pm-status").textContent = pmState.loading
-    ? "загружаю /v1/models…"
-    : pmState.error
-      ? `не удалось загрузить (${pmState.error}) — показаны сохранённые`
-      : isAutoAllProvider(pmState.provider)
-        ? `все модели провайдера выбираются автоматически (${pmState.ids.length})`
-        : `выбрано ${saved.length} из ${pmState.ids.length}`
   renderPmList()
 }
 
@@ -151,17 +155,13 @@ $("pm-provider-filter-clear").onclick = () => {
   $("pm-provider-filter").focus()
 }
 
-$("pm-provider").onchange = (e) => {
-  pmState = { provider: e.target.value, ids: [...(cfg.providers[e.target.value]?.models ?? [])], filter: "", loading: false, error: null }
-  renderProviderModels()
-  loadPmModels(pmState.provider)
-}
 $("pm-refresh").onclick = () => loadPmModels(pmState.provider)
-$("pm-autoload").onchange = async (e) => {
+
+async function setPmAutoAll(enabled) {
   const name = pmState.provider
   if (!name) return
   const map = providerAutoAll()
-  if (e.target.checked) {
+  if (enabled) {
     // Remember the manual selection so switching auto off brings the ticks back
     // exactly as they were; the sync below only replaces the effective list.
     cfg.providers[name].autoSelectedModels ??= [...(cfg.providers[name].models ?? [])]
@@ -189,12 +189,62 @@ $("pm-autoload").onchange = async (e) => {
   renderOpenCode()
   renderImageGenerator()
 }
+
+function pmBulkSelect(selected) {
+  const name = pmState.provider
+  if (!name) return flash(false, "сначала выбери провайдера")
+  const provider = cfg.providers[name]
+  const chainsBefore = chainFillSnapshot()
+  if (selected) {
+    provider.models = [...new Set([...(provider.models ?? []), ...pmState.ids])]
+  } else {
+    // Snapshot: removeModelReferences mutates provider.models via direct lists.
+    for (const id of [...(provider.models ?? [])]) removeModelReferences(name, id)
+    provider.models = []
+    pmState.ids = pmState.ids.filter((id) => provider.modelAvailability?.[id]?.available === true)
+  }
+  // "Select all" keeps the manual ticks in sync when auto manages the list.
+  if (isAutoAllProvider(name) && selected) provider.autoSelectedModels = [...(provider.models ?? [])]
+  save()
+  renderProviderModels()
+  renderProviders()
+  renderModels()
+  renderOpencodeModels()
+  renderOpenCode()
+  renderImageGenerator()
+  reportEmptiedChains(chainsBefore)
+}
+
+$("pm-menu").onclick = () => {
+  const auto = pmState.provider ? isAutoAllProvider(pmState.provider) : false
+  openSearchMenu($("pm-menu"), [
+    { label: "Выбрать все", action: () => pmBulkSelect(true) },
+    { label: "Отключить все", action: () => pmBulkSelect(false) },
+    { label: "Выбирать все автоматически", toggle: true, checked: auto, action: (on) => setPmAutoAll(on) },
+  ])
+}
+$("pm-filter-menu").onclick = () => {
+  openSearchMenu($("pm-filter-menu"), [
+    { label: "Выбранные", toggle: true, stayOpen: true, checked: pmFilters.has("selected"), action: () => togglePmFilter("selected") },
+    { label: "Не выбранные", toggle: true, stayOpen: true, checked: pmFilters.has("unselected"), action: () => togglePmFilter("unselected") },
+    { label: "Чат", toggle: true, stayOpen: true, checked: pmFilters.has("chat"), action: () => togglePmFilter("chat") },
+    { label: "Изображения", toggle: true, stayOpen: true, checked: pmFilters.has("image"), action: () => togglePmFilter("image") },
+  ])
+}
 $("pm-filter").oninput = (e) => {
   pmState.filter = e.target.value
   renderPmList()
   const nf = $("pm-filter")
   nf.focus()
   nf.setSelectionRange(nf.value.length, nf.value.length)
+}
+$("pm-filter-clear").onclick = () => {
+  pmState.filter = ""
+  $("pm-filter").value = ""
+  pmFilters.clear()
+  syncPmFilterButton()
+  renderPmList()
+  $("pm-filter").focus()
 }
 $("pm-add").onclick = () => {
   if (!pmState.provider) return flash(false, "сначала добавь провайдера")
@@ -304,24 +354,20 @@ function renderPmList() {
   // list in the background and must not move them.
   const saved = auto ? (p.autoSelectedModels ?? p.models ?? []) : (p.models ?? [])
   const ft = (pmState.filter ?? "").toLowerCase()
-  const shown = pmState.ids.filter((id) => id.toLowerCase().includes(ft))
+  const shown = pmState.ids.filter((id) => {
+    if (!id.toLowerCase().includes(ft)) return false
+    // Picking both boxes of a pair means "either", i.e. no restriction.
+    if (pmFilters.has("image") && !pmFilters.has("chat") && !isImageModel(pmState.provider, id)) return false
+    if (pmFilters.has("chat") && !pmFilters.has("image") && isImageModel(pmState.provider, id)) return false
+    if (pmFilters.has("selected") && !pmFilters.has("unselected") && !saved.includes(id)) return false
+    if (pmFilters.has("unselected") && !pmFilters.has("selected") && saved.includes(id)) return false
+    return true
+  })
+  // Model filters live in the panel button; keep its state in sync on every list render.
+  syncPmFilterButton()
   $("pm-list").innerHTML = shown.length
-    ? shown
-        .map(
-           (id) => `
-        <div class="provider-model-card">
-          <label class="provider-model-card-main">
-            <input type="checkbox" data-id="${esc(id)}" ${saved.includes(id) ? "checked" : ""}${auto ? " disabled" : ""}>
-            <span class="provider-model-card-body">
-              <code title="${esc(id)}">${esc(id)}</code>
-              <span class="provider-model-card-meta">${isImageModel(pmState.provider, id) ? imageIcon() : ""}${contextBadge(pmState.provider, id)}${availabilityBadge(pmState.provider, id)}</span>
-            </span>
-          </label>
-          <button type="button" class="model-settings-button" data-model-settings="${esc(id)}" aria-label="Параметры модели ${esc(id)}" title="Параметры модели">⋮</button>
-        </div>`,
-        )
-        .join("")
-    : `<span class="muted">${pmState.ids.length ? "ничего не найдено" : "список пуст — нажми «обновить список» или добавь вручную"}</span>`
+    ? modelCardsHtml(pmState.provider, shown, { checked: (id) => saved.includes(id), disabled: auto, settings: true })
+    : emptyStateHtml(pmState.ids.length ? "ничего не найдено" : "список пуст — обнови его или добавь модель вручную")
   // No redraw per click — only counters, otherwise the list scroll jumps to the top.
   $("pm-list").querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.onchange = () => {
@@ -341,7 +387,6 @@ function renderPmList() {
       renderOpencodeModels()
       renderOpenCode()
       renderImageGenerator()
-      $("pm-status").textContent = `выбрано ${arr.length} из ${pmState.ids.length}`
       reportEmptiedChains(chainsBefore)
     }
   })
@@ -351,16 +396,16 @@ function renderPmList() {
   applyPmColumns($("pm-list"))
 }
 
-// Cards per row: as many as the widest card needs, so a model id is not cut in
-// half. Too few columns waste space, so the count follows the real card width
-// instead of a guessed minimum and stays between 1 and 4.
+// Cards per row: as many as fit without clipping a card's content. The probe
+// measures each card's full natural width (id + badges); if even one card would
+// be squeezed, the column count drops until it fits.
 function pmColumnCount(available, cardWidth, gap = 8) {
   return Math.max(1, Math.min(4, Math.floor((available + gap) / (cardWidth + gap))))
 }
 let pmColumnsObserver = null
 function applyPmColumns(box) {
   // Measured once per render: a max-content copy reports the width the card
-  // wants, ellipsis and all. One pathologically long id must not collapse the
+  // wants, badges and all. One pathologically long id must not collapse the
   // grid to a single column, hence the cap.
   const MAX_CARD = 320
   const probe = document.createElement("div")
@@ -373,18 +418,21 @@ function applyPmColumns(box) {
     widest = Math.max(widest, Math.ceil(probe.getBoundingClientRect().width))
   }
   probe.remove()
-  const needed = Math.max(210, Math.min(MAX_CARD, widest))
+  // The card cannot shrink below its fixed chrome (tick, gap, ⋮ button), so a
+  // very long id is capped rather than forcing one column.
+  const MIN_CARD = 210
+  const needed = Math.max(MIN_CARD, Math.min(MAX_CARD, widest))
+  const grid = box.querySelector(".pm-grid") ?? box
   const fit = () => {
-    const available = box.clientWidth
+    const available = grid.clientWidth
     if (!available) return // hidden tab: the observer fires once it has width
     const cols = pmColumnCount(available, needed)
-    if (box.dataset.pmCols === String(cols)) return
-    box.dataset.pmCols = String(cols)
-    box.style.setProperty("--pm-cols", cols)
+    if (grid.dataset.pmCols === String(cols)) return
+    grid.dataset.pmCols = String(cols)
+    grid.style.setProperty("--pm-cols", cols)
   }
   fit()
   pmColumnsObserver?.disconnect()
   pmColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
-  pmColumnsObserver.observe(box)
+  pmColumnsObserver.observe(grid)
 }
-

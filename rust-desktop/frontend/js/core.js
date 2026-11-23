@@ -19,7 +19,7 @@ if (appWindow) {
     document.body.classList.toggle("is-maximized", maximized)
     const label = maximized ? "Восстановить окно" : "Развернуть окно"
     $("titlebar-maximize").setAttribute("aria-label", label)
-    $("titlebar-maximize").title = label
+    $("titlebar-maximize").dataset.tip = label
   }
   appWindow.onResized(syncFrameState)
   syncFrameState()
@@ -29,11 +29,21 @@ if (appWindow) {
 // the button and clamped to the viewport. It opens only for the button itself:
 // hovering the label used to cover the input and block typing.
 const fieldHint = $("field-hint")
-function showFieldHint(button) {
-  const hint = button?.dataset.hint
+let hintButton = null
+let hintPinned = false
+let hintDeadline = 0
+let hintTimer = 0
+function showFieldHint(button, html) {
+  const hint = html ?? button?.dataset.hint ?? button?.dataset.tip
   if (!hint) return
-  fieldHint.textContent = hint
+  hintButton = button
+  if (html) fieldHint.innerHTML = html
+  else fieldHint.textContent = hint
   fieldHint.hidden = false
+  // A modal dialog paints in the top layer, above any page-level layer, so the
+  // hint has to live inside the dialog that owns the button.
+  const host = button.closest("dialog") ?? document.body
+  if (fieldHint.parentElement !== host) host.append(fieldHint)
   const anchor = button.getBoundingClientRect()
   const box = fieldHint.getBoundingClientRect()
   const margin = 8
@@ -48,7 +58,41 @@ function showFieldHint(button) {
   fieldHint.style.top = `${top}px`
   fieldHint.style.left = `${left}px`
 }
-const hideFieldHint = () => { fieldHint.hidden = true }
+function hideFieldHint() {
+  clearTimeout(hintTimer)
+  hintTimer = 0
+  hintPinned = false
+  hintDeadline = 0
+  const button = hintButton
+  hintButton = null
+  fieldHint.hidden = true
+  // A click leaves the button focused; without this its accent ring outlives
+  // the hint it opened. The window may already have lost focus, where the
+  // button no longer reports :focus, so blur it unconditionally.
+  button?.blur()
+}
+// A click holds the hint for five seconds. The countdown pauses while the
+// pointer rests on the hint or its button, and resumes from where it stopped.
+function pinFieldHint(button) {
+  showFieldHint(button)
+  hintPinned = true
+  hintDeadline = Date.now() + 5000
+  armHintTimer()
+}
+function armHintTimer() {
+  clearTimeout(hintTimer)
+  hintTimer = 0
+  if (!hintDeadline) return
+  hintTimer = setTimeout(hideFieldHint, Math.max(0, hintDeadline - Date.now()))
+}
+function holdFieldHint(inside) {
+  if (!hintPinned) return
+  if (inside) {
+    clearTimeout(hintTimer)
+    hintTimer = 0
+  } else armHintTimer()
+}
+const overHintArea = (node) => Boolean(node?.closest?.(".field-help, [data-tip], #field-hint"))
 // A session name is long and gets truncated, so hovering shows it whole and a
 // click copies it. The copy uses the clipboard API and falls back to a hidden
 // textarea, because the desktop webview may not expose navigator.clipboard.
@@ -75,22 +119,52 @@ document.addEventListener("click", async (event) => {
   const copied = await copyText(text)
   flash(copied, copied ? `скопировано: ${text}` : "не удалось скопировать")
 })
+document.addEventListener("click", (event) => {
+  const button = event.target.closest?.(".field-help")
+  if (button) {
+    pinFieldHint(button)
+    return
+  }
+  // A click anywhere outside the hint dismisses it and drops its highlight.
+  if (!event.target.closest?.("#field-hint")) hideFieldHint()
+})
+// Native title attributes are replaced by the shared hint layer: one look
+// everywhere, and it works inside dialogs. Runs once at boot; dynamic markup
+// uses data-tip directly.
+for (const node of document.querySelectorAll("[title]")) {
+  if (!node.dataset.tip) node.dataset.tip = node.getAttribute("title")
+  node.removeAttribute("title")
+}
 document.addEventListener("pointerover", (event) => {
   const button = event.target.closest?.(".field-help")
   if (button) showFieldHint(button)
+  else {
+    const tipped = event.target.closest?.("[data-tip]")
+    if (tipped && !hintPinned) showFieldHint(tipped, tipped.dataset.tipHtml || null)
+  }
+  if (hintPinned) holdFieldHint(overHintArea(event.target))
 })
 document.addEventListener("pointerout", (event) => {
-  if (event.target.closest?.(".field-help")) hideFieldHint()
+  if (!overHintArea(event.target)) return
+  if (hintPinned) {
+    holdFieldHint(overHintArea(event.relatedTarget))
+    return
+  }
+  hideFieldHint()
 })
 document.addEventListener("focusin", (event) => {
   const button = event.target.closest?.(".field-help")
   if (button) showFieldHint(button)
 })
 document.addEventListener("focusout", (event) => {
-  if (event.target.closest?.(".field-help")) hideFieldHint()
+  // A pinned hint survives losing focus; its own timer, a click, a scroll or a
+  // tab switch close it instead.
+  if (event.target.closest?.(".field-help") && !hintPinned) hideFieldHint()
 })
 window.addEventListener("scroll", hideFieldHint, true)
 window.addEventListener("resize", hideFieldHint)
+// Switching to another app (minimizing) must not leave the hint hanging.
+window.addEventListener("blur", hideFieldHint)
 
 let cfg = { providers: {}, models: {}, imageSettings: { defaultProvider: "", defaultModel: "" }, appSettings: { theme: "dark", autoUpdate: false, autoRestart: false, autostart: false } }
 let token = localStorage.getItem("pp_token") ?? ""
@@ -132,9 +206,121 @@ function askToken() {
   })
   return tokenRequest
 }
+// One styled confirm dialog replaces every native confirm(): the browser box
+// cannot be themed and shows the raw origin. Resolves true/false; Escape and a
+// click on the backdrop count as "cancel".
+let confirmRequest = null
+function askConfirm(message, { title = "Подтверждение", okLabel = "Подтвердить", danger = false } = {}) {
+  if (confirmRequest) return confirmRequest
+  confirmRequest = new Promise((resolve) => {
+    const dialog = $("dlg-confirm")
+    $("confirm-title").textContent = title
+    // An empty title means the dialog asks one plain question and needs no header.
+    dialog.querySelector(".dialog-header").hidden = !title
+    $("confirm-message").textContent = message
+    const ok = $("confirm-ok")
+    ok.textContent = okLabel
+    ok.className = danger ? "danger" : "primary"
+    const finish = (value) => {
+      confirmRequest = null
+      $("confirm-cancel").onclick = null
+      ok.onclick = null
+      if (dialog.open) dialog.close()
+      resolve(value)
+    }
+    $("confirm-cancel").onclick = () => finish(false)
+    ok.onclick = () => finish(true)
+    dialog.addEventListener("close", () => { if (confirmRequest) finish(false) }, { once: true })
+    dialog.returnValue = ""
+    dialog.showModal()
+    ok.focus()
+  })
+  return confirmRequest
+}
+
+// Shared popover for search filters and the "⋮" actions menu. Lives inside the
+// open dialog when the anchor is in one, because the top layer paints above
+// any page-level element.
+const searchMenu = $("search-menu")
+let searchMenuAnchor = null
+function closeSearchMenu() {
+  searchMenu.hidden = true
+  searchMenuAnchor?.setAttribute("aria-expanded", "false")
+  searchMenuAnchor = null
+}
+function openSearchMenu(anchor, items) {
+  if (searchMenuAnchor === anchor && !searchMenu.hidden) return closeSearchMenu()
+  closeSearchMenu()
+  searchMenuAnchor = anchor
+  anchor.setAttribute("aria-expanded", "true")
+  searchMenu.replaceChildren(...items.map((item) => {
+    if (item.toggle) {
+      const label = document.createElement("label")
+      label.className = "search-menu-switch"
+      const input = document.createElement("input")
+      input.type = "checkbox"
+      input.checked = Boolean(item.checked)
+      input.onchange = () => { if (!item.stayOpen) closeSearchMenu(); item.action?.(input.checked) }
+      const text = document.createElement("span")
+      text.textContent = item.label
+      label.append(input, text)
+      return label
+    }
+    const button = document.createElement("button")
+    button.type = "button"
+    button.setAttribute("role", "menuitemradio")
+    button.setAttribute("aria-checked", String(Boolean(item.checked)))
+    button.className = "search-menu-item" + (item.checked ? " is-active" : "") + (item.danger ? " danger" : "")
+    button.textContent = item.label
+    button.onclick = () => { closeSearchMenu(); item.action?.() }
+    return button
+  }))
+  const host = anchor.closest("dialog") ?? document.body
+  if (searchMenu.parentElement !== host) host.append(searchMenu)
+  searchMenu.hidden = false
+  const anchorBox = anchor.getBoundingClientRect()
+  const box = searchMenu.getBoundingClientRect()
+  const margin = 8
+  let left = Math.min(anchorBox.right - box.width, window.innerWidth - box.width - margin)
+  if (left < margin) left = margin
+  const aboveTop = anchorBox.top - box.height - 6
+  let top = aboveTop >= margin ? aboveTop : anchorBox.bottom + 6
+  if (top + box.height > window.innerHeight - margin) top = Math.max(margin, aboveTop)
+  searchMenu.style.left = `${left}px`
+  searchMenu.style.top = `${top}px`
+}
+document.addEventListener("click", (event) => {
+  if (searchMenu.hidden) return
+  if (event.target.closest?.("#search-menu") || event.target === searchMenuAnchor || searchMenuAnchor?.contains?.(event.target)) return
+  closeSearchMenu()
+})
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !searchMenu.hidden) closeSearchMenu() })
+window.addEventListener("scroll", closeSearchMenu, true)
+window.addEventListener("resize", closeSearchMenu)
+
+const emptyStateHtml = (message) => `<div class="sessions-empty"><svg class="sessions-empty-icon" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="88"></circle><path d="M67 67l66 66m0-66-66 66"></path></svg><strong>${esc(message)}</strong></div>`
+// Dialog panes have little room: a one-line note instead of the big illustration.
+const emptyInlineHtml = (message) => `<div class="empty-inline">${esc(message)}</div>`
+const filterIconHtml = (id, label) => `<button id="${id}" class="search-filter" type="button" aria-label="${esc(label)}" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button>`
+
 const filters = new Map() // filter text per chips list, keyed by container id
 let providersFilter = ""
 let pmProviderFilter = ""
+let modelSearch = ""
+// Checkbox filters: an empty set shows everything, any picked value narrows.
+let chainFilters = new Set() // active | disabled | empty
+let directModelSearch = ""
+let directFilters = new Set() // active | disabled
+
+function syncFilterButton(id, filters) {
+  const button = $(id)
+  if (button) button.classList.toggle("is-active", filters.size > 0)
+}
+function toggleFilter(buttonId, filters, value) {
+  if (filters.has(value)) filters.delete(value)
+  else filters.add(value)
+  syncFilterButton(buttonId, filters)
+}
 
 const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
 const isImageModel = (provider, id) => {
@@ -150,7 +336,7 @@ const directModelIds = (provider, definition = cfg.opencodeModels?.[provider]) =
   return [...new Set(ids.filter((id) => !isImageModel(provider, id)))]
 }
 const imageModelEndpoint = (provider, id) => (modelDetails(provider, id)?.endpoints ?? []).find((endpoint) => /images\/generations/i.test(String(endpoint))) ? "images/generations" : "images/tasks"
-const imageIcon = (label = "Модель изображений") => `<span class="model-kind-icon" title="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5-5 3 3 2-2 6 5"></path></svg></span>`
+const imageIcon = (label = "Модель изображений") => `<span class="model-kind-icon" data-tip="${esc(label)}" aria-label="${esc(label)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m4 17 5-5 3 3 2-2 6 5"></path></svg></span>`
 function mergeProviderModelDetails(provider, details) {
   provider.modelInfo ??= {}
   for (const [id, detail] of Object.entries(details ?? {})) {
@@ -211,12 +397,12 @@ const chainContextBadge = (upstreams) => {
     .map((upstream) => contextValues(modelDetails(upstream.provider, upstream.model)).current)
     .filter((value) => Number.isSafeInteger(value) && value > 0)
   if (!contexts.length) return ""
-  return `<span class="pill model-context-pill" title="контекст цепочки">ctx ${esc(formatContext(Math.min(...contexts)))}</span>`
+  return `<span class="pill model-context-pill" data-tip="контекст цепочки">ctx ${esc(formatContext(Math.min(...contexts)))}</span>`
 }
 const availabilityBadge = (provider, id) => {
   const status = cfg.providers[provider]?.modelAvailability?.[id]
   return status?.available === false
-    ? `<span class="model-warning" title="Модель не найдена в последнем успешном ответе /v1/models">⚠ не найдена</span>`
+    ? `<span class="model-warning" data-tip="Модель не найдена после обновления списка">⚠ не найдена</span>`
     : ""
 }
 const imageSettings = () => (cfg.imageSettings ??= { defaultProvider: "", defaultModel: "" })
@@ -350,8 +536,7 @@ function save(silent = false) {
     if (seq === saveSeq) configDirty = false
     const j = await r.json().catch(() => ({}))
     debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
-    if (j.opencodeSynced === false) return flash(false, "сохранено, но интеграция не обновлена — проверь путь и вкладку «Логи»")
+    if (j.opencodeSynced === false) return flash(false, "сохранено, но Opencode не обновлен — проверь путь и вкладку «Логи»")
     if (!silent) flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
   }, 300)
 }
-

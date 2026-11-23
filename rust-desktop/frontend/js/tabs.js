@@ -10,7 +10,7 @@ function setNavigationCollapsed(collapsed) {
   navigation.classList.toggle("nav-collapsed", collapsed)
   navigationCollapseButton.setAttribute("aria-expanded", String(!collapsed))
   navigationCollapseButton.setAttribute("aria-label", collapsed ? "Развернуть навигацию" : "Свернуть навигацию")
-  navigationCollapseButton.title = collapsed ? "Развернуть навигацию" : "Свернуть навигацию"
+  navigationCollapseButton.dataset.tip = collapsed ? "Развернуть навигацию" : "Свернуть навигацию"
   localStorage.setItem("pp_navigation_collapsed", collapsed ? "1" : "0")
 }
 setNavigationCollapsed(navigationCollapsed)
@@ -35,6 +35,7 @@ document.querySelectorAll(".tab-group-toggle").forEach((button) => {
 
 function showTab(name) {
   if (!TABS.includes(name)) name = "providers"
+  hideFieldHint()
   tab = name
   debugLog("tab", { name })
   localStorage.setItem("pp_tab", name)
@@ -53,7 +54,10 @@ function showTab(name) {
   const activeSection = document.querySelector(`main > section[data-tab="${name}"]`)
   const heading = activeSection?.querySelector(".section-head h2")
   const hint = activeSection?.querySelector(".section-head .field-help")
-  titlebarTitle.textContent = heading?.textContent ?? ""
+  // The caption title mirrors the navigation label; the section heading stays
+  // as the fallback and the single source of the hint text.
+  const navLabel = document.querySelector(`.tabs button[data-tab="${name}"] .tab-label`)
+  titlebarTitle.textContent = navLabel?.textContent?.trim() ?? heading?.textContent ?? ""
   titlebarHelp.hidden = !hint
   if (hint) {
     titlebarHelp.dataset.hint = hint.dataset.hint

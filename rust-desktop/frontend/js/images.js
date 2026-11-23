@@ -16,12 +16,11 @@ function renderImageGenerator() {
   const shownNames = query ? allNames.filter((name) => name.toLowerCase().includes(query)) : allNames
   const settings = imageSettings()
   if (!allNames.includes(imageState.provider)) imageState.provider = allNames.includes(settings.defaultProvider) ? settings.defaultProvider : allNames[0] ?? null
-  $("ig-provider-result").textContent = query ? `${shownNames.length} из ${allNames.length}` : `${allNames.length} ${allNames.length === 1 ? "провайдер" : "провайдеров"}`
   $("ig-provider-options").innerHTML = shownNames.length
     ? shownNames
-        .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong><small>${plural(imageModelIds(name).length, "image-модель", "image-модели", "image-моделей")}</small></button>`)
+        .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong></button>`)
         .join("")
-    : `<span class="muted">${allNames.length ? "провайдер не найден — измени запрос" : "моделей изображений пока нет — обнови список на вкладке «Подключения» и отметь image-модель"}</span>`
+    : emptyStateHtml(allNames.length ? "ничего не найдено" : "моделей изображений пока нет — обнови список на вкладке «Подключения» и отметь image-модель")
   $("ig-provider-current").innerHTML = imageState.provider ? `<strong>${esc(imageState.provider)}</strong>` : "<strong>—</strong>"
   const ids = imageState.provider ? imageModelIds(imageState.provider) : []
   const selectedModel = $("ig-model").value
@@ -29,7 +28,6 @@ function renderImageGenerator() {
   const preferredModel = ids.includes(selectedModel) ? selectedModel : ids.includes(settings.defaultModel) ? settings.defaultModel : ids[0]
   if (preferredModel) $("ig-model").value = preferredModel
   $("ig-model").disabled = !ids.length
-  $("ig-status").textContent = imageState.provider ? plural(ids.length, "image-модель", "image-модели", "image-моделей") : "нет доступных моделей"
   $("ig-provider-filter").value = imageProviderFilter
   $("ig-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
@@ -184,4 +182,3 @@ $("ig-clear").onclick = () => {
   $("ig-image-file-name").textContent = ""
   renderImageResult()
 }
-

@@ -14,14 +14,14 @@
       <button id="titlebar-help" class="field-help" type="button" hidden>?</button>
     </div>
     <div class="titlebar-controls">
-      <button id="titlebar-minimize" class="titlebar-button" type="button" aria-label="Свернуть окно" title="Свернуть">
+      <button id="titlebar-minimize" class="titlebar-button" type="button" aria-label="Свернуть окно" data-tip="Свернуть">
         <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 5h8"/></svg>
       </button>
-      <button id="titlebar-maximize" class="titlebar-button" type="button" aria-label="Развернуть окно" title="Развернуть">
+      <button id="titlebar-maximize" class="titlebar-button" type="button" aria-label="Развернуть окно" data-tip="Развернуть">
         <svg class="titlebar-ico-maximize" viewBox="0 0 10 10" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="7" rx="1"/></svg>
         <svg class="titlebar-ico-restore" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 3.5V1.5h5v5h-2"/><rect x="1.5" y="3.5" width="5" height="5" rx=".8"/></svg>
       </button>
-      <button id="titlebar-close" class="titlebar-button titlebar-close" type="button" aria-label="Закрыть окно" title="Закрыть">
+      <button id="titlebar-close" class="titlebar-button titlebar-close" type="button" aria-label="Закрыть окно" data-tip="Закрыть">
         <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1.6 1.6l6.8 6.8M8.4 1.6l-6.8 6.8"/></svg>
       </button>
     </div>
@@ -30,7 +30,7 @@
     <div class="tabs-brand">
       <img class="tabs-brand-mark" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAARklEQVR42mMQk5D9P5CYYdA4QE3LmK541AGjDiDaAbZVwRThUQeMOmDUAaMOGHXAqANGHTDqgKHvgNE24agD6OaAEds7BgDTgWu7q0wBGgAAAABJRU5ErkJggg==" alt="">
       <span class="tabs-brand-text">Provider Proxy</span>
-      <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" title="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path class="tabs-collapse-arrow" d="m16 15-3-3 3-3"/></svg></button>
+      <button id="tabs-collapse" class="tabs-collapse" type="button" aria-label="Свернуть навигацию" aria-expanded="true" data-tip="Свернуть навигацию"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path class="tabs-collapse-arrow" d="m16 15-3-3 3-3"/></svg></button>
     </div>
     <div class="tabs-scroll">
       <div class="tab-group" role="group" aria-label="Провайдеры">
@@ -43,13 +43,13 @@
         <button class="tab-group-toggle" type="button" data-group="connections" aria-expanded="true"><span>Подключения</span></button>
         <div class="tab-group-tabs">
           <button data-tab="connections"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg></span><span class="tab-label">Подключения</span></button>
-          <button data-tab="integrations"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="tab-label">Интеграции</span></button>
+          <button data-tab="integrations"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877L1.896 13.96a2.404 2.404 0 0 1-.707-1.704 2.402 2.402 0 0 1 .706-1.704l1.611-1.611a.98.98 0 0 1 .837-.276c.47.07.802.48.968.925a2.501 2.501 0 1 0 3.214-3.214c-.446-.166-.855-.497-.925-.968a.979.979 0 0 1 .276-.837l1.61-1.61a2.404 2.404 0 0 1 1.705-.707c.618 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z"/></svg></span><span class="tab-label">Интеграции</span></button>
         </div>
       </div>
       <div class="tab-group" role="group" aria-label="Модели">
         <button class="tab-group-toggle" type="button" data-group="models" aria-expanded="true"><span>Модели</span></button>
         <div class="tab-group-tabs">
-          <button data-tab="chains"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 6h11"/><path d="M10 12h11"/><path d="M10 18h11"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg></span><span class="tab-label">Цепочки</span></button>
+          <button data-tab="chains"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><span class="tab-label">Цепочки</span></button>
           <button data-tab="models"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span><span class="tab-label">Модели</span></button>
         </div>
       </div>
@@ -69,66 +69,55 @@
       <button id="update-nav-button" class="update-nav-button" type="button" hidden aria-label="Доступно обновление"><span class="update-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg></span><span id="update-nav-label">Обновление</span><span class="update-progress" id="update-progress" hidden><span class="update-progress-fill" id="update-progress-fill"></span></span></button>
     </div>
     <div class="tabs-splitter" aria-hidden="true"></div>
-    <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span>Настройки</span></button>
+    <button class="settings-nav-button" data-tab="settings" type="button"><span class="settings-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span class="tab-label">Настройки</span></button>
   </nav>
 
   <section data-tab="providers">
     <div class="section-head">
       <h2>Провайдеры</h2>
       <button type="button" class="field-help" data-hint="Подключение внешних провайдеров." aria-label="Что на вкладке «Провайдеры»">?</button>
-      <div class="row">
-        <button id="p-checkins" style="display:none">Открыть все чекины</button>
-        <button class="primary" id="p-add">+ Добавить провайдера</button>
-      </div>
     </div>
-    <div class="filter-bar">
+    <div class="filter-bar providers-toolbar">
       <label class="search-field">
-        <span class="sr-only">Поиск провайдеров</span>
-        <input id="providers-filter" placeholder="Найти провайдера…" autocomplete="off">
-        <button id="providers-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+        <span class="sr-only">Поиск</span>
+        <input id="providers-filter" placeholder="Поиск" autocomplete="off">
+        <button id="providers-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
       </label>
-      <span id="providers-filter-result" class="filter-result"></span>
+      <button id="p-checkins" type="button" style="display:none" data-tip="Открыть все чек-ины"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"></path><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"></path></svg>Чек-ины</button>
+      <button class="primary" id="p-add" type="button"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
     </div>
     <table id="providers"></table>
+    <div id="providers-empty"></div>
   </section>
 
-  <section data-tab="connections">
+  <section data-tab="connections" class="connections-page">
     <div class="section-head">
-      <h2>Модели провайдеров</h2>
+      <h2>Подключения</h2>
       <button type="button" class="field-help" data-hint="Включение моделей провайдера. Только включенные модели могут быть использованы в дальнейшем." aria-label="Что на вкладке «Подключения»">?</button>
-      <span class="muted" id="pm-status"></span>
     </div>
-    <div class="provider-picker">
+    <div class="pm-providers-pane">
       <div class="filter-bar">
         <label class="search-field">
-          <span class="sr-only">Поиск провайдеров</span>
-          <input id="pm-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
-          <button id="pm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+          <span class="sr-only">Поиск</span>
+          <input id="pm-provider-filter" placeholder="Поиск" autocomplete="off">
+          <button id="pm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
         </label>
-        <span id="pm-provider-result" class="filter-result"></span>
       </div>
       <div id="pm-provider-options" class="provider-options" role="listbox" aria-label="Список провайдеров"></div>
     </div>
-    <div class="row" style="margin-top:10px">
-      <span class="muted">выбран:</span>
-      <span id="pm-provider-current" class="provider-current"><strong>—</strong></span>
-      <select id="pm-provider" class="sr-only" tabindex="-1" aria-hidden="true"></select>
-      <button type="button" id="pm-refresh">обновить список</button>
-    </div>
-    <div class="pm-filter-row">
-      <input id="pm-filter" placeholder="фильтр по имени…">
-      <label class="pm-autoload" title="Все модели провайдера выбираются и обновляются автоматически. Галочки на моделях не ставятся.">
-        <input id="pm-autoload" type="checkbox">
-        <span class="pm-autoload-body">
-          <strong>выбирать все автоматически</strong>
-          <small>загружать список моделей</small>
-        </span>
-      </label>
-    </div>
-    <div id="pm-list" style="max-height:360px;overflow:auto;margin-top:8px;padding-right:2px;scrollbar-gutter:stable;display:grid;grid-template-columns:repeat(var(--pm-cols,1),minmax(0,1fr));gap:8px"></div>
-    <div class="row" style="margin-top:12px;padding:10px;border:1px dashed #3a4150;border-radius:8px">
-      <input id="pm-manual" placeholder="ID модели вручную" style="flex:1">
-      <button type="button" id="pm-add">＋ добавить</button>
+    <div class="pm-splitter" aria-hidden="true"></div>
+    <div class="pm-models-pane">
+      <div id="pm-provider-current" class="pm-current-line"></div>
+      <div class="filter-bar pm-filter-row">
+        <label class="search-field"><span class="sr-only">Поиск</span><input id="pm-filter" placeholder="Поиск"><button id="pm-filter-menu" class="search-filter" type="button" aria-label="Фильтр моделей" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="pm-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+        <button type="button" id="pm-refresh" class="pm-icon-button" aria-label="Обновить список моделей" data-tip="Обновить список"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+        <button type="button" id="pm-menu" class="pm-icon-button" aria-label="Действия с моделями" data-tip="Действия" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg></button>
+      </div>
+      <div id="pm-list"></div>
+      <div class="pm-manual-row">
+        <input id="pm-manual" placeholder="ID модели вручную">
+        <button type="button" id="pm-add" class="primary"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
+      </div>
     </div>
   </section>
 
@@ -140,12 +129,12 @@
     <div class="opencode-panel integration-card">
       <div class="opencode-panel-head">
         <div>
-          <h3>Интеграция</h3>
+          <h3>Opencode</h3>
           <p>Сюда записываются прямые модели и включённые цепочки.</p>
         </div>
         <div class="integration-actions">
           <button id="opencode-sync" type="button">Синхронизировать</button>
-          <label id="opencode-toggle" class="chain-toggle is-on" title="Выключить интеграцию">
+          <label id="opencode-toggle" class="chain-toggle is-on" data-tip="Выключить Opencode">
             <input id="opencode-enabled" type="checkbox" checked>
             <span class="chain-switch" aria-hidden="true"></span>
           </label>
@@ -153,10 +142,10 @@
       </div>
       <div class="opencode-config-grid">
         <label>Файл конфигурации
-          <input id="oc-path" placeholder="~/.config/opencode/opencode.jsonc">
+          <span class="reset-input"><input id="oc-path" placeholder="~/.config/opencode/opencode.jsonc"><button type="button" class="field-reset" data-reset="oc-path" aria-label="Сбросить файл конфигурации" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
         </label>
         <label>Имя провайдера
-          <input id="oc-provider" placeholder="provider-proxy">
+          <span class="reset-input"><input id="oc-provider" placeholder="provider-proxy"><button type="button" class="field-reset" data-reset="oc-provider" aria-label="Сбросить имя провайдера" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
         </label>
       </div>
       <div class="opencode-preview-head">
@@ -164,22 +153,8 @@
         <span id="oc-status" class="muted"></span>
       </div>
       <div id="oc-preview" class="opencode-preview"></div>
-      <div class="skill-card integration-skill-card">
-        <div class="skill-card-head">
-          <div>
-            <h3>Skill генерации изображений</h3>
-            <p>Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
-          </div>
-          <span id="image-skill-status" class="skill-status">проверяю…</span>
-        </div>
-        <div id="image-skill-path" class="skill-path">—</div>
-        <div class="row">
-          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
-          <button type="button" id="image-skill-settings" class="settings-button" aria-label="Настройки skill" title="Модель по умолчанию для skill">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-          </button>
-          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
-        </div>
+      <div class="row" style="margin-top:12px">
+        <button type="button" id="integrations-advanced">Расширенные настройки</button>
       </div>
     </div>
   </section>
@@ -188,7 +163,10 @@
     <div class="section-head">
       <h2>Цепочки</h2>
       <button type="button" class="field-help" data-hint="Цепочка пробует модели по очереди: если первая не ответила, берётся следующая." aria-label="Что на вкладке «Цепочки»">?</button>
-      <button class="primary" id="m-add">+ Добавить цепочку</button>
+    </div>
+    <div class="filter-bar">
+      <label class="search-field"><span class="sr-only">Поиск цепочек</span><input id="m-search" type="search" placeholder="Поиск" autocomplete="off"><button id="m-search-filter" class="search-filter" type="button" aria-label="Фильтр цепочек" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="m-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+      <button class="primary" id="m-add" type="button"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
     </div>
     <div id="models"></div>
   </section>
@@ -197,25 +175,26 @@
     <div class="section-head">
       <h2>Модели</h2>
       <button type="button" class="field-help" data-hint="Выбор провайдера и его моделей, которые нужно использовать без цепочки." aria-label="Что на вкладке «Модели»">?</button>
-      <button class="primary" id="om-add">+ Добавить модель</button>
+    </div>
+    <div class="filter-bar">
+      <label class="search-field"><span class="sr-only">Поиск моделей</span><input id="om-search" type="search" placeholder="Поиск" autocomplete="off"><button id="om-search-filter" class="search-filter" type="button" aria-label="Фильтр моделей" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="om-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+      <button class="primary" id="om-add" type="button"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
     </div>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
   <section data-tab="images">
     <div class="section-head">
-      <h2>Генерация изображений</h2>
+      <h2>Изображения</h2>
       <button type="button" class="field-help" data-hint="Использование image моделей для генерации изображений." aria-label="Что на вкладке «Изображения»">?</button>
-      <span class="muted" id="ig-status"></span>
     </div>
     <div class="provider-picker">
       <div class="filter-bar">
         <label class="search-field">
-          <span class="sr-only">Поиск провайдеров с моделями изображений</span>
-          <input id="ig-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
-          <button id="ig-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
+          <span class="sr-only">Поиск</span>
+          <input id="ig-provider-filter" placeholder="Поиск" autocomplete="off">
+          <button id="ig-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
         </label>
-        <span id="ig-provider-result" class="filter-result"></span>
       </div>
       <div id="ig-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры с моделями изображений"></div>
     </div>
@@ -271,35 +250,23 @@
     <div class="section-head">
         <h2>Логи</h2>
       <button type="button" class="field-help" data-hint="Записи прокси: переключения между провайдерами, ошибки апстримов и ответы моделей." aria-label="Что на вкладке «Логи»">?</button>
-      <span class="muted" id="log-info"></span>
     </div>
     <div class="log-controls">
-      <input id="log-search" type="search" placeholder="Поиск по логам…" aria-label="Поиск по логам">
-      <select id="log-filter" aria-label="Фильтр логов">
-        <option value="all">Все события</option>
-        <option value="answer">Ответы</option>
-        <option value="switch">Переключения</option>
-        <option value="error">Ошибки</option>
-      </select>
+      <label class="search-field"><span class="sr-only">Поиск по логам</span><input id="log-search" type="search" placeholder="Поиск" aria-label="Поиск"><button id="log-filter-menu" class="search-filter" type="button" aria-label="Фильтр событий" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="log-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
     </div>
     <div class="logbox" id="logbox">—</div>
     <div class="log-pager" id="log-pager"></div>
   </section>
 
   <section data-tab="usage">
-    <div class="section-head">
-        <h2>Статистика</h2>
-      <button type="button" class="field-help" data-hint="Запросы, провайдеры и сессии за выбранный день и за всё время." aria-label="Что на вкладке «Статистика»">?</button>
-      <span class="muted" id="u-info"></span>
-    </div>
-    <p class="muted" id="u-lifetime" style="margin:8px 0 0"></p>
-    <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div id="u-groups" class="usage-groups" role="tablist" aria-label="Разделы статистики">
       <button type="button" class="usage-group" data-group="overview" role="tab">Обзор</button>
       <button type="button" class="usage-group" data-group="providers" role="tab">Провайдеры</button>
       <button type="button" class="usage-group" data-group="sessions" role="tab">Сессии</button>
       <button type="button" class="usage-group" data-group="images" role="tab">Изображения</button>
+      <button type="button" class="usage-group" data-group="lifetime" role="tab">За всё время</button>
     </div>
+    <div id="u-days" class="usage-days" role="tablist" aria-label="Статистика по дням"></div>
     <div class="usage-panel" data-panel="overview">
       <div class="tiles" id="u-tiles"></div>
       <div class="usage-grid">
@@ -307,20 +274,18 @@
           <div class="chart-head">
             <div>
               <h3>Результаты запросов</h3>
-              <p>Успешные ответы и ошибки по попыткам апстримов</p>
             </div>
-            <span class="muted" id="u-outcome-note"></span>
           </div>
           <div class="outcome-layout">
             <div class="donut-wrap">
               <svg viewBox="0 0 120 120" role="img" aria-label="Результаты запросов">
                 <circle class="donut-track" cx="60" cy="60" r="43"></circle>
                 <circle id="u-donut-ok" class="donut-segment ok" cx="60" cy="60" r="43"></circle>
+                <circle id="u-donut-limit" class="donut-segment limit" cx="60" cy="60" r="43"></circle>
                 <circle id="u-donut-failed" class="donut-segment failed" cx="60" cy="60" r="43"></circle>
-                <circle id="u-donut-skipped" class="donut-segment skipped" cx="60" cy="60" r="43"></circle>
                 <circle id="u-donut-other" class="donut-segment other" cx="60" cy="60" r="43"></circle>
               </svg>
-              <div class="donut-center"><strong id="u-donut-total">0</strong><span>попыток</span></div>
+              <div class="donut-center"><strong id="u-donut-total">0</strong><span>запросов</span></div>
             </div>
             <div class="chart-legend" id="u-outcome-legend"></div>
           </div>
@@ -330,7 +295,7 @@
             <div>
               <h3>Проблемность провайдеров</h3>
             </div>
-            <div class="token-legend"><span class="token-key success">Ok</span><span class="token-key limit">RateLimit</span><span class="token-key error">Err</span><span class="token-key other">Прочее</span></div>
+            <div class="token-legend"><span class="token-key success">Успех</span><span class="token-key limit">Рейт-лимит</span><span class="token-key error">Ошибка</span><span class="token-key other">Прочее</span></div>
           </div>
           <div class="token-bars" id="u-token-chart"></div>
         </article>
@@ -354,12 +319,13 @@
     <div class="usage-panel" data-panel="sessions">
       <div class="filter-bar">
         <label class="search-field" style="margin:0">
-          <input id="u-session-search" type="search" placeholder="Поиск по сессии" aria-label="Поиск по сессии">
+          <input id="u-session-search" type="search" placeholder="Поиск" aria-label="Поиск">
+          <button id="u-session-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
         </label>
         <button type="button" id="u-session-all">За все дни</button>
         <span class="filter-result" id="u-session-count"></span>
       </div>
-      <table id="u-sessions"></table>
+      <div id="u-sessions" class="sessions-content"></div>
       <div class="usage-pager" id="u-session-pager"></div>
     </div>
     <div class="usage-panel" data-panel="images">
@@ -367,6 +333,9 @@
       <div class="tiles" id="u-image-tiles"></div>
       <div class="card" id="u-image-recent" style="margin-top:10px"></div>
       <table id="u-images"></table>
+    </div>
+    <div class="usage-panel" data-panel="lifetime">
+      <div class="tiles" id="u-lifetime-tiles"></div>
     </div>
   </section>
 
@@ -384,7 +353,7 @@
             <span class="field-label">Порт
               <button type="button" class="field-help" data-hint="Локальный порт прокси. Смена применится после перезапуска приложения." aria-label="Что делает настройка «Порт»">?</button>
             </span>
-            <input id="s-port" type="number" min="1" max="65535" inputmode="numeric">
+            <span class="reset-input"><input id="s-port" type="number" min="1" max="65535" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-port" aria-label="Сбросить порт" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
           <label for="s-auth">
             <span class="field-label">Токен доступа
@@ -407,46 +376,47 @@
       <div class="settings-block wide">
         <h3>Защита от сбоев</h3>
         <p>Время блокировки upstream после лимита или временной ошибки.</p>
-        <div class="settings-grid">
+        <div class="settings-grid reset-grid">
           <label for="s-limit">
             <span class="field-label">Блокировка после лимита, сек
               <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты." aria-label="Что значит «Блокировка после лимита»">?</button>
             </span>
-            <input id="s-limit" type="number" min="1" step="1" inputmode="numeric">
+            <span class="reset-input"><input id="s-limit" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-limit" aria-label="Сбросить блокировку после лимита" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
           <label for="s-error">
             <span class="field-label">Блокировка после ошибки, сек
               <button type="button" class="field-help" data-hint="Сколько не отправлять запросы после сетевой ошибки или ответа 5xx." aria-label="Что значит «Блокировка после ошибки»">?</button>
             </span>
-            <input id="s-error" type="number" min="1" step="1" inputmode="numeric">
+            <span class="reset-input"><input id="s-error" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-error" aria-label="Сбросить блокировку после ошибки" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
           <label for="s-header">
             <span class="field-label">Таймаут ответа, сек
               <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
             </span>
-            <input id="s-header" type="number" min="1" step="1" inputmode="numeric">
+            <span class="reset-input"><input id="s-header" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-header" aria-label="Сбросить таймаут ответа" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
           <label for="s-stream-idle">
             <span class="field-label">Тишина в потоке, сек
               <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
             </span>
-            <input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric">
+            <span class="reset-input"><input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-stream-idle" aria-label="Сбросить тишину в потоке" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
           <label for="s-session-gap">
             <span class="field-label">Пауза сессии, сек
               <button type="button" class="field-help" data-hint="Длительность сессии — сумма пауз между запросами. Пауза длиннее этого значения считается простоем и не входит в длительность." aria-label="Что значит «Пауза сессии»">?</button>
             </span>
-            <input id="s-session-gap" type="number" min="30" max="86400" step="1" inputmode="numeric">
+            <span class="reset-input"><input id="s-session-gap" type="number" min="30" max="86400" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-session-gap" aria-label="Сбросить паузу сессии" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
-          <label class="setting-option" id="s-retry-forever-wrap">
+          <label class="setting-option reset-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
             <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>
+            <button type="button" class="field-reset" data-reset="s-retry-forever" aria-label="Сбросить повторение запросов" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button>
           </label>
           <label for="s-pending-buffer">
             <span class="field-label">Буфер размышлений
               <button type="button" class="field-help" data-hint="Сколько модель может думать вслух, прежде чем прокси сочтёт попытку пустой и перейдёт к следующей. Больше — терпимее к долгим размышлениям, но больше памяти на активный запрос." aria-label="Что значит «Буфер размышлений»">?</button>
             </span>
-            <select id="s-pending-buffer">
+            <span class="reset-input"><select id="s-pending-buffer">
               <option value="16384">16 КиБ</option>
               <option value="262144">256 КиБ</option>
               <option value="1048576">1 МиБ</option>
@@ -454,7 +424,7 @@
               <option value="4194304">4 МиБ</option>
               <option value="8388608">8 МиБ</option>
               <option value="16777216">16 МиБ</option>
-            </select>
+            </select><button type="button" class="field-reset" data-reset="s-pending-buffer" aria-label="Сбросить буфер размышлений" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
           </label>
         </div>
       </div>
@@ -537,24 +507,40 @@
     <div class="dialog-header">
       <h3 id="dp-title">Добавить провайдера</h3>
     </div>
-    <div class="dialog-body">
-      <label>Имя провайдера
+      <div class="dialog-body">
+      <label for="dp-name">
+        <span class="field-label">Имя провайдера
+          <button type="button" class="field-help" data-hint="Видимый псевдоним для провайдера." aria-label="Что значит «Имя провайдера»">?</button>
+        </span>
         <input id="dp-name" required placeholder="openrouter">
       </label>
-      <label>baseURL — адрес api провайдера
+      <label for="dp-url">
+        <span class="field-label">Базовый URL
+          <button type="button" class="field-help" data-hint="Адрес API провайдера." aria-label="Что значит «Базовый URL»">?</button>
+        </span>
         <input id="dp-url" required placeholder="https://openrouter.ai/api/v1">
       </label>
-      <label>apiKey — приватный ключ провайдера
+      <label for="dp-key">
+        <span class="field-label">Ключ API
+          <button type="button" class="field-help" data-hint="Секретный ключ доступа к провайдеру." aria-label="Что значит «Ключ API»">?</button>
+        </span>
         <input id="dp-key" type="password" placeholder="sk-...">
       </label>
-      <label>Домашняя страница — добавляет кнопку открытия страницы (опционально)
+      <label for="dp-homepage">
+        <span class="field-label">Домашняя страница (опционально)
+          <button type="button" class="field-help" data-hint="Добавляет кнопку открытия страницы." aria-label="Что значит «Домашняя страница»">?</button>
+        </span>
         <input id="dp-homepage" placeholder="https://provider.example">
       </label>
-      <label>Ссылка для чекина — для открытия страницы check in (опционально)
+      <label for="dp-checkin">
+        <span class="field-label">Страница чек-ина (опционально)
+          <button type="button" class="field-help" data-hint="добавляет кнопку для открытия страницы чек-ина (ежедневного бонуса)." aria-label="Что значит «Страница чек-ина»">?</button>
+        </span>
         <input id="dp-checkin" placeholder="https://provider.example/checkin">
       </label>
     </div>
-    <div class="dialog-actions">
+      <div class="dialog-actions">
+      <button type="button" id="dp-delete" class="danger" hidden>Удалить</button>
       <button type="button" id="dp-cancel">Отмена</button>
       <button value="save" class="primary">Сохранить</button>
     </div>
@@ -562,59 +548,25 @@
 </dialog>
 
 <!-- Диалог: модель (добавить / изменить) -->
-<dialog id="dlg-model" aria-labelledby="dm-title" aria-describedby="dm-help">
+<dialog id="dlg-model" aria-labelledby="dm-title">
   <form method="dialog" id="dm-form" class="dialog-form">
     <div class="dialog-header">
       <h3 id="dm-title">Добавить цепочку</h3>
-      <p id="dm-help">Добавь модели провайдеров в нужном порядке — первая будет основной, остальные запасными.</p>
     </div>
-    <div class="dialog-body">
+    <div class="dialog-body chain-dialog-body">
       <label>Название цепочки
-        <input id="dm-name" required placeholder="claude-sonnet" aria-label="Название цепочки" aria-describedby="dm-name-help">
+        <input id="dm-name" required placeholder="claude-sonnet" aria-label="Название цепочки">
       </label>
-      <span id="dm-name-help" class="muted" style="display:block;margin:-5px 0 14px">Цепочка будет доступна как <code>proxy/&lt;имя&gt;</code>.</span>
-
-      <section class="dialog-section" aria-labelledby="dm-chain-title">
-        <div class="dialog-section-head">
-          <div>
-            <h4 id="dm-chain-title">1. Порядок цепочки</h4>
-            <p>Первый провайдер — основной, остальные используются как запасные.</p>
-          </div>
-          <span id="dm-count" class="dialog-count"></span>
-        </div>
-        <div id="dm-chain" class="chain-editor" aria-live="polite"></div>
-      </section>
-
-      <section class="dialog-section" aria-labelledby="dm-add-title">
-        <div class="dialog-section-head">
-          <div>
-            <h4 id="dm-add-title">2. Добавить провайдера</h4>
-            <p>Найди провайдера и выбери модель — она добавится в конец цепочки.</p>
-          </div>
-        </div>
-        <div class="provider-picker">
-          <div class="filter-bar chain-provider-filter">
-            <label class="search-field">
-              <span class="sr-only">Поиск провайдеров в цепочке</span>
-              <input id="dm-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
-              <button id="dm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
-            </label>
-            <span id="dm-provider-result" class="filter-result provider-result-count"></span>
-          </div>
-          <div id="dm-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для цепочки"></div>
-        </div>
-        <div id="dm-pick-list"></div>
-        <details class="manual-add">
-          <summary>Модели нет в списке? Ввести ID вручную</summary>
-          <div class="dialog-add-row">
-            <label class="sr-only" for="dm-add-model">ID модели у провайдера</label>
-            <input id="dm-add-model" placeholder="ID модели у провайдера">
-            <button type="button" id="dm-add">Добавить</button>
-          </div>
-        </details>
-      </section>
+      <div class="dm-current-line" id="dm-current-line"><strong>Порядок цепочки</strong></div>
+      <div id="dm-chain" class="chain-editor" aria-live="polite"></div>
+      <div class="pm-splitter" aria-hidden="true"></div>
+      <div id="dm-provider-current" class="dm-current-line"><strong>Выбери провайдера</strong></div>
+      <label class="search-field dm-provider-search"><span class="sr-only">Поиск провайдера</span><input id="dm-provider-filter" placeholder="Поиск провайдера" autocomplete="off"><button id="dm-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+      <div id="dm-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для цепочки"></div>
+      <div id="dm-pick-list" class="direct-model-grid"></div>
     </div>
     <div class="dialog-actions">
+      <button type="button" id="dm-delete" class="danger" hidden>Удалить</button>
       <button type="button" id="dm-cancel">Отмена</button>
       <button value="save" class="primary">Сохранить</button>
     </div>
@@ -622,43 +574,53 @@
 </dialog>
 
 <!-- Диалог: прямая модель -->
-<dialog id="dlg-opencode-model" aria-labelledby="dom-title" aria-describedby="dom-help">
+<dialog id="dlg-opencode-model" aria-labelledby="dom-title">
   <form method="dialog" id="dom-form" class="dialog-form">
-    <div class="dialog-header">
-      <h3 id="dom-title">Добавить модель</h3>
-      <p id="dom-help">Выбери провайдера, затем одну или несколько моделей из списка вкладки «Подключения».</p>
-    </div>
-    <div class="dialog-body">
-      <div class="provider-picker">
-        <div class="filter-bar">
-          <label class="search-field">
-            <span class="sr-only">Поиск провайдеров</span>
-            <input id="dom-provider-filter" placeholder="Найти провайдера…" autocomplete="off">
-            <button id="dom-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск провайдеров" title="Очистить">×</button>
-          </label>
-          <span id="dom-provider-result" class="filter-result"></span>
-        </div>
+    <div class="dialog-header"><h3 id="dom-title">Добавить модель</h3></div>
+    <div class="dialog-body direct-model-dialog-body">
+      <div class="dom-providers-pane">
+        <label class="search-field"><span class="sr-only">Поиск провайдера</span><input id="dom-provider-filter" placeholder="Поиск провайдера" autocomplete="off"><button id="dom-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
         <div id="dom-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для модели"></div>
       </div>
-      <div class="row" style="margin-top:10px">
-        <span class="muted">выбран:</span>
-        <span id="dom-provider-current" class="provider-current"><strong>—</strong></span>
-      </div>
-      <div class="dialog-section">
-        <div class="dialog-section-head">
-          <div>
-            <h4>Модели провайдера</h4>
-          </div>
-          <span id="dom-count" class="dialog-count"></span>
+      <div class="pm-splitter" aria-hidden="true"></div>
+      <div class="dom-models-pane">
+        <div id="dom-provider-current" class="dom-current-line"><strong>—</strong></div>
+        <div class="filter-bar pm-filter-row">
+          <label class="search-field"><span class="sr-only">Поиск моделей</span><input id="dom-filter" placeholder="Поиск"><button id="dom-filter-tick" class="search-filter" type="button" aria-label="Фильтр моделей" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="dom-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+          <button id="dom-filter-menu" class="pm-icon-button" type="button" aria-label="Действия с моделями" data-tip="Действия" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg></button>
         </div>
-        <input id="dom-filter" placeholder="фильтр по имени…" style="width:100%">
-        <label class="check" style="margin-top:10px"><input id="dom-select-all" type="checkbox"> выбрать все доступные модели</label>
-        <div id="dom-model-list" style="max-height:300px;overflow:auto;margin-top:10px;display:grid;gap:7px"></div>
+        <div id="dom-model-list" class="direct-model-grid"></div>
       </div>
     </div>
     <div class="dialog-actions">
+      <button type="button" id="dom-delete" class="danger" hidden>Удалить</button>
       <button type="button" id="dom-cancel">Отмена</button>
       <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: сессии за все дни -->
+<dialog id="dlg-all-sessions" aria-labelledby="all-sessions-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header"><h3 id="all-sessions-title">Сессии за все дни</h3></div>
+    <div class="dialog-body">
+      <div class="filter-bar" style="margin:0 0 10px">
+        <label class="search-field" style="margin:0">
+          <input id="all-sessions-search" type="search" placeholder="Поиск" aria-label="Поиск по сессиям">
+          <button id="all-sessions-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
+        </label>
+        <span class="filter-result" id="all-sessions-count"></span>
+      </div>
+      <div id="all-sessions-table"></div>
+      <!-- Page controls sit in a drawer so a short table keeps no empty pager row. -->
+      <div class="pager-drawer" id="all-sessions-drawer" hidden>
+        <button type="button" class="pager-drawer-toggle" id="all-sessions-drawer-toggle" aria-expanded="false" aria-controls="all-sessions-pager">Страницы</button>
+        <div class="pager-drawer-body" id="all-sessions-pager" hidden></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button value="close">Закрыть</button>
     </div>
   </form>
 </dialog>
@@ -673,20 +635,47 @@
       <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">—</strong></div>
       <label>Тип модели
         <select id="dms-kind">
-          <option value="auto">Определять автоматически</option>
           <option value="chat">Обычная (chat)</option>
           <option value="image">Изображения (image)</option>
         </select>
+        <small id="dms-kind-auto" class="muted" hidden>определяется автоматически</small>
       </label>
       <label>Контекст модели, токенов
-        <input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000">
+        <span class="reset-input"><input id="dms-context" type="number" min="1" step="1" inputmode="numeric" placeholder="например, 128000"><button type="button" id="dms-context-reset" class="field-reset" aria-label="Сбросить контекст модели" data-tip="Сбросить контекст"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
       </label>
-      <button type="button" id="dms-context-max">Авто</button>
-      <p class="muted" style="margin:0 0 10px">«Авто» берёт значение из <code>/v1/models</code>. Своё число в поле перекрывает его до следующего обновления списка.</p>
     </div>
     <div class="dialog-actions">
       <button type="button" id="dms-cancel">Отмена</button>
       <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: расширенные настройки интеграций -->
+<dialog id="dlg-integrations-advanced" aria-labelledby="integrations-advanced-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header"><h3 id="integrations-advanced-title">Расширенные настройки</h3></div>
+    <div class="dialog-body">
+      <div class="skill-card integration-skill-card">
+        <div class="skill-card-head">
+          <div>
+            <h3>Skill генерации изображений</h3>
+            <p>Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
+          </div>
+          <span id="image-skill-status" class="skill-status">проверяю…</span>
+        </div>
+        <div id="image-skill-path" class="skill-path">—</div>
+        <div class="row">
+          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
+          <button type="button" id="image-skill-settings" class="settings-button" aria-label="Настройки skill" data-tip="Модель по умолчанию для skill">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+          </button>
+          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button value="close">Закрыть</button>
     </div>
   </form>
 </dialog>
@@ -742,7 +731,9 @@
           <div class="filter-bar">
             <label class="search-field" style="margin:0">
               <span class="sr-only">Поиск темы</span>
-              <input id="theme-search" placeholder="Найти тему…" autocomplete="off">
+          <input id="theme-search" placeholder="Поиск" autocomplete="off">
+          <button id="theme-search-filter" class="search-filter" type="button" aria-label="Фильтр тем" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button>
+          <button id="theme-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
             </label>
             <span id="theme-search-result" class="filter-result"></span>
           </div>
@@ -764,8 +755,8 @@
             <button class="danger" type="button">Button 3</button>
           </div>
           <div class="row">
-            <label class="chain-toggle" title="Switch on"><input type="checkbox" checked><span class="chain-switch"></span></label>
-            <label class="chain-toggle" title="Switch off"><input type="checkbox"><span class="chain-switch"></span></label>
+            <label class="chain-toggle" data-tip="Switch on"><input type="checkbox" checked><span class="chain-switch"></span></label>
+            <label class="chain-toggle" data-tip="Switch off"><input type="checkbox"><span class="chain-switch"></span></label>
           </div>
           <div class="row">
             <span class="pill">метка</span>
@@ -794,13 +785,10 @@
     <div class="dialog-body">
       <div class="filter-bar">
         <label class="search-field" style="margin:0">
-          <input id="rollback-search" type="search" placeholder="Поиск по версии" aria-label="Поиск по версии">
+          <input id="rollback-search" type="search" placeholder="Поиск" aria-label="Поиск">
+          <button id="rollback-filter-menu" class="search-filter" type="button" aria-label="Фильтр версий" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button>
+          <button id="rollback-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
         </label>
-        <select id="rollback-filter" aria-label="Фильтр версий" style="flex:0 0 auto;width:auto">
-          <option value="older">Только старше текущей</option>
-          <option value="all">Все версии</option>
-          <option value="current">Только текущая</option>
-        </select>
         <span class="filter-result" id="rollback-count"></span>
       </div>
       <div class="rollback-list" id="rollback-list"></div>
@@ -811,30 +799,26 @@
   </form>
 </dialog>
 
-<div class="field-hint-layer" id="field-hint" role="tooltip" hidden></div>
-
-<!-- Диалог: все сессии за 7 дней -->
-<dialog id="dlg-all-sessions" aria-labelledby="all-sessions-title">
-  <form method="dialog" class="dialog-form">
+<!-- Диалог: подтверждение действия (заменяет нативный confirm) -->
+<dialog id="dlg-confirm" aria-labelledby="confirm-title">
+  <div class="dialog-form confirm-form">
     <div class="dialog-header">
-      <h3 id="all-sessions-title">Все сессии</h3>
-      <p>Сессии за все сохранённые дни. Клик по названию копирует ID сессии.</p>
+      <h3 id="confirm-title">Подтверждение</h3>
     </div>
     <div class="dialog-body">
-      <div class="filter-bar">
-        <label class="search-field" style="margin:0">
-          <input id="all-sessions-search" type="search" placeholder="Поиск по сессии" aria-label="Поиск по всем сессиям">
-        </label>
-        <span class="filter-result" id="all-sessions-count"></span>
-      </div>
-      <table id="all-sessions-table"></table>
-      <div class="usage-pager" id="all-sessions-pager"></div>
+      <p id="confirm-message" class="confirm-message"></p>
     </div>
     <div class="dialog-actions">
-      <button type="button" id="all-sessions-close">Закрыть</button>
+      <button type="button" id="confirm-cancel">Отмена</button>
+      <button type="button" id="confirm-ok" class="primary">Подтвердить</button>
     </div>
-  </form>
+  </div>
 </dialog>
+
+<!-- Меню поиска: фильтры или действия, открывается кнопкой внутри поля -->
+<div id="search-menu" class="search-menu" role="menu" hidden></div>
+
+<div class="field-hint-layer" id="field-hint" role="tooltip" hidden></div>
 
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/layout.css">

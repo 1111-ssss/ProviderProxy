@@ -1,9 +1,18 @@
 const LOG_PAGE_SIZE = 50
 let logQuery = ""
-let logFilter = "all"
+// Checkbox filter: empty means every event, otherwise any picked kind matches.
+let logFilters = new Set() // answer | switch | error
 let logPage = 0
 let logLines = []
+let logSessionTitles = {}
 let logHasRenderedRecords = false
+
+// The harness sends a shortened id, so a title keyed by the full id still fits.
+function logSessionTitle(id) {
+  if (!id) return ""
+  const key = logSessionTitles[id] ? id : Object.keys(logSessionTitles).find((full) => full.startsWith(id))
+  return key ? logSessionTitles[key] : ""
+}
 
 function logPageSlice(lines, page, size = LOG_PAGE_SIZE) {
   const start = page * size
@@ -12,15 +21,25 @@ function logPageSlice(lines, page, size = LOG_PAGE_SIZE) {
 
 function logMatches(line) {
   const text = String(line).toLowerCase()
-  if (logQuery && !text.includes(logQuery)) return false
-  if (logFilter === "answer") return text.includes("ответ")
-  if (logFilter === "switch") return text.includes("свитч") || text.includes("заблокирован")
-  if (logFilter === "error") return text.includes("ошибк") || text.includes("error") || text.includes("пропущен")
-  return true
+  if (logQuery) {
+    const sessionId = String(line).match(/\[ses:([^\]]+)\]/)?.[1] ?? ""
+    const title = logSessionTitle(sessionId).toLowerCase()
+    if (!text.includes(logQuery) && !title.includes(logQuery)) return false
+  }
+  const isAnswer = text.includes("ответ")
+  const isSwitch = text.includes("свитч") || text.includes("заблокирован")
+  const isError = text.includes("ошибк") || text.includes("error") || text.includes("пропущен")
+  if (!logFilters.size) return true
+  return (logFilters.has("answer") && isAnswer)
+    || (logFilters.has("switch") && isSwitch)
+    || (logFilters.has("error") && isError)
+    // "Инфо" is the badge the card falls back to: anything with no outcome.
+    || (logFilters.has("info") && !isAnswer && !isSwitch && !isError)
 }
 
 function renderLogs() {
   const box = $("logbox")
+  syncFilterButton("log-filter-menu", logFilters)
   // Desktop scrolls the whole Logs section; narrow layouts constrain logbox.
   // Anchor the first visible card in whichever element actually scrolls so a
   // three-second refresh doesn't make the records jump under the pointer.
@@ -63,7 +82,7 @@ async function loadLogs() {
   try {
     const j = await (await api("/api/logs")).json()
     logLines = (j.lines ?? []).slice().reverse()
-    $("log-info").textContent = `последние ${logLines.length} из ${j.max ?? "?"}`
+    logSessionTitles = j.sessionTitles ?? {}
     renderLogs()
   } catch {
     /* прокси недоступен — следующий опрос повторит */
@@ -75,15 +94,25 @@ $("log-search").oninput = (event) => {
   logPage = 0
   renderLogs()
 }
-$("log-filter").onchange = (event) => {
-  logFilter = event.target.value
+$("log-search-clear").onclick = () => {
+  logQuery = ""
+  logFilters.clear()
+  syncFilterButton("log-filter-menu", logFilters)
   logPage = 0
+  $("log-search").value = ""
   renderLogs()
+  $("log-search").focus()
+}
+$("log-filter-menu").onclick = () => {
+  const options = [["answer", "Ответы"], ["switch", "Переключения"], ["error", "Ошибки"], ["info", "Инфо"]]
+  openSearchMenu($("log-filter-menu"), options.map(([value, label]) => ({
+    label, toggle: true, stayOpen: true, checked: logFilters.has(value),
+    action: () => { toggleFilter("log-filter-menu", logFilters, value); logPage = 0; renderLogs() },
+  })))
 }
 
-// Parse a line like "[2026-10-20 13:55:35] deepseek-v4.1-flash → свитч: ... [ses:ses_x]"
-// into a card: the date sits on top with the session id and event badge to the
-// right, the model/chain name goes on the next line, then the message.
+// Chat cards show the requested chain/model on its own line and any outcome
+// details below it; the event kind is already shown by the badge.
 const logCard = (line) => {
   const m = String(line).match(/^\[([^\]]+)\]\s*(.*)$/)
   const ts = m?.[1] ?? ""
@@ -94,6 +123,10 @@ const logCard = (line) => {
   const [head, ...tail] = rest.split(" → ")
   const detail = tail.join(" → ")
   const isChat = tail.length > 0
+  // Other arrow lines (images, HTTP requests) keep the name on its own line.
+  const chatKind = isChat && /^(?:ответ|свитч|ошибка)/.test(detail)
+  const chatMessage = chatKind ? detail.replace(/^(?:ответ|свитч|ошибка)\s*:\s*/, "") : ""
+  const [chatLabel = head, chatDescription = ""] = chatMessage.split(" — ", 2)
   const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
   const card = document.createElement("div")
   card.className = "log-card" + (cls ? ` ${cls}` : "")
@@ -110,7 +143,8 @@ const logCard = (line) => {
     const chip = document.createElement("span")
     chip.className = "ses"
     chip.textContent = session
-    chip.title = `скопировать ${session}`
+    const title = logSessionTitle(session)
+    chip.dataset.tip = title ? `${title} · нажми, чтобы скопировать id` : `скопировать ${session}`
     chip.dataset.sessionCopy = session
     top.append(chip)
   }
@@ -121,32 +155,35 @@ const logCard = (line) => {
   const tag = detail ? tail[0].replace(/[:：].*$/, "").trim() : ""
   const fallback = cls === "err" ? "ошибка" : cls === "warn" ? "блок" : "инфо"
   badge.textContent = tag && tag.length <= 24 ? tag : fallback
-  badge.title = tag
+  badge.dataset.tip = tag
   top.append(badge)
   card.append(top)
-  // The model or chain name sits on its own line right under the date.
-  if (isChat) {
+  if (isChat && !chatKind) {
     const chain = document.createElement("div")
     chain.className = "chain"
     chain.textContent = head
+    card.append(chain)
+  } else if (chatKind) {
+    const chain = document.createElement("div")
+    chain.className = "chain"
+    chain.textContent = chatLabel
     card.append(chain)
   }
   const msg = document.createElement("div")
   msg.className = "m"
   if (isChat) {
-    msg.textContent = detail
+    msg.textContent = chatKind ? chatDescription : detail
   } else {
     const em = document.createElement("b")
     em.textContent = head
     msg.append(em)
   }
-  card.append(msg)
+  if (!chatKind || chatDescription) card.append(msg)
   return card
 }
 
 const logEmpty = () => {
   const p = document.createElement("div")
-  p.className = "log-empty muted"
-  p.textContent = "Ничего не найдено."
-  return p
+  p.innerHTML = emptyStateHtml(logLines.length ? "ничего не найдено" : "записей пока нет")
+  return p.firstElementChild
 }

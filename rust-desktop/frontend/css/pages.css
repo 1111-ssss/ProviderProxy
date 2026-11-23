@@ -10,6 +10,9 @@
   .settings-button svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   #dlg-image-settings { width: min(620px, calc(100vw - 28px)); }
   #dlg-model-settings { width: min(440px, calc(100vw - 28px)); }
+  #dlg-all-sessions { width: min(900px, calc(100vw - 28px)); }
+  #dlg-all-sessions .dialog-body { max-height: min(560px, calc(100vh - 180px)); overflow: auto; }
+  #dlg-integrations-advanced { width: min(620px, calc(100vw - 28px)); }
   .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 10px; background: var(--surface-soft); }
   .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .skill-card h4 { margin: 0; }
@@ -116,7 +119,6 @@
   .provider-current,
   .opencode-preview-toggle,
   .skill-card { background: color-mix(in srgb, var(--surface) 72%, var(--panel)); }
-  .settings-nav-button { background: var(--surface) !important; }
   code { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
   .step .prov, .opencode-model strong, .model-kind-icon { color: var(--accent); }
   .chain-toggle.is-on { color: var(--success); }

@@ -1,39 +1,44 @@
+// Deleting a provider lives in its edit dialog: a permanent trash button in the
+// table put a destructive action one stray click away.
+async function deleteProvider(name) {
+  if (!(await askConfirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`, { title: "Удалить провайдера", okLabel: "Удалить", danger: true }))) return false
+  const chainsBefore = chainFillSnapshot()
+  delete cfg.providers[name]
+  removeProviderReferences(name)
+  save(); renderAll()
+  reportEmptiedChains(chainsBefore)
+  return true
+}
+
 function renderProviders() {
   const t = $("providers")
   const allEntries = Object.entries(cfg.providers)
   const query = providersFilter.trim().toLowerCase()
-  const entries = query ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query)) : allEntries
-  t.innerHTML = entries.length ? "<tr><th>имя</th><th>baseURL</th><th>модели</th><th></th></tr>" : ""
+  const shown = query
+    ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query))
+    : allEntries
+  t.innerHTML = shown.length ? "<tr><th>имя</th><th>baseURL</th><th>модели</th><th></th></tr>" : ""
   let anyCheckin = false
-  for (const [name, p] of entries) {
+  for (const [name, p] of shown) {
     const models = p.models ?? []
     if (p.checkin) anyCheckin = true
     const tr = t.insertRow()
     tr.innerHTML = `
-      <td><b>${esc(name)}</b>${p.homepage || p.checkin ? `<span class="provider-links">${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" title="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" title="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}</span>` : ""}</td>
+      <td><b>${esc(name)}</b>${p.homepage || p.checkin ? `<span class="provider-links">${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" data-tip="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" data-tip="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}</span>` : ""}</td>
       <td class="muted">${esc(p.baseURL ?? "")}</td>
       <td class="muted">${models.length}</td>
       <td class="provider-actions">
-        <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
-        <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
+        <button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
       </td>`
     if (p.homepage) tr.querySelector('[data-a="homepage"]').onclick = () => openUrl(p.homepage)
     if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
     tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
-    tr.querySelector('[data-a="del"]').onclick = () => {
-      if (!confirm(`Удалить провайдера «${name}»? Его записи уберутся из цепочек моделей.`)) return
-      const chainsBefore = chainFillSnapshot()
-      delete cfg.providers[name]
-      removeProviderReferences(name)
-      save(); renderAll()
-      reportEmptiedChains(chainsBefore)
-    }
   }
   $("p-checkins").style.display = anyCheckin ? "" : "none"
-  $("providers-filter-result").textContent = query ? `${entries.length} из ${allEntries.length}` : plural(allEntries.length, "провайдер", "провайдера", "провайдеров")
-  if (!entries.length) {
-    const tr = t.insertRow()
-    tr.innerHTML = `<td colspan="4" class="muted">${allEntries.length ? "ничего не найдено — измени запрос" : "провайдеров пока нет — нажми «+ Добавить провайдера»"}</td>`
+  if (!shown.length) {
+    $("providers-empty").innerHTML = emptyStateHtml(allEntries.length ? "ничего не найдено" : "провайдеров пока нет — нажми «Добавить»")
+  } else {
+    $("providers-empty").innerHTML = ""
   }
 }
 
@@ -44,7 +49,19 @@ $("p-checkins").onclick = () => {
 function renderModels() {
   const box = $("models")
   box.innerHTML = ""
-  const entries = Object.entries(cfg.models).sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
+  syncFilterButton("m-search-filter", chainFilters)
+  const query = modelSearch.trim().toLowerCase()
+  const allEntries = Object.entries(cfg.models)
+  const entries = allEntries
+    .filter(([name]) => !query || name.toLowerCase().includes(query))
+    .filter(([, def]) => {
+      if (!chainFilters.size) return true
+      return [...chainFilters].some((kind) =>
+        kind === "active" ? def?.enabled !== false
+        : kind === "disabled" ? def?.enabled === false
+        : !(def?.upstreams ?? []).length)
+    })
+    .sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
   for (const [name, def] of entries) {
     const ups = def.upstreams ?? []
     const enabled = def.enabled !== false
@@ -52,19 +69,18 @@ function renderModels() {
      div.className = `card${enabled ? "" : " chain-disabled"}`
      div.dataset.model = name
     div.innerHTML = `
-      <div class="model-card-head">
+    <div class="model-card-head">
         <b class="model-title">${esc(name)}</b>
         <div class="model-badges">
-          ${ups.length > 1 ? `<span class="pill">x${ups.length}</span>` : ups.length ? "" : `<span class="pill empty">пусто</span>`}${chainContextBadge(ups)}
+          ${ups.length ? "" : `<span class="pill empty">пусто</span>`}${chainContextBadge(ups)}
         </div>
         <div class="head-controls">
-          <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}" aria-label="${enabled ? "Активна" : "Скрыта"}">
+          <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" data-tip="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}" aria-label="${enabled ? "Активна" : "Скрыта"}">
             <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
             <span class="chain-switch" aria-hidden="true"></span>
           </label>
           <div class="model-actions">
-            <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
-            <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
+            <button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
           </div>
         </div>
       </div>
@@ -86,14 +102,6 @@ function renderModels() {
        debugLog("chain-edit", { name })
        openModelDialog(name)
      }
-     div.querySelector('[data-a="del"]').onclick = (event) => {
-       event.preventDefault()
-       event.stopPropagation()
-       debugLog("chain-delete", { name })
-       if (!confirm(`Удалить модель proxy/${name}?`)) return
-       delete cfg.models[name]
-       save(); renderModels(); renderOpenCode()
-     }
      div.querySelector(".chain-toggle").onclick = (event) => {
        event.preventDefault()
        event.stopPropagation()
@@ -105,7 +113,7 @@ function renderModels() {
      }
      box.append(div)
    }
-   if (!entries.length) box.innerHTML = `<p class="muted">цепочек пока нет — нажми «+ Добавить цепочку»</p>`
+    if (!entries.length) box.innerHTML = emptyStateHtml(allEntries.length ? "ничего не найдено" : "цепочек пока нет — нажми «Добавить»")
    applyStepColumns(box)
  }
 
@@ -148,13 +156,6 @@ document.addEventListener("click", (event) => {
       event.preventDefault(); event.stopPropagation()
       return openModelDialog(name)
     }
-    if (target.closest('[data-a="del"]')) {
-      event.preventDefault(); event.stopPropagation()
-      if (!confirm(`Удалить модель proxy/${name}?`)) return
-      delete cfg.models[name]
-      save(); renderModels(); renderOpenCode()
-      return
-    }
     if (target.closest(".chain-toggle")) {
       event.preventDefault(); event.stopPropagation()
       const enabled = cfg.models[name].enabled !== false
@@ -172,13 +173,6 @@ document.addEventListener("click", (event) => {
       event.preventDefault(); event.stopPropagation()
       return openOpenCodeModelDialog(provider)
     }
-    if (target.closest('[data-a="del"]')) {
-      event.preventDefault(); event.stopPropagation()
-      if (!confirm(`Удалить прямые модели провайдера «${provider}»?`)) return
-      delete cfg.opencodeModels[provider]
-      save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
-      return
-    }
     if (target.closest(".chain-toggle")) {
       event.preventDefault(); event.stopPropagation()
       const toggle = directCard.querySelector('[data-a="toggle"]')
@@ -190,8 +184,11 @@ document.addEventListener("click", (event) => {
   }
 })
 
- const DEFAULT_OPENCODE_CONFIG = "~/.config/opencode/opencode.jsonc"
+const DEFAULT_OPENCODE_CONFIG = "~/.config/opencode/opencode.jsonc"
 const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
+// The effective default can be .json or .jsonc depending on which file exists;
+// only the backend knows, so GET reports it and the GUI compares against that.
+let opencodeConfigDefault = DEFAULT_OPENCODE_CONFIG
 
  const previewExpanded = new Set()
  function renderOpenCodePreview(id, entries) {
@@ -218,10 +215,11 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
  }
 
  function renderOpenCode() {
-  const path = cfg.opencodeConfig ?? DEFAULT_OPENCODE_CONFIG
+  const path = cfg.opencodeConfig ?? opencodeConfigDefault
   const provider = cfg.opencodeProvider ?? DEFAULT_OPENCODE_PROVIDER
    $("oc-path").value = path
    $("oc-provider").value = provider
+  syncResetVisibility()
   const chains = Object.entries(cfg.models).filter(([, def]) => def.enabled !== false)
    const direct = Object.entries(cfg.opencodeModels ?? {}).flatMap(([provider, def]) =>
       def?.enabled === false ? [] : directModelIds(provider, def).map((model) => [`${provider}/${model}`, ""]),
@@ -229,12 +227,12 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
   const entries = [...chains.map(([name, def]) => [name, `proxy, x${(def.upstreams ?? []).length}`]), ...direct]
   const status = entries.length ? plural(entries.length, "модель", "модели", "моделей") : "пока пусто"
   const enabled = cfg.integrations?.opencode?.enabled !== false
-  $("oc-status").textContent = enabled ? status : "интеграция выключена"
+  $("oc-status").textContent = enabled ? status : "Opencode выключен"
   $("opencode-enabled").checked = enabled
   $("opencode-toggle").className = `chain-toggle ${enabled ? "is-on" : "is-off"}`
-  $("opencode-toggle").title = enabled ? "Выключить интеграцию" : "Включить интеграцию"
+  $("opencode-toggle").dataset.tip = enabled ? "Выключить Opencode" : "Включить Opencode"
   if (enabled) renderOpenCodePreview("oc-preview", entries)
-  else $("oc-preview").innerHTML = `<span class="muted">Интеграция выключена — включи её, чтобы публиковать модели.</span>`
+  else $("oc-preview").innerHTML = `<span class="muted">Opencode выключен — включи его, чтобы публиковать модели.</span>`
 }
 
 // Chips sit in rows of at most four, and every card uses the same count: a
@@ -277,9 +275,18 @@ function applyModelColumns(box) {
 
 function renderOpencodeModels() {
   const box = $("opencode-models")
-  const entries = Object.entries(cfg.opencodeModels ?? {})
+  syncFilterButton("om-search-filter", directFilters)
+  const allEntries = Object.entries(cfg.opencodeModels ?? {})
     .filter(([provider]) => cfg.providers[provider])
     .sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
+  const query = directModelSearch.trim().toLowerCase()
+  const entries = allEntries
+    .filter(([provider, def]) => !query || provider.toLowerCase().includes(query) || directModelIds(provider, def).some((id) => id.toLowerCase().includes(query)))
+    .filter(([, def]) => {
+      if (!directFilters.size) return true
+      return [...directFilters].some((kind) =>
+        kind === "active" ? def?.enabled !== false : def?.enabled === false)
+    })
   box.innerHTML = entries.length
     ? entries
         .map(([provider, def]) => {
@@ -288,15 +295,14 @@ function renderOpencodeModels() {
            return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
-              <div class="model-badges">${ids.length > 1 ? `<span class="pill">x${ids.length}</span>` : ids.length ? "" : `<span class="pill empty">пусто</span>`}</div>
+              <div class="model-badges"></div>
               <div class="head-controls">
-                <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" title="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}" aria-label="${enabled ? "Активен" : "Скрыт"}">
+                <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" data-tip="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}" aria-label="${enabled ? "Активен" : "Скрыт"}">
                   <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
                   <span class="chain-switch" aria-hidden="true"></span>
                 </label>
                 <div class="model-actions">
-                  <button type="button" class="icon-action" data-a="edit" title="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
-                  <button type="button" class="icon-action quiet danger" data-a="del" title="Удалить" aria-label="Удалить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
+                  <button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
                 </div>
               </div>
             </div>
@@ -304,7 +310,7 @@ function renderOpencodeModels() {
           </div>`
         })
         .join("")
-     : `<p class="muted">прямых моделей пока нет — нажми «+ Добавить модель»</p>`
+      : emptyStateHtml(allEntries.length ? "ничего не найдено" : "прямых моделей пока нет — нажми «Добавить»")
   applyModelColumns(box)
   for (const card of box.querySelectorAll(".direct-model-card")) {
     const provider = card.dataset.provider
@@ -313,14 +319,6 @@ function renderOpencodeModels() {
       event.stopPropagation()
       debugLog("direct-edit", { provider })
       openOpenCodeModelDialog(provider)
-    }
-    card.querySelector('[data-a="del"]').onclick = (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      debugLog("direct-delete", { provider })
-      if (!confirm(`Удалить прямые модели провайдера «${provider}»?`)) return
-      delete cfg.opencodeModels[provider]
-      save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
     }
     card.querySelector(".chain-toggle").onclick = (event) => {
       event.preventDefault()
@@ -346,6 +344,7 @@ function renderSettings() {
   $("s-session-gap").value = cfg.sessionIdleGapSec ?? 300
   $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
+  syncResetVisibility()
   $("s-version").textContent = cfg.appVersion ?? "—"
   $("s-theme-current").textContent = themeLabel(settings.theme)
   $("s-auto-update").checked = settings.autoUpdate
@@ -407,7 +406,7 @@ async function exportConfigFile() {
 
 async function importConfigFile(file) {
   if (!file) return
-  if (!window.confirm("Импорт заменит настройки из выбранного файла. Продолжить?")) return
+  if (!(await askConfirm("Импорт заменит настройки из выбранного файла. Продолжить?", { title: "Импорт конфигурации", okLabel: "Импортировать" }))) return
   const button = $("config-import")
   button.disabled = true
   clearTimeout(saveT)
@@ -423,12 +422,14 @@ async function importConfigFile(file) {
     const current = await api("/api/config")
     if (!current.ok) throw new Error(`не удалось перечитать конфиг: HTTP ${current.status}`)
     cfg = await current.json()
+    opencodeConfigDefault = cfg.opencodeConfigDefault ?? DEFAULT_OPENCODE_CONFIG
+    delete cfg.opencodeConfigDefault
     cfg.providers ??= {}
     cfg.models ??= {}
     cfg.opencodeModels ??= {}
     renderAll()
     applyTheme(appSettings().theme)
-    flash(true, payload.opencodeSynced === false ? "импортирован, но интеграция не обновлена" : "конфиг импортирован ✓; перезапуск")
+    flash(true, payload.opencodeSynced === false ? "импортирован, но Opencode не обновлен" : "конфиг импортирован ✓; перезапуск")
     setTimeout(() => {
       if (isDesktopApp()) tauriInvoke("restart_app")
       else window.location.reload()
@@ -461,7 +462,7 @@ function setUpdateNav(state) {
     updateNavProgress.hidden = true
     updateNavProgressFill.style.width = "0%"
     updateNavButton.dataset.mode = ""
-    updateNavButton.title = ""
+    updateNavButton.dataset.tip = ""
     return
   }
   updateNavButton.hidden = false
@@ -480,14 +481,14 @@ function setUpdateNav(state) {
     updateNavProgress.hidden = false
     updateNavProgress.classList.toggle("is-indeterminate", !total)
     updateNavProgressFill.style.width = total ? `${percent}%` : "0%"
-    updateNavButton.title = "Идёт загрузка обновления"
+    updateNavButton.dataset.tip = "Идёт загрузка обновления"
     return
   }
   updateNavProgress.hidden = true
   updateNavProgress.classList.remove("is-indeterminate")
   updateNavProgressFill.style.width = "0%"
   updateNavLabel.textContent = state.mode === "restart" ? "Перезапустить" : `Обновить до ${state.version}`
-  updateNavButton.title = state.mode === "restart" ? "Перезапустить и применить обновление" : `Установить версию ${state.version}`
+  updateNavButton.dataset.tip = state.mode === "restart" ? "Перезапустить и применить обновление" : `Установить версию ${state.version}`
 }
 // Events emitted during a download can still land after the command resolved.
 // Without this guard a late frame flipped "Перезапустить" back to "Обновление"
@@ -571,13 +572,14 @@ async function checkForDesktopUpdate(manual = false) {
 // Theme picker: one button per palette, each tinted by its own tokens so the
 // swatch shows the real colours before the user commits to it.
 let themeQuery = ""
+let themeOnlyCurrent = false
 // Each dot paints one token; the button carries data-theme-preview, so the
 // variables resolve to that theme's palette without touching the page.
 const THEME_COLOR_KEYS = ["--bg", "--accent", "--success", "--warning", "--danger", "--text"]
 function renderThemeDialog() {
   const current = appSettings().theme
   const query = themeQuery.trim().toLowerCase()
-  const shown = query ? THEMES.filter((theme) => theme.label.toLowerCase().includes(query) || theme.id.includes(query)) : THEMES
+  const shown = (query ? THEMES.filter((theme) => theme.label.toLowerCase().includes(query) || theme.id.includes(query)) : THEMES).filter((theme) => !themeOnlyCurrent || theme.id === current)
   $("theme-search-result").textContent = query ? `${shown.length} из ${THEMES.length}` : ""
   $("theme-options").innerHTML = shown.length
     ? shown
@@ -591,7 +593,7 @@ function renderThemeDialog() {
     </button>`
         })
         .join("")
-    : `<span class="muted">тема не найдена — измени запрос</span>`
+    : emptyStateHtml("ничего не найдено")
   $("theme-options").querySelectorAll("[data-theme-id]").forEach((button) => {
     button.onclick = () => {
       appSettings().theme = button.dataset.themeId
@@ -638,7 +640,7 @@ $("s-create-shortcut-menu").onclick = () => createAppShortcut(false)
 $("s-create-shortcut-desktop").onclick = () => createAppShortcut(true)
 
 $("settings-shutdown").onclick = async () => {
-  if (!window.confirm("Выйти из приложения и закрыть его вкладку?")) return
+  if (!(await askConfirm("Выйти из приложения и закрыть его вкладку?", { title: "Выход", okLabel: "Выйти", danger: true }))) return
   const button = $("settings-shutdown")
   button.disabled = true
   button.textContent = "Выхожу…"
@@ -651,7 +653,7 @@ $("settings-shutdown").onclick = async () => {
     setTimeout(() => {
       try { window.close() } catch { /* browser may forbid closing a user-opened tab */ }
       if (!document.hidden) {
-        document.title = "Provider Proxy — закрыто"
+        document.dataset.tip = "Provider Proxy — закрыто"
         document.body.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;padding:32px"><p style="color:#9aaabd">Приложение завершено. Вкладку можно закрыть.</p></main>'
       }
     }, 250)
@@ -670,24 +672,27 @@ function openModelSettings(provider, id) {
   modelSettingsDraft = { provider, id }
   dlgModelSettings.returnValue = ""
   $("dms-model").textContent = `${provider}/${id}`
-  // The stored `image` flag is the manual override; absent means "auto".
-  $("dms-kind").value = info.image === true ? "image" : info.image === false ? "chat" : "auto"
+  // The stored `image` flag is the manual override; absent means "auto". The
+  // select shows the type the model actually has, so an auto-detected image
+  // model is not presented as "определять автоматически".
+  $("dms-kind").value = isImageModel(provider, id) ? "image" : "chat"
+  $("dms-kind-auto").hidden = info.image === true || info.image === false
   $("dms-context").value = values.manual ? String(values.manual) : ""
   $("dms-context").max = values.provider ? String(values.provider) : ""
-  // Auto is always available so a stale/manual value can be cleared even when
-  // the provider did not return a context_length for this model.
-  $("dms-context-max").disabled = false
-  $("dms-context-max").textContent = "Авто"
+  $("dms-context-reset").hidden = !values.manual
   dlgModelSettings.showModal()
   $("dms-context").focus()
 }
 $("dms-cancel").onclick = () => dlgModelSettings.close()
-$("dms-context-max").onclick = () => {
+$("dms-context-reset").onclick = async () => {
+  if (!(await askConfirm("Сбросить заданный контекст модели?", { title: "Сброс контекста", okLabel: "Сбросить" }))) return
   // Saving an empty field drops the manual value, so the next /v1/models
   // refresh sets the context again on its own.
   $("dms-context").value = ""
+  $("dms-context-reset").hidden = true
   $("dms-context").focus()
 }
+$("dms-context").oninput = () => { $("dms-context-reset").hidden = !$("dms-context").value.trim() }
 dlgModelSettings.addEventListener("close", () => {
   if (dlgModelSettings.returnValue !== "save" || !modelSettingsDraft) return
   const { provider, id } = modelSettingsDraft
@@ -695,11 +700,10 @@ dlgModelSettings.addEventListener("close", () => {
   if (!providerConfig) return
   const raw = $("dms-context").value.trim()
   const info = { ...(providerConfig.modelInfo?.[id] ?? {}) }
-  // Manual type override: true/false is stored, "auto" removes the flag.
+  // Manual type override: true/false is stored; the auto hint only hides/shows.
   const kind = $("dms-kind").value
   if (kind === "image") info.image = true
   else if (kind === "chat") info.image = false
-  else delete info.image
   const maxContext = Number(info.providerContextLength)
   if (raw) {
     const context = Number(raw)
@@ -725,6 +729,10 @@ const dlgImageSettings = $("dlg-image-settings")
 const imageSkillStatusNode = $("image-skill-status")
 const imageSkillPathNode = $("image-skill-path")
 const imageSkillInstallButton = $("image-skill-install")
+$("integrations-advanced").onclick = () => {
+  $("dlg-integrations-advanced").showModal()
+  loadImageSkillStatus()
+}
 $("image-skill-settings").onclick = () => {
   dlgImageSettings.showModal()
   renderImageSettings()
@@ -761,7 +769,7 @@ async function installImageSkill(overwrite = false) {
     const response = await api("/api/skills/image-generation", { method: "POST", body: JSON.stringify({ overwrite }) })
     const payload = await response.json().catch(() => ({}))
     if (response.status === 409 && !overwrite) {
-      const shouldOverwrite = window.confirm("В этом месте уже есть другая версия skill. Обновить её встроенной версией?")
+      const shouldOverwrite = await askConfirm("В этом месте уже есть другая версия skill. Обновить её встроенной версией?", { title: "Обновить skill", okLabel: "Обновить" })
       if (shouldOverwrite) return installImageSkill(true)
       renderImageSkillStatus(payload)
       return
@@ -782,7 +790,7 @@ imageSkillInstallButton.onclick = () => installImageSkill()
 
 $("oc-path").onchange = (e) => {
   const value = e.target.value.trim()
-  if (value && value !== DEFAULT_OPENCODE_CONFIG) cfg.opencodeConfig = value
+  if (value && value !== opencodeConfigDefault) cfg.opencodeConfig = value
   else delete cfg.opencodeConfig
   renderOpenCode(); save()
 }
@@ -792,6 +800,51 @@ $("oc-provider").onchange = (e) => {
   else delete cfg.opencodeProvider
   renderOpenCode(); save()
 }
+const SETTINGS_RESET_DEFAULTS = {
+  "s-port": "8787",
+  "s-limit": "300",
+  "s-error": "30",
+  "s-header": "120",
+  "s-stream-idle": "90",
+  "s-session-gap": "300",
+  "s-pending-buffer": "8388608",
+}
+function syncResetVisibility() {
+  document.querySelectorAll("[data-reset]").forEach((button) => {
+    const id = button.dataset.reset
+    const control = $(id)
+    if (!control) return
+    if (id === "s-retry-forever") button.hidden = !control.checked
+    else if (id === "oc-path") button.hidden = control.value === opencodeConfigDefault
+    else if (id === "oc-provider") button.hidden = control.value === DEFAULT_OPENCODE_PROVIDER
+    else button.hidden = control.value === SETTINGS_RESET_DEFAULTS[id]
+  })
+}
+// Live typing must reveal/hide the reset immediately, not only on commit.
+document.addEventListener("input", syncResetVisibility)
+document.addEventListener("change", syncResetVisibility)
+
+document.querySelectorAll("[data-reset]").forEach((button) => {
+  button.onclick = async () => {
+    const id = button.dataset.reset
+    if (!(await askConfirm("Вернуть значение по умолчанию?", { title: "", okLabel: "Подтвердить сброс" }))) return
+    if (id === "oc-path") delete cfg.opencodeConfig
+    else if (id === "oc-provider") delete cfg.opencodeProvider
+    else if (id === "s-port") delete cfg.port
+    else if (id === "s-limit") delete cfg.limitCooldownSec
+    else if (id === "s-error") delete cfg.errorCooldownSec
+    else if (id === "s-header") delete cfg.headerTimeoutSec
+    else if (id === "s-stream-idle") delete cfg.streamIdleTimeoutSec
+    else if (id === "s-session-gap") delete cfg.sessionIdleGapSec
+    else if (id === "s-retry-forever") delete cfg.retryForever
+    else if (id === "s-pending-buffer") delete cfg.pendingBufferBytes
+    if (id === "s-retry-forever") $(id).checked = false
+    else if (id === "s-pending-buffer") $(id).value = "8388608"
+    renderSettings()
+    if (id === "oc-path" || id === "oc-provider") renderOpenCode()
+    save()
+  }
+})
 $("opencode-toggle").onclick = (event) => {
   event.preventDefault()
   const enabled = cfg.integrations?.opencode?.enabled !== false
@@ -836,6 +889,12 @@ $("theme-search").oninput = (event) => {
   const field = $("theme-search")
   field.focus()
   field.setSelectionRange(field.value.length, field.value.length)
+}
+$("theme-search-clear").onclick = () => {
+  themeQuery = ""
+  $("theme-search").value = ""
+  renderThemeDialog()
+  $("theme-search").focus()
 }
 $("s-auto-update").onchange = (e) => {
   appSettings().autoUpdate = e.target.checked
@@ -916,7 +975,6 @@ $("s-rollback-open").onclick = () => {
   rollbackQuery = ""
   rollbackFilter = "older"
   $("rollback-search").value = ""
-  $("rollback-filter").value = rollbackFilter
   dlgRollback.showModal()
   loadRollbackVersions()
 }
@@ -924,9 +982,18 @@ $("rollback-search").oninput = (event) => {
   rollbackQuery = event.target.value
   renderRollbackList()
 }
-$("rollback-filter").onchange = (event) => {
-  rollbackFilter = event.target.value
+$("rollback-search-clear").onclick = () => {
+  rollbackQuery = ""
+  $("rollback-search").value = ""
   renderRollbackList()
+  $("rollback-search").focus()
+}
+$("rollback-filter-menu").onclick = () => {
+  const options = [["older", "Только старше текущей"], ["all", "Все версии"], ["current", "Только текущая"]]
+  openSearchMenu($("rollback-filter-menu"), options.map(([value, label]) => ({
+    label, checked: rollbackFilter === value,
+    action: () => { rollbackFilter = value; renderRollbackList() },
+  })))
 }
 $("rollback-cancel").onclick = () => dlgRollback.close()
 $("s-auto-restart").onchange = (e) => {
@@ -977,6 +1044,13 @@ $("u-session-search").oninput = (e) => {
   sessionPage = 0
   renderUsageReportKeepingScroll(usageReport)
 }
+$("u-session-search-clear").onclick = () => {
+  sessionQuery = ""
+  sessionPage = 0
+  $("u-session-search").value = ""
+  if (usageReport) renderUsageReportKeepingScroll(usageReport)
+  $("u-session-search").focus()
+}
 
 // Every session across the stored days, merged by id: the per-day view only
 // sees one bucket, so a session that ran yesterday and today looked missing.
@@ -1005,11 +1079,14 @@ let allSessionQuery = ""
 let allSessionPage = 0
 function renderAllSessions() {
   const days = Array.isArray(usageReport?.days) ? usageReport.days : []
-  const rows = usageSessionRows(allSessions(days), usageReport?.sessionTitles)
+  const rows = usageSessionRows(allSessions(days), usageReport?.sessionTitles, allSessionQuery)
   const pages = Math.max(1, Math.ceil(rows.length / SESSION_PAGE_SIZE))
   if (allSessionPage >= pages) allSessionPage = pages - 1
   const slice = rows.slice(allSessionPage * SESSION_PAGE_SIZE, (allSessionPage + 1) * SESSION_PAGE_SIZE)
-  $("all-sessions-count").textContent = rows.length ? `${rows.length} сессий` : ""
+  $("all-sessions-count").textContent = ""
+  $("all-sessions-table").innerHTML = sessionTableHtml(slice)
+  // One page needs no controls: the drawer only exists while there is a choice.
+  $("all-sessions-drawer").hidden = pages <= 1
   $("all-sessions-pager").innerHTML = pages > 1
     ? `<button type="button" data-page="${allSessionPage - 1}"${allSessionPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${allSessionPage + 1} / ${pages}</span><button type="button" data-page="${allSessionPage + 1}"${allSessionPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
     : ""
@@ -1019,24 +1096,32 @@ function renderAllSessions() {
       renderAllSessions()
     }
   })
-  $("all-sessions-table").innerHTML = sessionTableHtml(slice)
 }
 $("u-session-all").onclick = () => {
+  allSessionQuery = ""
   allSessionPage = 0
-  $("all-sessions-search").value = sessionQuery
-  allSessionQuery = sessionQuery
+  $("all-sessions-search").value = ""
   renderAllSessions()
   $("dlg-all-sessions").showModal()
+}
+$("all-sessions-drawer-toggle").onclick = () => {
+  const body = $("all-sessions-pager")
+  const open = body.hidden
+  body.hidden = !open
+  $("all-sessions-drawer-toggle").setAttribute("aria-expanded", String(open))
 }
 $("all-sessions-search").oninput = (e) => {
   allSessionQuery = e.target.value
   allSessionPage = 0
-  const saved = sessionQuery
-  sessionQuery = allSessionQuery
   renderAllSessions()
-  sessionQuery = saved
 }
-$("all-sessions-close").onclick = () => $("dlg-all-sessions").close()
+$("all-sessions-search-clear").onclick = () => {
+  allSessionQuery = ""
+  $("all-sessions-search").value = ""
+  allSessionPage = 0
+  renderAllSessions()
+  $("all-sessions-search").focus()
+}
 $("providers-filter").oninput = (e) => {
   providersFilter = e.target.value
   renderProviders()
@@ -1046,6 +1131,44 @@ $("providers-filter-clear").onclick = () => {
   $("providers-filter").value = ""
   renderProviders()
   $("providers-filter").focus()
+}
+$("m-search").oninput = (event) => { modelSearch = event.target.value; renderModels() }
+$("m-search-clear").onclick = () => {
+  modelSearch = ""
+  chainFilters.clear()
+  syncFilterButton("m-search-filter", chainFilters)
+  $("m-search").value = ""
+  renderModels()
+  $("m-search").focus()
+}
+$("om-search").oninput = (event) => { directModelSearch = event.target.value; renderOpencodeModels() }
+$("om-search-clear").onclick = () => {
+  directModelSearch = ""
+  directFilters.clear()
+  syncFilterButton("om-search-filter", directFilters)
+  $("om-search").value = ""
+  renderOpencodeModels()
+  $("om-search").focus()
+}
+$("m-search-filter").onclick = () => {
+  const options = [["active", "Активные"], ["disabled", "Скрытые"], ["empty", "Пустые"]]
+  openSearchMenu($("m-search-filter"), options.map(([value, label]) => ({
+    label, toggle: true, stayOpen: true, checked: chainFilters.has(value),
+    action: () => { toggleFilter("m-search-filter", chainFilters, value); renderModels() },
+  })))
+}
+$("om-search-filter").onclick = () => {
+  const options = [["active", "Активные"], ["disabled", "Скрытые"]]
+  openSearchMenu($("om-search-filter"), options.map(([value, label]) => ({
+    label, toggle: true, stayOpen: true, checked: directFilters.has(value),
+    action: () => { toggleFilter("om-search-filter", directFilters, value); renderOpencodeModels() },
+  })))
+}
+$("theme-search-filter").onclick = () => {
+  openSearchMenu($("theme-search-filter"), [
+    { label: "Все темы", checked: !themeOnlyCurrent, action: () => { themeOnlyCurrent = false; renderThemeDialog() } },
+    { label: "Только текущая", checked: themeOnlyCurrent, action: () => { themeOnlyCurrent = true; renderThemeDialog() } },
+  ])
 }
 
 function renderAll() {

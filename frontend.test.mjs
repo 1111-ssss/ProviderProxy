@@ -55,7 +55,7 @@ const element = (id) => {
   if (!elements.has(id)) elements.set(id, { value: "", innerHTML: "", querySelectorAll: () => [] })
   return elements.get(id)
 }
-const context = vm.createContext({ $: element, save: () => {}, esc: (s) => String(s ?? "") })
+const context = vm.createContext({ $: element, save: () => {}, esc: (s) => String(s ?? ""), emptyStateHtml: (message) => `<div class="sessions-empty"><strong>${message}</strong></div>` })
 const run = (code) => vm.runInContext(code, context)
 
 run(`let cfg = {
@@ -144,12 +144,12 @@ test("provider model grid drops columns instead of cutting ids", () => {
   assert.equal(cols(2000, 120), 4, "four columns is the ceiling")
 })
 
-test("a chat log line shows the full session id and the chain under the date", () => {
+test("chat logs show model separately and put outcomes below it", () => {
   // logCard builds DOM nodes; give it a tiny node/document stub of its own.
   const node = (tag) => ({ tagName: tag, className: "", textContent: "", title: "", dataset: {}, children: [], append(...kids) { this.children.push(...kids) } })
-  const ctx = vm.createContext({ document: { createElement: (tag) => node(tag) } })
+  const ctx = vm.createContext({ document: { createElement: (tag) => node(tag) }, logSessionTitle: () => "" })
   vm.runInContext(scripts.slice(scripts.indexOf("const logCard = ("), scripts.indexOf("const logEmpty =")), ctx)
-  const line = "[2026-11-15 10:04:35] logfare-1mil → ответ: logfare/deepseek-v4.1-flash-1017 (HTTP 200 OK) [ses:ses_e21fa60f0ffeD7GJwkbN2F0UGs]"
+  const line = "[2026-11-15 10:04:35] logfare-1mil → ответ: logfare-1mil (deepseek-v4.1-flash-1017) [ses:ses_e21fa60f0ffeD7GJwkbN2F0UGs]"
   const card = vm.runInContext(`logCard(${JSON.stringify(line)})`, ctx)
   // The header holds the date and the session chip; the chip keeps the whole id.
   const top = card.children[0]
@@ -158,11 +158,33 @@ test("a chat log line shows the full session id and the chain under the date", (
   assert.ok(ses, "the session chip is present")
   assert.equal(ses.textContent, "ses_e21fa60f0ffeD7GJwkbN2F0UGs", "the id is not shortened")
   assert.equal(ses.dataset.sessionCopy, "ses_e21fa60f0ffeD7GJwkbN2F0UGs", "clicking copies the full id")
-  // The chain name sits on its own line right under the header, not inside it.
+  const badge = top.children.find((c) => c.className === "b")
+  assert.equal(badge.textContent, "ответ", "the kind is the badge, so the message drops it")
   const chain = card.children.find((c) => c.className === "chain")
-  assert.ok(chain, "the chain name has its own line")
-  assert.equal(chain.textContent, "logfare-1mil")
-  assert.ok(!top.children.some((c) => c.className === "chain"), "the chain is not in the header row")
+  assert.equal(chain.textContent, "logfare-1mil (deepseek-v4.1-flash-1017)")
+  assert.equal(card.children.find((c) => c.className === "m"), undefined, "answers show only the model/chain")
+  const switched = vm.runInContext(
+    `logCard("[2026-11-15 10:04:35] logfare-1mil → свитч: logfare-1mil (deepseek-v4.1-flash-1017) — HTTP 429, заблокирован, пробую следующего")`,
+    ctx,
+  )
+  assert.equal(switched.children.find((c) => c.className === "chain").textContent, "logfare-1mil (deepseek-v4.1-flash-1017)")
+  assert.equal(switched.children.find((c) => c.className === "m").textContent, "HTTP 429, заблокирован, пробую следующего")
+  const failed = vm.runInContext(
+    `logCard("[2026-11-15 10:04:35] logfare-1mil → ошибка: logfare-1mil (deepseek-v4.1-flash-1017) — HTTP 401")`,
+    ctx,
+  )
+  assert.equal(failed.children.find((c) => c.className === "m").textContent, "HTTP 401")
+  // Image and HTTP lines are not chat events: their name stays above the message.
+  const image = vm.runInContext(
+    `logCard("[2026-11-15 10:04:35] image images/generations logfare/flux → HTTP 400: provider, model and prompt are required")`,
+    ctx,
+  )
+  assert.equal(image.children.find((c) => c.className === "chain").textContent, "image images/generations logfare/flux")
+})
+
+test("the check-in field uses its name as the label and the exact hint copy", () => {
+  assert.match(indexHtml, /<span class="field-label">Страница чек-ина \(опционально\)/)
+  assert.match(indexHtml, /data-hint="добавляет кнопку для открытия страницы чек-ина \(ежедневного бонуса\)\."/)
 })
 
 test("applyTheme accepts every palette offered by the picker", () => {
@@ -226,7 +248,7 @@ test("digit shortcuts map to the nine tabs", () => {
 test("a quick second digit reaches tabs 11..19", () => {
   const source = scripts.slice(
     scripts.indexOf("const TAB_KEYS"),
-    scripts.indexOf('document.addEventListener("keydown"'),
+    scripts.lastIndexOf('document.addEventListener("keydown"'),
   )
   const sandbox = { TABS: ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "settings", "ten", "eleven"] }
   vm.createContext(sandbox)
@@ -286,14 +308,354 @@ test("log pages keep newest records on page one and prepend fresh lines at top",
   assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify(logPageSlice(lines, 1, 3))', sandbox)), ["line-4", "line-5"])
 })
 
-test("model context Auto clears the manual value", () => {
-  const source = scripts.slice(scripts.indexOf('$("dms-context-max").onclick ='), scripts.indexOf("dlgModelSettings.addEventListener"))
-  const field = { value: "128000", focus() { this.focused = true } }
-  const button = {}
-  const sandbox = { $: (id) => id === "dms-context" ? field : button }
+test("clearing the log search resets the query, page and visible input", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf('$("log-search-clear").onclick ='), logs.indexOf('$("log-filter-menu").onclick ='))
+  const input = { value: "timeout", focus() { this.focused = true } }
+  const button = { classList: { toggle() {} } }
+  let renders = 0
+  const sandbox = {
+    logQuery: "timeout",
+    logPage: 3,
+    logFilters: new Set(["error"]),
+    syncFilterButton: () => {},
+    renderLogs() { renders++ },
+    $: (id) => id === "log-search" ? input : button,
+  }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   button.onclick()
-  assert.equal(field.value, "", "Auto leaves /v1/models in control")
+  assert.equal(sandbox.logQuery, "")
+  assert.equal(sandbox.logFilters.size, 0, "the clear button drops the event filter too")
+  assert.equal(sandbox.logPage, 0)
+  assert.equal(input.value, "")
+  assert.equal(input.focused, true)
+  assert.equal(renders, 1)
+})
+
+test("the all-days session search does not reuse the main session query", () => {
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const source = usage.slice(usage.indexOf("function usageSessionRows"), usage.indexOf("function usageSessionTable"))
+  const sandbox = {
+    sessionQuery: "beta",
+    sessionTitle: (_titles, id) => id === "a" ? "alpha" : "beta",
+    sortSessionRows: (rows) => rows,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const rows = JSON.parse(vm.runInContext(
+    'JSON.stringify(usageSessionRows({ a: { ok: 1 }, b: { ok: 1 } }, {}, "alpha"))',
+    sandbox,
+  ))
+  assert.deepEqual(rows.map((row) => row.id), ["a"], "the dialog uses its own query")
+})
+
+test("an empty session list shows the centered not-found illustration", () => {
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const source = usage.slice(usage.indexOf("const sortArrow"), usage.indexOf('document.addEventListener("click"'))
+  const sandbox = {
+    sessionQuery: "",
+    sessionSort: { key: "lastSeen", dir: -1 },
+    sessionTitle: (_titles, id) => id,
+    esc: (value) => String(value ?? ""),
+    fmtNum: (value) => String(value ?? 0),
+    fmtTok: (value) => String(value ?? 0),
+    fmtUptime: (value) => String(value ?? 0),
+    emptyStateHtml: (message) => `<div class="sessions-empty"><svg class="sessions-empty-icon"></svg><strong>${message}</strong></div>`,
+    $: () => ({ textContent: "", innerHTML: "", querySelectorAll: () => [] }),
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const empty = vm.runInContext("sessionTableHtml([])", sandbox)
+  assert.match(empty, /class="sessions-empty-icon"/)
+  assert.match(empty, /<strong>ничего не найдено<\/strong>/)
+  assert.doesNotMatch(empty, /<table>/)
+  const filled = vm.runInContext('sessionTableHtml([{ id: "session-1", stat: { requests: 1 }, title: "Session" }])', sandbox)
+  assert.match(filled, /^<table>/)
+})
+
+test("confirmed setting resets remove overrides and restore defaults", async () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.lastIndexOf('document.querySelectorAll("[data-reset]")'), providers.indexOf('$("opencode-toggle").onclick'))
+  const runReset = async (id, initial) => {
+    const button = { dataset: { reset: id } }
+    const controls = {
+      "s-retry-forever": { checked: true },
+      "s-pending-buffer": { value: "16384" },
+    }
+    let saves = 0
+    let renders = 0
+    const sandbox = {
+      cfg: { ...initial },
+      document: { querySelectorAll: () => [button] },
+      askConfirm: async () => true,
+      renderSettings() { renders++ },
+      renderOpenCode() {},
+      save() { saves++ },
+      $: (elementId) => controls[elementId] ?? {},
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(source, sandbox)
+    await button.onclick()
+    return { cfg: sandbox.cfg, controls, saves, renders }
+  }
+
+  const limit = await runReset("s-limit", { limitCooldownSec: 12 })
+  assert.equal(limit.cfg.limitCooldownSec, undefined)
+  assert.equal(limit.saves, 1)
+  assert.equal(limit.renders, 1)
+
+  const retry = await runReset("s-retry-forever", { retryForever: true })
+  assert.equal(retry.cfg.retryForever, undefined)
+  assert.equal(retry.controls["s-retry-forever"].checked, false)
+
+  const buffer = await runReset("s-pending-buffer", { pendingBufferBytes: 16384 })
+  assert.equal(buffer.cfg.pendingBufferBytes, undefined)
+  assert.equal(buffer.controls["s-pending-buffer"].value, "8388608")
+
+  const path = await runReset("oc-path", { opencodeConfig: "/tmp/opencode.json" })
+  assert.equal(path.cfg.opencodeConfig, undefined)
+})
+
+test("reset buttons appear only for non-default values, using the backend default", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("const SETTINGS_RESET_DEFAULTS"), providers.indexOf("// Live typing"))
+  const controls = {
+    "s-port": { value: "8787" },
+    "s-limit": { value: "300" },
+    "s-retry-forever": { checked: false },
+    "s-pending-buffer": { value: "8388608" },
+    "oc-path": { value: "~/.config/opencode/opencode.json" },
+    "oc-provider": { value: "provider-proxy" },
+  }
+  const buttons = Object.fromEntries(Object.keys(controls).map((id) => [id, { dataset: { reset: id }, hidden: false }]))
+  const sandbox = {
+    opencodeConfigDefault: "~/.config/opencode/opencode.json",
+    DEFAULT_OPENCODE_PROVIDER: "provider-proxy",
+    document: { querySelectorAll: () => Object.values(buttons) },
+    $: (id) => controls[id],
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("syncResetVisibility()", sandbox)
+  for (const [id, button] of Object.entries(buttons)) assert.equal(button.hidden, true, `${id}: default value hides reset`)
+  // The backend default is .json here: the .jsonc constant must not win.
+  controls["oc-path"].value = "~/.config/opencode/opencode.jsonc"
+  controls["s-port"].value = "9000"
+  controls["s-retry-forever"].checked = true
+  vm.runInContext("syncResetVisibility()", sandbox)
+  assert.equal(buttons["oc-path"].hidden, false, "any path other than the effective default shows reset")
+  assert.equal(buttons["s-port"].hidden, false)
+  assert.equal(buttons["s-retry-forever"].hidden, false)
+  assert.equal(buttons["s-limit"].hidden, true)
+})
+
+test("provider table keeps four columns, the model count and a dialog-only delete", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
+  const table = {
+    rows: [],
+    set innerHTML(html) { this.rows = html ? [{ cells: [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1]) }] : [] },
+    insertRow() { const row = { cells: [], querySelector: () => ({}), set innerHTML(html) { this.html = html; this.cells = [...html.matchAll(/<td\b([^>]*)>/g)].map((m) => m[1]) } }; this.rows.push(row); return row },
+  }
+  const emptyBox = { innerHTML: "" }
+  const sandbox = {
+    cfg: { providers: { alpha: { baseURL: "https://a.example/v1", models: ["m1", "m2"] } } },
+    providersFilter: "",
+    esc: (s) => String(s ?? ""),
+    emptyStateHtml: (message) => `<div class="sessions-empty"><strong>${message}</strong></div>`,
+    $: (id) => id === "providers" ? table : id === "providers-empty" ? emptyBox : { style: {} },
+    openProviderDialog() {}, openUrl() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("renderProviders()", sandbox)
+  assert.deepEqual(table.rows[0].cells, ["имя", "baseURL", "модели", ""], "header has four columns")
+  assert.equal(table.rows[1].cells.length, 4, "data row has four cells")
+  assert.match(table.rows[1].html, /<td class="muted">2<\/td>/, "model count is rendered")
+  assert.doesNotMatch(table.rows[1].html, /data-a="del"/, "delete lives in the edit dialog, not the row")
+  sandbox.providersFilter = "нет такого"
+  vm.runInContext("renderProviders()", sandbox)
+  assert.equal(table.rows.length, 0, "search hides non-matching providers")
+  assert.match(emptyBox.innerHTML, /ничего не найдено/)
+})
+
+test("adding direct models hides delete even when that provider already has models", () => {
+  const models = readFileSync(new URL("js/models.js", FRONTEND), "utf8")
+  const source = models.slice(models.indexOf("function openOpenCodeModelDialog"), models.indexOf("function renderOpenCodeModelDialog"))
+  const deleteButton = { hidden: false }
+  const dialog = { returnValue: "save", showModal() {} }
+  const sandbox = {
+    cfg: { providers: { p: { models: ["m"] } }, opencodeModels: { p: { models: ["m"] } } },
+    directModelIds: () => ["m"],
+    directDraft: null,
+    dlgOpenCodeModel: dialog,
+    renderOpenCodeModelDialog() {},
+    $: (id) => id === "dom-delete" ? deleteButton : {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("openOpenCodeModelDialog()", sandbox)
+  assert.equal(deleteButton.hidden, true, "add mode never exposes a destructive action")
+  vm.runInContext('openOpenCodeModelDialog("p")', sandbox)
+  assert.equal(deleteButton.hidden, false, "edit mode exposes delete for an existing entry")
+})
+
+test("model context reset confirms and clears the manual value", async () => {
+  const source = scripts.slice(scripts.indexOf('$("dms-context-reset").onclick ='), scripts.indexOf("dlgModelSettings.addEventListener"))
+  const field = { value: "128000", focus() { this.focused = true } }
+  const button = { hidden: false }
+  const sandbox = { $: (id) => id === "dms-context" ? field : button, askConfirm: async () => true }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  await button.onclick()
+  assert.equal(field.value, "", "the reset leaves /v1/models in control")
   assert.equal(field.focused, true)
+  assert.equal(button.hidden, true, "reset hides itself once the value is default")
+})
+
+test("askConfirm resolves ok/cancel and Escape counts as cancel", async () => {
+  const core = readFileSync(new URL("js/core.js", FRONTEND), "utf8")
+  const source = core.slice(core.indexOf("let confirmRequest = null"), core.indexOf("// Shared popover"))
+  const nodes = {}
+  const node = (id) => nodes[id] ??= { textContent: "", className: "", onclick: null, focus() { this.focused = true } }
+  const dialog = {
+    open: false, returnValue: "", listeners: {},
+    showModal() { this.open = true },
+    close() { this.open = false; this.listeners.close?.() },
+    addEventListener(type, fn) { this.listeners[type] = fn },
+    querySelector: () => header,
+  }
+  const header = { hidden: false }
+  const sandbox = { $: (id) => id === "dlg-confirm" ? dialog : node(id) }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+
+  const okRun = vm.runInContext('askConfirm("Удалить?", { okLabel: "Удалить", danger: true })', sandbox)
+  assert.equal(dialog.open, true)
+  assert.equal(header.hidden, false, "a titled dialog keeps its header")
+  assert.equal(node("confirm-message").textContent, "Удалить?")
+  assert.equal(node("confirm-ok").textContent, "Удалить")
+  assert.equal(node("confirm-ok").className, "danger")
+  node("confirm-ok").onclick()
+  assert.equal(await okRun, true)
+  assert.equal(dialog.open, false)
+
+  const cancelRun = vm.runInContext('askConfirm("Сбросить?")', sandbox)
+  node("confirm-cancel").onclick()
+  assert.equal(await cancelRun, false)
+
+  const escapeRun = vm.runInContext('askConfirm("Выйти?")', sandbox)
+  dialog.close() // Escape closes the dialog without pressing a button
+  assert.equal(await escapeRun, false)
+
+  const resetRun = vm.runInContext('askConfirm("Вернуть значение по умолчанию?", { title: "", okLabel: "Подтвердить сброс" })', sandbox)
+  assert.equal(header.hidden, true, "an empty title hides the header")
+  assert.equal(node("confirm-ok").textContent, "Подтвердить сброс")
+  node("confirm-cancel").onclick()
+  assert.equal(await resetRun, false)
+})
+
+test("connections bulk select ticks everything and deselect cleans references", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(connections.indexOf("function pmBulkSelect"), connections.indexOf('$("pm-menu").onclick'))
+  const removed = []
+  const sandbox = {
+    cfg: { providers: { p: { models: ["a"], modelAvailability: { a: { available: true }, b: { available: true }, c: { available: false } } } } },
+    pmState: { provider: "p", ids: ["a", "b", "c"] },
+    chainFillSnapshot: () => new Map(),
+    removeModelReferences(provider, id) { removed.push(id) },
+    isAutoAllProvider: () => false,
+    saved: false,
+    save() {},
+    renderProviderModels() {}, renderProviders() {}, renderModels() {}, renderOpencodeModels() {}, renderOpenCode() {}, renderImageGenerator() {},
+    reportEmptiedChains() {}, flash() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("pmBulkSelect(true)", sandbox)
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.providers.p.models)", sandbox)), ["a", "b", "c"])
+  vm.runInContext("pmBulkSelect(false)", sandbox)
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.providers.p.models)", sandbox)), [])
+  assert.deepEqual(removed, ["a", "b", "c"], "deselect removes every reference, not just the first")
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(pmState.ids)", sandbox)), ["a", "b"], "unavailable ids drop out of the shown list")
+})
+
+test("the model selection filter keeps only the requested ticks", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(connections.indexOf("function renderPmList"), connections.indexOf("No redraw per click") - 5) + "\n}"
+  const list = { innerHTML: "", querySelectorAll: () => [] }
+  const menuButton = { classList: { toggle() {} }, dataset: {} }
+  const sandbox = {
+    cfg: { providers: { p: { models: ["a"] } } },
+    pmState: { provider: "p", ids: ["a", "b"], filter: "" },
+    pmFilters: new Set(["selected"]),
+    isAutoAllProvider: () => false,
+    isImageModel: () => false,
+    contextBadge: () => "", availabilityBadge: () => "",
+    modelCardsHtml: (_provider, ids) => ids.map((id) => `<label data-id="${id}"></label>`).join(""),
+    syncPmFilterButton: () => {},
+    esc: (s) => String(s ?? ""),
+    emptyStateHtml: (message) => `<div class="sessions-empty"><strong>${message}</strong></div>`,
+    $: (id) => (id === "pm-filter-menu" ? menuButton : list),
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("renderPmList()", sandbox)
+  assert.match(list.innerHTML, /data-id="a"/)
+  assert.doesNotMatch(list.innerHTML, /data-id="b"/, "unselected model is filtered out")
+  sandbox.pmFilters.clear()
+  sandbox.pmFilters.add("unselected")
+  vm.runInContext("renderPmList()", sandbox)
+  assert.match(list.innerHTML, /data-id="b"/)
+  assert.doesNotMatch(list.innerHTML, /data-id="a"/)
+  sandbox.pmState.filter = "нет такого"
+  sandbox.pmFilters.clear()
+  vm.runInContext("renderPmList()", sandbox)
+  assert.match(list.innerHTML, /sessions-empty/, "a fruitless search shows the shared illustration")
+})
+
+test("model filters are independent checkboxes", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(connections.indexOf("function togglePmFilter"), connections.indexOf('$("pm-filter-menu").onclick'))
+  const sandbox = {
+    pmFilters: new Set(),
+    renderPmList: () => {},
+    syncPmFilterButton: () => {},
+    $: () => ({ classList: { toggle() {} }, dataset: {} }),
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const state = () => JSON.parse(vm.runInContext("JSON.stringify([...pmFilters])", sandbox))
+  vm.runInContext('togglePmFilter("selected")', sandbox)
+  assert.deepEqual(state(), ["selected"])
+  vm.runInContext('togglePmFilter("image")', sandbox)
+  assert.deepEqual(state(), ["selected", "image"], "groups combine")
+  vm.runInContext('togglePmFilter("unselected")', sandbox)
+  assert.deepEqual(state(), ["selected", "image", "unselected"], "every box can be on at once")
+  vm.runInContext('togglePmFilter("unselected")', sandbox)
+  assert.deepEqual(state(), ["selected", "image"], "a second click clears the box")
+})
+
+test("log search also matches the session title", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("const LOG_PAGE_SIZE"), logs.indexOf("function renderLogs"))
+  const sandbox = {}
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext('logSessionTitles = { ses_abc123: "Починить меню" }', sandbox)
+  const line = "[2026-11-23 10:00:00] chain → ответ: p/m [ses:ses_abc123]"
+  const match = (query) => vm.runInContext(`logQuery = ${JSON.stringify(query)}; logMatches(${JSON.stringify(line)})`, sandbox)
+  assert.equal(match(""), true)
+  assert.equal(match("меню"), true, "the session title is searchable")
+  assert.equal(match("abc123"), true, "the id still matches")
+  assert.equal(match("нет такого"), false)
+  // Event kinds are independent boxes; "Инфо" is everything without an outcome.
+  const kind = (filters, value) => vm.runInContext(
+    `logQuery = ""; logFilters = new Set(${JSON.stringify(filters)}); logMatches(${JSON.stringify(value)})`, sandbox)
+  assert.equal(kind(["info"], "config обновлён"), true, "neutral lines are info")
+  assert.equal(kind(["info"], line), false, "an answer is not info")
+  assert.equal(kind(["answer"], line), true)
+  assert.equal(kind(["info", "answer"], line), true, "boxes combine")
+  assert.equal(kind([], "config обновлён"), true, "no filter shows everything")
 })
