@@ -650,7 +650,7 @@ pub(super) async fn stream_upstream_response(
                                 &state,
                                 session.as_deref(),
                                 format!(
-                                    "{exposed} → пропущен кадр потока: {reason}"
+                                    "{exposed} → инфо: пропущен кадр потока: {reason}"
                                 ),
                             ),
                         }
@@ -685,7 +685,7 @@ pub(super) async fn stream_upstream_response(
                         &state,
                         session.as_deref(),
                         format!(
-                            "{exposed} → пропущен кадр потока: {reason}"
+                            "{exposed} → инфо: пропущен кадр потока: {reason}"
                         ),
                     ),
                 }

@@ -45,22 +45,32 @@ pub(crate) fn map_headers(value: Option<&Value>) -> HashMap<String, String> {
         .unwrap_or_default()
 }
 
-fn is_image_model(provider: &Value, id: &str) -> bool {
+pub(crate) fn is_image_model(provider: &Value, id: &str) -> bool {
     let info = provider
         .get("modelInfo")
         .and_then(|models| models.get(id));
     let endpoints = info.and_then(|model| model.get("endpoints")).and_then(Value::as_array);
-    info.and_then(|model| model.get("image")).and_then(Value::as_bool) == Some(true)
+    let image_endpoint = endpoints.is_some_and(|items| {
+        items.iter().filter_map(Value::as_str).any(|endpoint| {
+            endpoint.to_ascii_lowercase().contains("images/generations")
+                || endpoint.to_ascii_lowercase().contains("images/tasks")
+                || endpoint.to_ascii_lowercase().contains("images/edits")
+        })
+    });
+    // A manual choice in the model dialog wins over every heuristic.
+    if info.and_then(|model| model.get("image")).and_then(Value::as_bool) == Some(false) {
+        return false;
+    }
+    // `image` is also written for auto-detected models, so chat endpoints in the
+    // provider's own catalog contradict it: a chat model must not be treated as
+    // an image one.
+    (info.and_then(|model| model.get("image")).and_then(Value::as_bool) == Some(true)
+        && (endpoints.is_none() || image_endpoint))
         || info
             .and_then(|model| model.get("type"))
             .and_then(Value::as_str)
             .is_some_and(|kind| kind.eq_ignore_ascii_case("image"))
-        || endpoints.is_some_and(|items| {
-            items.iter().filter_map(Value::as_str).any(|endpoint| {
-                endpoint.to_ascii_lowercase().contains("images/generations")
-                    || endpoint.to_ascii_lowercase().contains("images/tasks")
-            })
-        })
+        || image_endpoint
         || id.to_ascii_lowercase().contains("image")
 }
 

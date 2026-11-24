@@ -420,6 +420,7 @@ pub(crate) async fn image_task_create(State(state): State<AppState>, request: Re
                 if selected_endpoint == "images/generations" {
                     stat.ok += 1;
                     usage.images_generated += 1;
+                    state.lifetime.lock().unwrap().images_generated += 1;
                 }
             }
         }
@@ -517,10 +518,14 @@ fn image_model_suggestions(state: &AppState, exclude: &str) -> Vec<String> {
         ids.dedup();
         for model in ids {
             let metadata = provider.get("modelInfo").and_then(|v| v.get(&model));
-            let image = metadata
+            // `image` is also written for auto-detected models, so chat endpoints
+            // in the provider's catalog override it, same rule as routing.rs.
+            let has_endpoints = metadata.and_then(|v| v.get("endpoints")).is_some();
+            let image = (metadata
                 .and_then(|v| v.get("image"))
                 .and_then(Value::as_bool)
                 .unwrap_or(false)
+                && !has_endpoints)
                 || metadata
                     .and_then(|v| v.get("type"))
                     .and_then(Value::as_str)
@@ -530,6 +535,7 @@ fn image_model_suggestions(state: &AppState, exclude: &str) -> Vec<String> {
                     "images/generations",
                 )
                 || contains_endpoint(metadata.and_then(|v| v.get("endpoints")), "images/tasks")
+                || contains_endpoint(metadata.and_then(|v| v.get("endpoints")), "images/edits")
                 || model.to_ascii_lowercase().contains("image");
             if image && format!("{provider_name}/{model}") != exclude {
                 out.push(format!("{provider_name}/{model}"));
@@ -628,6 +634,7 @@ pub(crate) async fn image_task_get(
             }
             if terminal_ok {
                 usage.images_generated += 1;
+                state.lifetime.lock().unwrap().images_generated += 1;
             }
             let final_status = if terminal_ok { "succeeded" } else { "failed" };
             let model_name = image_key

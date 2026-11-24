@@ -1,7 +1,6 @@
 const dlgModel = $("dlg-model")
 let draft = null // { original, enabled, upstreams: [{provider, model}] }
 let pickProvider = null // провайдер, выбранный в пикере «или из выбранных моделей провайдера»
-let chainColumnsObserver = null
 let chainProviderFilter = ""
 // Ticks filter for the model picker: empty means every model.
 let pickFilters = new Set()
@@ -38,23 +37,8 @@ function renderModelDialog() {
           </div>
         </div>`).join("")
     : emptyInlineHtml("Цепочка пуста — выбери модель ниже")
-  // Columns follow the pane width, like the chain cards on the Chains tab.
-  const chainBox = $("dm-chain")
-  const fitChainColumns = () => {
-    const available = chainBox.clientWidth
-    if (!available) return
-    const cols = Math.max(1, Math.min(2, Math.floor((available + 8) / (330 + 8))))
-    // Rows are counted so the grid can fill downwards first.
-    const rows = Math.max(1, Math.ceil(ups.length / cols))
-    if (chainBox.dataset.chainCols === `${cols}x${rows}`) return
-    chainBox.dataset.chainCols = `${cols}x${rows}`
-    chainBox.style.setProperty("--chain-cols", cols)
-    chainBox.style.setProperty("--chain-rows", rows)
-  }
-  fitChainColumns()
-  chainColumnsObserver?.disconnect()
-  chainColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fitChainColumns))
-  chainColumnsObserver.observe(chainBox)
+  // Columns follow the pane width and collapse if the rendered model label clips.
+  applyChainColumns($("dm-chain"))
 
   const on = (a, fn) => $("dm-chain").querySelectorAll(`[data-a="${a}"]`).forEach((b) => (b.onclick = () => fn(+b.dataset.i)))
   on("up", (i) => { const u = draft.upstreams; [u[i - 1], u[i]] = [u[i], u[i - 1]]; renderModelDialog() })
@@ -103,7 +87,6 @@ function renderModelDialog() {
   $("dm-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
       pickProvider = button.dataset.provider
-      filters.delete("dm-pick-list")
       renderModelDialog()
     }
   })

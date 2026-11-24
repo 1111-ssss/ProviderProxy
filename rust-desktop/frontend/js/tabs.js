@@ -73,7 +73,8 @@ document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = 
 // Digits switch tabs while nothing else claims the keyboard: no focused input
 // and no open dialog. 1..8 pick tabs in order, 0 opens the last one (settings);
 // 9 has no tab and is ignored. A second press of the same digit within 200ms
-// targets tab 11..19, so a missing one falls back to the first tab.
+// targets tab 11..19, so "22" means tab 2: the tenth tab does not exist and the
+// pressed digit is the best match.
 const TAB_KEYS = { "1": "providers", "2": "connections", "3": "integrations", "4": "chains", "5": "models", "6": "images", "7": "logs", "8": "usage", "0": "settings" }
 const DOUBLE_TAP_MS = 200
 let lastDigit = ""
@@ -82,7 +83,7 @@ function digitTab(digit, now) {
   const repeated = digit === lastDigit && now - lastDigitAt < DOUBLE_TAP_MS
   lastDigit = digit
   lastDigitAt = now
-  if (repeated) return TABS[10 + Number(digit) - 1] ?? TABS[0]
+  if (repeated) return TABS[10 + Number(digit) - 1] ?? TAB_KEYS[digit]
   return TAB_KEYS[digit]
 }
 document.addEventListener("keydown", (event) => {

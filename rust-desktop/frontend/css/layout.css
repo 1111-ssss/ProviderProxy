@@ -6,8 +6,8 @@
      title and the window controls share this row. Browser visitors get the
      same strip without the window controls. */
   @property --rail-width { syntax: "<length>"; inherits: true; initial-value: 224px; }
-  :root { --topbar-height: 46px; }
-  html[data-frame="custom"] { --topbar-height: 38px; }
+  :root { --topbar-height: 36px; }
+  html[data-frame="custom"] { --topbar-height: 36px; }
   .titlebar { grid-column: 2; grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; height: var(--topbar-height); padding-left: clamp(12px, 2vw, 20px); user-select: none; }
   .titlebar-heading { display: flex; align-items: center; gap: 7px; min-width: 0; }
   .titlebar-title { min-width: 0; overflow: hidden; color: var(--text); font-size: 15px; font-weight: 650; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }

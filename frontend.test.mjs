@@ -34,6 +34,34 @@ test("every element id the scripts look up exists in the markup", () => {
   assert.deepEqual(missing, [], "these ids are used by JS but absent from index.html")
 })
 
+test("the desktop app flags its own frame so the window buttons are drawn", () => {
+  // The window is undecorated: without this flag the caption bar has no
+  // minimize/maximize/close at all, which is what Windows showed. On Windows a
+  // Tauri init script runs before <html> exists, so the flag must come from the
+  // page script, and only where window control actually exists.
+  const source = scripts.slice(
+    scripts.indexOf("// The desktop window is undecorated"),
+    scripts.indexOf("// The settings cards scroll"),
+  )
+  const frame = (appWindow) => {
+    const controls = { onclick: null, setAttribute() {}, dataset: {} }
+    const sandbox = {
+      window: { __TAURI__: appWindow ? { window: { getCurrentWindow: () => appWindow } } : undefined },
+      document: { documentElement: { dataset: {} }, body: { classList: { toggle() {} } } },
+      $: () => controls,
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(source, sandbox)
+    return sandbox.document.documentElement.dataset.frame ?? ""
+  }
+  const appWindow = { minimize() {}, toggleMaximize() {}, close() {}, isMaximized: async () => false, onResized() {} }
+  assert.equal(frame(appWindow), "custom", "inside the desktop webview the buttons get laid out")
+  assert.equal(frame(null), "", "a plain browser keeps the browser's own frame")
+  // A Tauri init script cannot do it: on Windows it runs before <html> exists.
+  const mainRs = readFileSync(new URL("rust-desktop/src/main.rs", import.meta.url), "utf8")
+  assert.ok(!mainRs.includes("dataset.frame"), "the flag must not come back as an init script")
+})
+
 test("a '?' inside a settings label never steals the label from its input", () => {
   // Chromium highlights a label's control on hover. Without an explicit `for`,
   // the first labelable element inside <label> is the "?" button, so hovering
@@ -132,9 +160,60 @@ test("removing connection models cleans chains and direct models", () => {
   assert.equal(run("cfg.opencodeModels.unselected"), undefined)
 })
 
+test("provider filter reset and search by name/base URL", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
+  const table = {
+    rows: [],
+    set innerHTML(html) { this.rows = html ? [{ html }] : [] },
+    insertRow() { const row = { innerHTML: "", querySelector() { return { onclick: null } } }; this.rows.push(row); return row },
+  }
+  const empty = { innerHTML: "" }
+  const sandbox = {
+    cfg: { providers: { alpha: { baseURL: "https://alpha.example/v1", models: [] }, beta: { baseURL: "https://beta.example/v1", models: [] } } },
+    providersFilter: "alpha",
+    esc: (value) => String(value ?? ""),
+    emptyStateHtml: (message) => message,
+    $: (id) => id === "providers" ? table : id === "providers-empty" ? empty : { style: {} },
+    openProviderDialog() {}, openUrl() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("renderProviders()", sandbox)
+  assert.equal(table.rows.length, 2, "one matching provider row plus header")
+  assert.match(table.rows[1].innerHTML, /alpha/)
+  sandbox.providersFilter = "beta.example"
+  vm.runInContext("renderProviders()", sandbox)
+  assert.equal(table.rows.length, 2)
+  assert.match(table.rows[1].innerHTML, /beta/)
+})
+
+test("lifetime panel shows request-based favourites and generated images, not speed", () => {
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const source = usage.slice(usage.indexOf("function renderLifetimePanel"), usage.indexOf("const usageDayLabel"))
+  const tiles = { innerHTML: "" }
+  const sandbox = {
+    fmtNum: String,
+    fmtTok: String,
+    esc: (value) => String(value ?? ""),
+    statTile: (kind, value, label) => `[${kind}|${value}|${label}]`,
+    $: () => tiles,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext('renderLifetimePanel({lifetimeTokens:{requests:15,tokensIn:100,tokensOut:200,streamMs:9000,imagesGenerated:7,providers:{alpha:8,beta:7},models:{"alpha/m1":9,"beta/m2":6}}})', sandbox)
+  assert.match(tiles.innerHTML, /любимая модель/)
+  assert.match(tiles.innerHTML, /alpha\/m1/)
+  assert.match(tiles.innerHTML, /любимый провайдер/)
+  assert.match(tiles.innerHTML, /alpha/)
+  assert.match(tiles.innerHTML, /изображений сгенерировано/)
+  assert.match(tiles.innerHTML, /\|7\|/)
+  assert.doesNotMatch(tiles.innerHTML, /в секунду/)
+})
+
 test("provider model grid drops columns instead of cutting ids", () => {
-  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
-  const source = connections.slice(connections.indexOf("function pmColumnCount"), connections.indexOf("let pmColumnsObserver"))
+  const shared = readFileSync(new URL("js/shared.js", FRONTEND), "utf8")
+  const source = shared.slice(shared.indexOf("function pmColumnCount"), shared.indexOf("let pmColumnsObservers"))
   const sandbox = vm.createContext({})
   vm.runInContext(source, sandbox)
   const cols = (available, card) => vm.runInContext(`pmColumnCount(${available}, ${card})`, sandbox)
@@ -212,7 +291,9 @@ test("a manual model type overrides the image heuristic", () => {
     `const cfg = { providers: { p: { modelInfo: {
         auto:   {},
         forced: { image: true },
-        plain:  { image: false, type: "image" }
+        plain:  { image: false, type: "image" },
+        chatAuto: { image: true, endpoints: ["chat/completions", "messages", "responses"] },
+        imageAuto: { image: true, endpoints: ["images/generations"] }
      } } } }
      const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
      ${source}
@@ -221,6 +302,8 @@ test("a manual model type overrides the image heuristic", () => {
        plain: isImageModel("p", "plain"),
        heuristic: isImageModel("p", "some-image-model"),
        auto: isImageModel("p", "auto"),
+       chatAuto: isImageModel("p", "chatAuto"),
+       imageAuto: isImageModel("p", "imageAuto"),
      }`,
     sandbox,
   )
@@ -230,6 +313,8 @@ test("a manual model type overrides the image heuristic", () => {
   assert.equal(sandbox.result.plain, false, "image:false beats type=image")
   assert.equal(sandbox.result.heuristic, true, "the name heuristic still applies")
   assert.equal(sandbox.result.auto, false, "no flag, no image hint")
+  assert.equal(sandbox.result.chatAuto, false, "chat endpoints override a stale auto-detected image flag")
+  assert.equal(sandbox.result.imageAuto, true, "image endpoints still mean an image model")
 })
 
 test("digit shortcuts map to the nine tabs", () => {
@@ -257,9 +342,14 @@ test("a quick second digit reaches tabs 11..19", () => {
   assert.equal(sandbox.digitTab("1", 100), "eleven", "second press within 200ms goes to tab 11")
   assert.equal(sandbox.digitTab("1", 400), "providers", "a slow press starts over")
   assert.equal(sandbox.digitTab("2", 450), "connections")
-  // Only nine tabs exist in the app, so tab 11 falls back to the first one.
+  // Only nine tabs exist in the app, so a double press of "5" cannot reach tab
+  // 15: it falls back to tab 5, not to the first tab.
   assert.equal(sandbox.digitTab("5", 500), "models")
-  assert.equal(sandbox.digitTab("5", 550), "providers", "missing tab 15 falls back to the first")
+  assert.equal(sandbox.digitTab("5", 550), "models", "missing tab 15 falls back to tab 5")
+  assert.equal(sandbox.digitTab("2", 600), "connections")
+  assert.equal(sandbox.digitTab("2", 650), "connections", "double 2 stays on the second tab")
+  assert.equal(sandbox.digitTab("3", 900), "integrations")
+  assert.equal(sandbox.digitTab("3", 950), "integrations", "double 3 stays on the third tab")
 })
 
 test("update progress survives late events and missing content length", () => {
@@ -318,7 +408,9 @@ test("clearing the log search resets the query, page and visible input", () => {
     logQuery: "timeout",
     logPage: 3,
     logFilters: new Set(["error"]),
-    syncFilterButton: () => {},
+    logChatFilters: new Set(["ses_1"]),
+    logModelFilters: new Set(["alpha"]),
+    syncLogFilterButton: () => {},
     renderLogs() { renders++ },
     $: (id) => id === "log-search" ? input : button,
   }
@@ -327,6 +419,8 @@ test("clearing the log search resets the query, page and visible input", () => {
   button.onclick()
   assert.equal(sandbox.logQuery, "")
   assert.equal(sandbox.logFilters.size, 0, "the clear button drops the event filter too")
+  assert.equal(sandbox.logChatFilters.size, 0, "chat filter is cleared as well")
+  assert.equal(sandbox.logModelFilters.size, 0, "model filter is cleared as well")
   assert.equal(sandbox.logPage, 0)
   assert.equal(input.value, "")
   assert.equal(input.focused, true)
@@ -584,7 +678,7 @@ test("connections bulk select ticks everything and deselect cleans references", 
 test("the model selection filter keeps only the requested ticks", () => {
   const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
   const source = connections.slice(connections.indexOf("function renderPmList"), connections.indexOf("No redraw per click") - 5) + "\n}"
-  const list = { innerHTML: "", querySelectorAll: () => [] }
+  const list = { innerHTML: "", classList: { toggle() {} }, querySelectorAll: () => [] }
   const menuButton = { classList: { toggle() {} }, dataset: {} }
   const sandbox = {
     cfg: { providers: { p: { models: ["a"] } } },
@@ -595,6 +689,7 @@ test("the model selection filter keeps only the requested ticks", () => {
     contextBadge: () => "", availabilityBadge: () => "",
     modelCardsHtml: (_provider, ids) => ids.map((id) => `<label data-id="${id}"></label>`).join(""),
     syncPmFilterButton: () => {},
+    applyPmColumns: () => {},
     esc: (s) => String(s ?? ""),
     emptyStateHtml: (message) => `<div class="sessions-empty"><strong>${message}</strong></div>`,
     $: (id) => (id === "pm-filter-menu" ? menuButton : list),
@@ -637,10 +732,160 @@ test("model filters are independent checkboxes", () => {
   assert.deepEqual(state(), ["selected", "image"], "a second click clears the box")
 })
 
+test("model cards put the not-found badge before the image icon and context", () => {
+  const shared = readFileSync(new URL("js/shared.js", FRONTEND), "utf8")
+  const source = shared.slice(shared.indexOf("function modelCardsHtml"), shared.indexOf("/// Provider buttons"))
+  const sandbox = {
+    esc: (value) => String(value ?? ""),
+    isImageModel: (_, id) => id === "img",
+    imageIcon: () => "[IMAGE]",
+    contextBadge: () => "[CTX]",
+    availabilityBadge: () => "[MISSING]",
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const html = vm.runInContext('modelCardsHtml("p", ["img"])', sandbox)
+  assert.ok(html.indexOf("[MISSING]") < html.indexOf("[IMAGE]"), "«не найдена» comes first")
+  assert.ok(html.indexOf("[IMAGE]") < html.indexOf("[CTX]"), "the image icon comes before the context badge")
+})
+
+test("provider buttons show the selected model count only when asked", () => {
+  const shared = readFileSync(new URL("js/shared.js", FRONTEND), "utf8")
+  const source = shared.slice(shared.indexOf("function providerOptionsHtml"), shared.indexOf("/// Search field"))
+  const sandbox = { esc: (value) => String(value ?? "") }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const plain = vm.runInContext('providerOptionsHtml(["alpha"], "alpha")', sandbox)
+  assert.doesNotMatch(plain, /<small>/, "pickers without counts stay as they were")
+  const counted = vm.runInContext('providerOptionsHtml(["alpha","beta"], "alpha", {alpha: 3, beta: 0})', sandbox)
+  assert.match(counted, /alpha<\/strong><small>3<\/small>/, "the connections list ends with the ticked count")
+  assert.match(counted, /beta<\/strong><small>0<\/small>/)
+})
+
+test("picking a provider keeps the typed model search", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(connections.indexOf("function renderProviderModels"), connections.indexOf('// "Выбирать все автоматически"'))
+  const options = { innerHTML: "", classList: { toggle() {}, add() {} }, buttons: [], querySelectorAll() { return this.buttons } }
+  const list = { innerHTML: "", classList: { toggle() {} } }
+  const current = { innerHTML: "" }
+  const input = { value: "" }
+  const providerInput = { value: "" }
+  let loaded = null
+  const sandbox = {
+    cfg: { providers: { alpha: { models: ["m1"] }, beta: { models: ["m2"] } } },
+    pmProviderFilter: "",
+    pmState: { provider: "alpha", ids: ["m1"], filter: "deep", loading: false, error: null },
+    providerOptionsHtml: (names) => {
+      options.buttons = names.map((name) => ({ dataset: { provider: name } }))
+      return names.join(",")
+    },
+    emptyStateHtml: (message) => message,
+    isAutoAllProvider: () => false,
+    pmCurrentLine() {},
+    loadPmModels(name) { loaded = name },
+    renderPmList() {},
+    $: (id) => ({ "pm-provider-options": options, "pm-list": list, "pm-provider-current": current, "pm-filter": input, "pm-provider-filter": providerInput })[id],
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("renderProviderModels()", sandbox)
+  options.buttons.find((button) => button.dataset.provider === "beta").onclick()
+  const state = vm.runInContext("pmState", sandbox)
+  assert.equal(state.provider, "beta")
+  assert.equal(state.filter, "deep", "the model search survives the provider switch")
+  assert.equal(loaded, "beta", "the new provider's catalog is fetched")
+  // The provider search keeps working on its own.
+  sandbox.pmProviderFilter = "alph"
+  vm.runInContext("renderProviderModels()", sandbox)
+  assert.equal(JSON.stringify(options.buttons.map((button) => button.dataset.provider)), '["alpha"]')
+})
+
+test("log facets collect chats and requested models from actual lines only", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("function logSessionId"), logs.indexOf("function logType"))
+  const sandbox = {}
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext('logSessionTitles = { ses_full1234: "Починить меню" }', sandbox)
+  const lines = [
+    "[2026-11-23 10:00:00] router → ответ: router (p/m) [ses:ses_full1234]",
+    "[2026-11-23 10:00:01] deepseek-v4 → свитч: deepseek-v4 (p/m) — HTTP 429 [ses:ses_other]",
+    "[2026-11-23 10:00:02] image images/generations p/flux → HTTP 400: bad",
+    "[2026-11-23 10:00:03] GET /v1/models → 3 моделей",
+  ]
+  const facets = vm.runInContext(`JSON.stringify(logFacets(${JSON.stringify(lines)}))`, sandbox)
+  const parsed = JSON.parse(facets)
+  assert.deepEqual(parsed.models, ["deepseek-v4", "router"], "only names left of the arrow, no upstream and no HTTP lines")
+  assert.deepEqual(parsed.chats.map((chat) => chat.id), ["ses_full1234", "ses_other"])
+  assert.equal(parsed.chats[0].label, "Починить меню", "a known title replaces the raw id")
+  assert.match(parsed.chats[0].tip, /ses_full1234/, "the tooltip keeps the full id")
+  assert.equal(parsed.chats[1].label, "ses_other", "without a title the id is shown")
+})
+
+test("log filters join groups with AND and values inside a group with OR", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("const LOG_PAGE_SIZE"), logs.indexOf("function logFilterActive"))
+  const sandbox = { document: { addEventListener() {} } }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const answer = "[2026-11-23 10:00:00] router → ответ: router (p/m) [ses:a]"
+  const switchLine = "[2026-11-23 10:00:01] other → свитч: other (p/m) — HTTP 429 [ses:b]"
+  const match = (types, chats, models, line) => vm.runInContext(
+    `logQuery = ""; logFilters = new Set(${JSON.stringify(types)}); logChatFilters = new Set(${JSON.stringify(chats)}); logModelFilters = new Set(${JSON.stringify(models)}); logMatches(${JSON.stringify(line)})`,
+    sandbox)
+  assert.equal(match([], [], [], answer), true, "no selection shows everything")
+  assert.equal(match(["answer", "switch"], [], [], switchLine), true, "values inside one group are OR-ed")
+  assert.equal(match(["answer"], [], [], switchLine), false)
+  assert.equal(match(["answer"], ["a"], [], answer), true)
+  assert.equal(match(["answer"], ["b"], [], answer), false, "groups are AND-ed")
+  assert.equal(match([], [], ["router"], answer), true)
+  assert.equal(match([], ["a"], ["other"], answer), false)
+})
+
+test("log facet pages hold six entries and search filters the list", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("function logPageSlice"), logs.indexOf("function logSessionId"))
+  const sandbox = {}
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const models = Array.from({ length: 8 }, (_, i) => `model-${i + 1}`)
+  sandbox.models = models
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(logPageSlice(models, 0, 6))", sandbox)), models.slice(0, 6))
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(logPageSlice(models, 1, 6))", sandbox)), models.slice(6))
+  const filtered = vm.runInContext(`models.filter((model) => model.includes("model-3"))`, sandbox)
+  assert.deepEqual(filtered, ["model-3"], "the mini search narrows the facet list")
+})
+
+test("a drag pick is staged until the pointer is released", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("function applyLogFacetDraft"), logs.indexOf("function logFacetEntries"))
+  const release = logs.slice(logs.indexOf("function finishLogFacetDrag"), logs.indexOf("function renderLogs"))
+  let renders = 0
+  const sandbox = {
+    logFilters: new Set(),
+    logChatFilters: new Set(),
+    logModelFilters: new Set(),
+    logFacetDraft: { types: new Set(["answer"]), chats: new Set(["ses_a"]), models: new Set() },
+    logFacetDrag: { view: "types", checked: true },
+    logPage: 2,
+    renderLogs() { renders++ },
+    document: { addEventListener() {} },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + release, sandbox)
+  assert.equal(sandbox.logFilters.size, 0, "staged ticks are not applied while the mouse is down")
+  vm.runInContext("finishLogFacetDrag()", sandbox)
+  assert.equal(JSON.stringify([...sandbox.logFilters]), '["answer"]', "release applies the whole draft at once")
+  assert.equal(JSON.stringify([...sandbox.logChatFilters]), '["ses_a"]', "the other groups apply together")
+  assert.equal(sandbox.logPage, 0, "a new filter starts from the newest page")
+  assert.equal(renders, 1, "one redraw for the whole drag")
+  assert.equal(sandbox.logFacetDrag, null)
+})
+
 test("log search also matches the session title", () => {
   const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
   const source = logs.slice(logs.indexOf("const LOG_PAGE_SIZE"), logs.indexOf("function renderLogs"))
-  const sandbox = {}
+  const sandbox = { document: { addEventListener() {} } }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   vm.runInContext('logSessionTitles = { ses_abc123: "Починить меню" }', sandbox)

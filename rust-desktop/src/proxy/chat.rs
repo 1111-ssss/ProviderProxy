@@ -450,6 +450,11 @@ async fn run_chain(
                 let mut usage = state.usage.lock().unwrap();
                 provider_stat(&mut usage, &upstream.name).requests += 1;
                 model_stat(&mut usage, &upstream.name, &upstream.model).requests += 1;
+                {
+                    let mut lifetime = state.lifetime.lock().unwrap();
+                    *lifetime.providers.entry(upstream.name.clone()).or_default() += 1;
+                    *lifetime.models.entry(format!("{}/{}", upstream.name, upstream.model)).or_default() += 1;
+                }
             }
             let mut request = state
                 .client

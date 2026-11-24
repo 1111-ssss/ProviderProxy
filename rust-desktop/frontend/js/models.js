@@ -40,7 +40,6 @@ function renderOpenCodeModelDialog() {
       directDraft.models = directModelIds(directDraft.provider, definition)
       directDraft.all = definition?.all === true
       $("dom-delete").hidden = !directDraft.editMode || !definition
-      directDraft.filter = ""
       renderOpenCodeModelDialog()
     }
   })

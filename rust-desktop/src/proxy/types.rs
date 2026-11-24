@@ -190,7 +190,7 @@ impl Default for Usage {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub(crate) struct LifetimeTokens {
     pub(crate) tokens_in: u64,
@@ -199,6 +199,13 @@ pub(crate) struct LifetimeTokens {
     /// Same meaning as `Usage::stream_ms`; `serde(default)` keeps totals saved
     /// before this field existed.
     pub(crate) stream_ms: u64,
+    /// Answers delivered per provider and per "provider/model". Bounded by the
+    /// configured catalog, so the blob stays small; it answers "favourite
+    /// provider/model" without keeping every day of history.
+    pub(crate) providers: HashMap<String, u64>,
+    pub(crate) models: HashMap<String, u64>,
+    #[serde(rename = "imagesGenerated")]
+    pub(crate) images_generated: u64,
 }
 
 #[derive(Clone)]

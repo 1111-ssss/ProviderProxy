@@ -224,12 +224,16 @@ fn main() {
                 .visible(!in_tray)
                 // Every platform drops the native frame: the page draws its own
                 // caption bar. The shadow keeps the rounded corners Windows 11
-                // gives an undecorated window and is a no-op elsewhere. The init
-                // script flags the page before its own scripts run, so the bar is
-                // laid out even if the Tauri JS API is unavailable.
+                // gives an undecorated window and is a no-op elsewhere. core.js
+                // flags the page for the bar; an init script cannot, because on
+                // Windows it runs before <html> exists.
                 .decorations(false)
                 .shadow(true)
-                .initialization_script("document.documentElement.dataset.frame = 'custom'")
+                // On Windows Tauri replaces WebView2's drag-drop handler with its
+                // own file-drop bridge, which swallows HTML5 drag events: moving
+                // chain rows with the mouse did nothing there. The GUI only needs
+                // in-page dragging, so the native handler has to go.
+                .disable_drag_drop_handler()
                 .on_new_window(move |url, _features| {
                     if let Some(url) = browser_url(&url) {
                         if let Err(error) = browser.opener().open_url(url, None::<&str>) {

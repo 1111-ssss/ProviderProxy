@@ -284,12 +284,20 @@ fn lifetime_totals_outlive_the_seven_day_window() {
         lifetime.tokens_in = 1234;
         lifetime.tokens_out = 5678;
         lifetime.requests = 9;
+        lifetime.images_generated = 4;
+        lifetime.providers.insert("alpha".into(), 6);
+        lifetime.models.insert("alpha/m1".into(), 6);
     }
     super::metrics::persist_lifetime(&state);
     let reloaded = super::metrics::load_lifetime(&state.storage);
     assert_eq!(reloaded.tokens_in, 1234);
     assert_eq!(reloaded.tokens_out, 5678);
     assert_eq!(reloaded.requests, 9);
+    // The favourite provider/model maps and the image counter must survive the
+    // round trip: the lifetime panel reads them straight from this blob.
+    assert_eq!(reloaded.images_generated, 4);
+    assert_eq!(reloaded.providers.get("alpha"), Some(&6));
+    assert_eq!(reloaded.models.get("alpha/m1"), Some(&6));
     let _ = std::fs::remove_file(&path);
 }
 

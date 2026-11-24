@@ -76,7 +76,7 @@ pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap)
         object.insert("sessionTitles".into(), json!(session_titles(&state)));
         object.insert(
             "lifetimeTokens".into(),
-            serde_json::to_value(*state.lifetime.lock().unwrap()).unwrap_or_else(|_| json!({})),
+            serde_json::to_value(state.lifetime.lock().unwrap().clone()).unwrap_or_else(|_| json!({})),
         );
     }
     Json(value).into_response()

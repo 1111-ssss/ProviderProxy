@@ -1,7 +1,15 @@
 const LOG_PAGE_SIZE = 50
+const LOG_FACET_PAGE_SIZE = 6
 let logQuery = ""
-// Checkbox filter: empty means every event, otherwise any picked kind matches.
-let logFilters = new Set() // answer | switch | error
+let logFilters = new Set() // answer | switch | error | info
+let logChatFilters = new Set()
+let logModelFilters = new Set()
+let logFacetDraft = null
+let logFacetDrag = null
+let logFacetView = "types"
+let logFacetSearchOpen = { chats: false, models: false }
+let logFacetSearch = { chats: "", models: "" }
+let logFacetPage = { chats: 0, models: 0 }
 let logPage = 0
 let logLines = []
 let logSessionTitles = {}
@@ -19,38 +27,183 @@ function logPageSlice(lines, page, size = LOG_PAGE_SIZE) {
   return lines.slice(start, start + size)
 }
 
+function logSessionId(line) {
+  return String(line).match(/\[ses:([^\]]+)\]/)?.[1] ?? ""
+}
+
+// The requested name is the part before the arrow. Non-chat lines that also
+// carry an arrow start with "image"/"GET"; everything else is a chat record.
+function logRequestedModel(line) {
+  const message = String(line).replace(/^\[[^\]]+\]\s*/, "").replace(/\s*\[ses:[^\]]+\]\s*$/, "")
+  const split = message.indexOf(" → ")
+  if (split < 0) return ""
+  const requested = message.slice(0, split).trim()
+  if (!requested || /^(?:image\b|GET\s|POST\s)/i.test(requested)) return ""
+  return requested
+}
+
+function logFacets(lines, titles = logSessionTitles) {
+  const chats = new Map()
+  const models = new Set()
+  for (const line of lines) {
+    const id = logSessionId(line)
+    if (id) {
+      const title = titles[id] ?? Object.entries(titles).find(([full]) => full.startsWith(id))?.[1] ?? ""
+      chats.set(id, { id, label: title || id, tip: title ? `${title} · ${id}` : id })
+    }
+    const model = logRequestedModel(line)
+    if (model) models.add(model)
+  }
+  return {
+    chats: [...chats.values()].sort((a, b) => a.label.localeCompare(b.label, "ru")),
+    models: [...models].sort((a, b) => a.localeCompare(b, "ru")),
+  }
+}
+
+function logType(line) {
+  const text = String(line).toLowerCase()
+  // A skipped stream frame is a warning worth seeing, not a failed request:
+  // the proxy logs it with an explicit "инфо" marker so it keeps its own kind
+  // instead of landing in errors.
+  if (/→\s*инфо:/.test(text)) return "info"
+  if (text.includes("ответ")) return "answer"
+  if (text.includes("свитч") || text.includes("заблокирован")) return "switch"
+  if (text.includes("ошибк") || text.includes("error") || text.includes("пропущен")) return "error"
+  return "info"
+}
+
 function logMatches(line) {
   const text = String(line).toLowerCase()
   if (logQuery) {
-    const sessionId = String(line).match(/\[ses:([^\]]+)\]/)?.[1] ?? ""
-    const title = logSessionTitle(sessionId).toLowerCase()
+    const title = logSessionTitle(logSessionId(line)).toLowerCase()
     if (!text.includes(logQuery) && !title.includes(logQuery)) return false
   }
-  const isAnswer = text.includes("ответ")
-  const isSwitch = text.includes("свитч") || text.includes("заблокирован")
-  const isError = text.includes("ошибк") || text.includes("error") || text.includes("пропущен")
-  if (!logFilters.size) return true
-  return (logFilters.has("answer") && isAnswer)
-    || (logFilters.has("switch") && isSwitch)
-    || (logFilters.has("error") && isError)
-    // "Инфо" is the badge the card falls back to: anything with no outcome.
-    || (logFilters.has("info") && !isAnswer && !isSwitch && !isError)
+  if (logFilters.size && !logFilters.has(logType(line))) return false
+  if (logChatFilters.size && !logChatFilters.has(logSessionId(line))) return false
+  const model = logRequestedModel(line)
+  if (logModelFilters.size && !logModelFilters.has(model)) return false
+  return true
 }
+
+function logFilterActive() {
+  return logFilters.size + logChatFilters.size + logModelFilters.size > 0
+}
+
+function syncLogFilterButton() {
+  $("log-filter-menu").classList.toggle("is-active", logFilterActive())
+}
+
+function applyLogFacetDraft() {
+  if (!logFacetDraft) return
+  logFilters = new Set(logFacetDraft.types)
+  logChatFilters = new Set(logFacetDraft.chats)
+  logModelFilters = new Set(logFacetDraft.models)
+  logPage = 0
+  renderLogs()
+}
+
+function logFacetEntries(group) {
+  const facets = logFacets(logLines)
+  if (group === "types") return [["answer", "Ответы"], ["switch", "Переключения"], ["error", "Ошибки"], ["info", "Инфо"]].map(([value, label]) => ({ value, label, tip: label }))
+  if (group === "chats") return facets.chats.map(({ id, label, tip }) => ({ value: id, label, tip }))
+  return facets.models.map((model) => ({ value: model, label: model, tip: model }))
+}
+
+function logFacetSelection(group) {
+  if (group === "types") return logFacetDraft?.types ?? logFilters
+  if (group === "chats") return logFacetDraft?.chats ?? logChatFilters
+  return logFacetDraft?.models ?? logModelFilters
+}
+
+/// Re-render the open menu and re-place it: switching to the paged views adds
+/// a footer, so the height (and therefore the top) changes.
+function refreshLogMenu() {
+  renderLogFilterMenu(searchMenu)
+  if (searchMenuAnchor) positionSearchMenu(searchMenuAnchor)
+}
+
+function renderLogFilterMenu(menu) {
+  if (!logFacetDraft) logFacetDraft = { types: new Set(logFilters), chats: new Set(logChatFilters), models: new Set(logModelFilters) }
+  const groups = [["types", "По типу"], ["chats", "По чатам"], ["models", "По моделям"]]
+  const view = logFacetView
+  const isPaged = view !== "types"
+  const query = isPaged ? logFacetSearch[view].trim().toLowerCase() : ""
+  const entries = logFacetEntries(view).filter((entry) => !query || `${entry.label} ${entry.tip}`.toLowerCase().includes(query))
+  const pages = Math.max(1, Math.ceil(entries.length / LOG_FACET_PAGE_SIZE))
+  logFacetPage[view] = Math.min(logFacetPage[view], pages - 1)
+  const pageEntries = isPaged ? logPageSlice(entries, logFacetPage[view], LOG_FACET_PAGE_SIZE) : entries
+  menu.className = "search-menu log-filter-menu"
+  menu.innerHTML = `<div class="log-filter-tabs">${groups.map(([key, label]) => `<button type="button" data-log-view="${key}" class="${view === key ? "active" : ""}" aria-pressed="${view === key}">${label}</button>`).join("")}</div>
+    <div class="log-facet-options" role="group" aria-label="${groups.find(([key]) => key === view)[1]}">${pageEntries.length ? pageEntries.map((entry) => `<label class="log-facet-option" data-log-value="${esc(entry.value)}" data-tip="${esc(entry.tip)}"><input type="checkbox" value="${esc(entry.value)}" ${logFacetSelection(view).has(entry.value) ? "checked" : ""}><span>${esc(entry.label)}</span></label>`).join("") : `<div class="empty-inline">${query ? "ничего не найдено" : "значений пока нет"}</div>`}</div>
+    ${isPaged ? `<div class="log-facet-footer"><button type="button" data-facet-page="-1" aria-label="Предыдущая страница" ${logFacetPage[view] === 0 ? "disabled" : ""}>‹</button><button type="button" data-facet-search aria-label="${logFacetSearchOpen[view] ? "Скрыть поиск" : "Показать поиск"}" data-tip="${logFacetSearchOpen[view] ? "Скрыть поиск" : "Поиск"}" aria-pressed="${logFacetSearchOpen[view]}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.5 4.5"></path></svg></button><button type="button" data-facet-page="1" aria-label="Следующая страница" ${logFacetPage[view] >= pages - 1 ? "disabled" : ""}>›</button></div>` : ""}
+    ${isPaged && logFacetSearchOpen[view] ? `<input class="log-facet-search" type="search" aria-label="Поиск ${view === "chats" ? "чатов" : "моделей"}" placeholder="Поиск" value="${esc(logFacetSearch[view])}" autocomplete="off">` : ""}`
+  menu.querySelectorAll("[data-log-view]").forEach((button) => button.onclick = () => { logFacetView = button.dataset.logView; refreshLogMenu() })
+  menu.querySelectorAll(".log-facet-option").forEach((label) => {
+    const checkbox = label.querySelector("input")
+    const stage = (checked) => {
+      const set = logFacetDraft[view]
+      if (checked) set.add(checkbox.value)
+      else set.delete(checkbox.value)
+      checkbox.checked = checked
+    }
+    label.onpointerdown = (event) => {
+      if (event.button !== 0) return
+      logFacetDrag = { view, checked: !logFacetDraft[view].has(checkbox.value) }
+      stage(logFacetDrag.checked)
+    }
+    label.onpointerenter = () => { if (logFacetDrag?.view === view) stage(logFacetDrag.checked) }
+    // Every pointer pick is staged on pointerdown and applied on pointerup, so
+    // the click is cancelled outright; the keyboard is handled on keydown.
+    // (Clicking the label also forwards a click to this box, so a detail-based
+    // check would double-toggle it.)
+    checkbox.onclick = (event) => event.preventDefault()
+    checkbox.onkeydown = (event) => {
+      if (event.key !== " " && event.key !== "Enter") return
+      event.preventDefault()
+      const set = logFacetDraft[view]
+      set.has(checkbox.value) ? set.delete(checkbox.value) : set.add(checkbox.value)
+      checkbox.checked = set.has(checkbox.value)
+      applyLogFacetDraft()
+    }
+  })
+  menu.querySelectorAll("[data-facet-page]").forEach((button) => button.onclick = () => {
+    logFacetPage[view] += Number(button.dataset.facetPage)
+    refreshLogMenu()
+  })
+  menu.querySelector("[data-facet-search]")?.addEventListener("click", () => {
+    logFacetSearchOpen[view] = !logFacetSearchOpen[view]
+    if (!logFacetSearchOpen[view]) logFacetSearch[view] = ""
+    logFacetPage[view] = 0
+    refreshLogMenu()
+    if (logFacetSearchOpen[view]) menu.querySelector(".log-facet-search")?.focus()
+  })
+  menu.querySelector(".log-facet-search")?.addEventListener("input", (event) => {
+    logFacetSearch[view] = event.target.value
+    logFacetPage[view] = 0
+    refreshLogMenu()
+    const input = menu.querySelector(".log-facet-search")
+    input?.focus()
+    input?.setSelectionRange(input.value.length, input.value.length)
+  })
+}
+
+/// Releasing the pointer, even outside the menu, is what applies a drag pick.
+function finishLogFacetDrag() {
+  if (!logFacetDrag) return
+  logFacetDrag = null
+  applyLogFacetDraft()
+}
+document.addEventListener("pointerup", finishLogFacetDrag)
+document.addEventListener("pointercancel", finishLogFacetDrag)
 
 function renderLogs() {
   const box = $("logbox")
-  syncFilterButton("log-filter-menu", logFilters)
-  // Desktop scrolls the whole Logs section; narrow layouts constrain logbox.
-  // Anchor the first visible card in whichever element actually scrolls so a
-  // three-second refresh doesn't make the records jump under the pointer.
+  syncLogFilterButton()
   const boxOverflow = getComputedStyle(box).overflowY
   const host = /auto|scroll/.test(boxOverflow) ? box : box.closest("section")
   const matching = logLines.filter(logMatches)
   const pages = Math.max(1, Math.ceil(matching.length / LOG_PAGE_SIZE))
   if (logPage >= pages) logPage = pages - 1
-  // Page zero is newest, but entries within each page are chronological so
-  // fresh lines arrive at the bottom and can be followed without rearranging
-  // the older cards.
   const slice = logPageSlice(matching, logPage)
   const hostTop = host.getBoundingClientRect().top
   const visible = [...box.querySelectorAll(".log-card")].find((card) => card.getBoundingClientRect().bottom > hostTop)
@@ -58,9 +211,8 @@ function renderLogs() {
   const anchorOffset = visible ? visible.getBoundingClientRect().top - hostTop : 0
   const atTop = !logHasRenderedRecords || host.scrollTop <= 60
   box.replaceChildren(...(slice.length ? slice.map(logCard) : [logEmpty()]))
-  if (atTop) {
-    host.scrollTop = 0
-  } else if (anchorText) {
+  if (atTop) host.scrollTop = 0
+  else if (anchorText) {
     const anchor = [...box.querySelectorAll(".log-card")].find((card) => card.dataset.logLine === anchorText)
     if (anchor) host.scrollTop += anchor.getBoundingClientRect().top - host.getBoundingClientRect().top - anchorOffset
   }
@@ -68,13 +220,11 @@ function renderLogs() {
   $("log-pager").innerHTML = pages > 1
     ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Новее</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Старее</button>`
     : ""
-  $("log-pager").querySelectorAll("[data-page]").forEach((button) => {
-    button.onclick = () => {
-      logPage = Number(button.dataset.page) || 0
-      renderLogs()
-      const host = /auto|scroll/.test(getComputedStyle(box).overflowY) ? box : box.closest("section")
-      host.scrollTop = 0
-    }
+  $("log-pager").querySelectorAll("[data-page]").forEach((button) => button.onclick = () => {
+    logPage = Number(button.dataset.page) || 0
+    renderLogs()
+    const scrollHost = /auto|scroll/.test(getComputedStyle(box).overflowY) ? box : box.closest("section")
+    scrollHost.scrollTop = 0
   })
 }
 
@@ -83,7 +233,26 @@ async function loadLogs() {
     const j = await (await api("/api/logs")).json()
     logLines = (j.lines ?? []).slice().reverse()
     logSessionTitles = j.sessionTitles ?? {}
+    // Old lines leave the buffer; a selection that no longer exists would hide
+    // every record forever, so keep only values the new lines still contain.
+    const facets = logFacets(logLines)
+    const chats = new Set(facets.chats.map((chat) => chat.id))
+    const models = new Set(facets.models)
+    const kept = (set, allowed) => new Set([...set].filter((value) => allowed.has(value)))
+    const chatsNext = kept(logChatFilters, chats)
+    const modelsNext = kept(logModelFilters, models)
+    const dropped = chatsNext.size !== logChatFilters.size || modelsNext.size !== logModelFilters.size
+    logChatFilters = chatsNext
+    logModelFilters = modelsNext
+    if (logFacetDraft) {
+      logFacetDraft.chats = kept(logFacetDraft.chats, chats)
+      logFacetDraft.models = kept(logFacetDraft.models, models)
+    }
+    if (dropped) logPage = 0
     renderLogs()
+    // Keep the open facet list in step with new lines, but never under the
+    // pointer mid-drag or while the mini search is being typed into.
+    if (!searchMenu.hidden && !logFacetDrag && logFacetView !== "types" && !logFacetSearchOpen[logFacetView]) refreshLogMenu()
   } catch {
     /* прокси недоступен — следующий опрос повторит */
   }
@@ -97,19 +266,22 @@ $("log-search").oninput = (event) => {
 $("log-search-clear").onclick = () => {
   logQuery = ""
   logFilters.clear()
-  syncFilterButton("log-filter-menu", logFilters)
+  logChatFilters.clear()
+  logModelFilters.clear()
+  syncLogFilterButton()
   logPage = 0
   $("log-search").value = ""
   renderLogs()
   $("log-search").focus()
 }
 $("log-filter-menu").onclick = () => {
-  const options = [["answer", "Ответы"], ["switch", "Переключения"], ["error", "Ошибки"], ["info", "Инфо"]]
-  openSearchMenu($("log-filter-menu"), options.map(([value, label]) => ({
-    label, toggle: true, stayOpen: true, checked: logFilters.has(value),
-    action: () => { toggleFilter("log-filter-menu", logFilters, value); logPage = 0; renderLogs() },
-  })))
+  // Closing throws the draft away: reopening starts from the applied filters.
+  openSearchMenuContent($("log-filter-menu"), renderLogFilterMenu, () => {
+    logFacetDraft = null
+    logFacetDrag = null
+  })
 }
+
 
 // Chat cards show the requested chain/model on its own line and any outcome
 // details below it; the event kind is already shown by the badge.
@@ -124,8 +296,8 @@ const logCard = (line) => {
   const detail = tail.join(" → ")
   const isChat = tail.length > 0
   // Other arrow lines (images, HTTP requests) keep the name on its own line.
-  const chatKind = isChat && /^(?:ответ|свитч|ошибка)/.test(detail)
-  const chatMessage = chatKind ? detail.replace(/^(?:ответ|свитч|ошибка)\s*:\s*/, "") : ""
+  const chatKind = isChat && /^(?:ответ|свитч|ошибка|инфо)/.test(detail)
+  const chatMessage = chatKind ? detail.replace(/^(?:ответ|свитч|ошибка|инфо)\s*:\s*/, "") : ""
   const [chatLabel = head, chatDescription = ""] = chatMessage.split(" — ", 2)
   const cls = /заблокирован|свитч/.test(line) ? "warn" : /401|ошибк|error/.test(line) ? "err" : /ответ/.test(line) ? "ok" : ""
   const card = document.createElement("div")

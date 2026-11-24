@@ -242,7 +242,7 @@ pub(crate) fn load_lifetime(storage: &Storage) -> LifetimeTokens {
 }
 
 pub(crate) fn persist_lifetime(state: &AppState) {
-    let totals = *state.lifetime.lock().unwrap();
+    let totals = state.lifetime.lock().unwrap().clone();
     let Ok(serialized) = serde_json::to_string(&totals) else {
         return;
     };

@@ -42,9 +42,11 @@ const TILE_ICONS = {
   latency: '<circle cx="12" cy="13" r="7.5"/><path d="M12 13V9M9.5 3h5"/>',
   uptime: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   images: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="m5 17 5-5 4 4 3-2.5 2.5 2"/>',
+  models: '<path d="M4 7h16M4 12h10M4 17h13"/>',
+  providers: '<path d="M4 20V10m5 10V4m5 16v-6m5 6V8"/>',
 }
-function statTile(kind, value, label) {
-  return `<div class="tile tile-${kind}"><span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${TILE_ICONS[kind] ?? ""}</svg></span><div class="tile-body"><span class="v">${value}</span><span class="k">${label}</span></div></div>`
+function statTile(kind, value, label, { wide = false, tip = "" } = {}) {
+  return `<div class="tile tile-${kind}${wide ? " tile-wide" : ""}"><span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${TILE_ICONS[kind] ?? ""}</svg></span><div class="tile-body"><span class="v"${tip ? ` data-tip="${esc(tip)}"` : ""}>${value}</span><span class="k">${label}</span></div></div>`
 }
 
 // Output tokens per second of real answer time; a dash when nothing streamed.
@@ -123,13 +125,16 @@ function renderProviderProblemChart(obj) {
     // left) has nothing to show: an empty grey bar reads as "0% проблемности"
     // and only adds rows to the list.
     .filter((row) => row.ok + row.limits + row.errors > 0)
+    // The day can roll over between the attempt and its outcome, so a row may
+    // carry results with no requests; a zero denominator would print NaN%.
+    .map((row) => ({ ...row, requests: Math.max(row.requests, row.ok + row.limits + row.errors + row.other) }))
     .sort((a, b) => b.requests - a.requests)
   const width = (row, value) => Math.max(0, (value / row.requests) * 100).toFixed(1)
   $("u-token-chart").innerHTML = rows.length
     ? rows
         .map((row) => {
           const bad = row.limits + row.errors
-          const problemRate = Math.round((bad / row.requests) * 100)
+          const problemRate = row.requests > 0 ? Math.round((bad / row.requests) * 100) : 0
           return `<div class="token-row">
             <div class="token-row-head"><span>${esc(row.name)}</span><span class="problem-rate"><b style="color:${problemColor(problemRate)}">${problemRate}%</b> проблем</span></div>
             <div class="token-track"><span class="token-fill success" style="width:${width(row, row.ok)}%"></span><span class="token-fill limit" style="width:${width(row, row.limits)}%"></span><span class="token-fill error" style="width:${width(row, row.errors)}%"></span><span class="token-fill other" style="width:${width(row, row.other)}%"></span></div>
@@ -389,13 +394,18 @@ const renderUsageGroups = () => {
 /// the Sessions tab, behind its "За все дни" dialog.
 function renderLifetimePanel(report) {
   const lifetime = report?.lifetimeTokens ?? {}
-  const speed = fmtSpeed(lifetime.tokensOut, lifetime.streamMs)
+  // Favourites are by delivered answers, the same unit as the request total.
+  const favourite = (counts) => {
+    const best = Object.entries(counts ?? {}).sort(([, a], [, b]) => b - a)[0]
+    return best ? best[0] : "—"
+  }
   $("u-lifetime-tiles").innerHTML =
     statTile("requests", fmtNum(lifetime.requests), "запросов") +
     statTile("input", fmtTok(lifetime.tokensIn), "токенов вход") +
     statTile("output", fmtTok(lifetime.tokensOut), "токенов выход") +
-    statTile("speed", speed, "токенов в секунду") +
-    statTile("uptime", fmtUptime(report?.uptimeMs ?? 0), "время работы")
+    statTile("models", esc(favourite(lifetime.models)), "любимая модель", { wide: true, tip: favourite(lifetime.models) }) +
+    statTile("providers", esc(favourite(lifetime.providers)), "любимый провайдер") +
+    statTile("images", fmtNum(lifetime.imagesGenerated), "изображений сгенерировано")
 }
 const usageDayLabel = (date, today) => {
   if (date === today) return "Сегодня"

@@ -34,19 +34,32 @@ function renderProviderModels() {
     pmState = { provider: null, ids: [], filter: "", loading: false, error: null }
     pmCurrentLine()
     $("pm-provider-options").innerHTML = emptyStateHtml("провайдеров пока нет — добавь на вкладке «Провайдеры»")
+    $("pm-provider-options").classList.add("is-empty")
     $("pm-list").innerHTML = ""
     return
   }
   if (!allNames.includes(pmState.provider))
     pmState = { provider: allNames[0], ids: [...(cfg.providers[allNames[0]].models ?? [])], filter: "", loading: false, error: null }
   pmCurrentLine()
+  // The count is what the pane below ticks: the user's own selection, not the
+  // models an auto-all provider adds in the background.
+  const selectedCount = (name) => {
+    const p = cfg.providers[name]
+    return (isAutoAllProvider(name) ? (p.autoSelectedModels ?? p.models) : p.models)?.length ?? 0
+  }
+  const counts = Object.fromEntries(names.map((name) => [name, selectedCount(name)]))
   $("pm-provider-options").innerHTML = names.length
-    ? providerOptionsHtml(names, pmState.provider)
+    ? providerOptionsHtml(names, pmState.provider, counts)
     : emptyStateHtml("ничего не найдено")
+  // The provider list is a grid of buttons; an empty state inside it would sit
+  // in the first cell, so it centers as a plain flex box instead.
+  $("pm-provider-options").classList.toggle("is-empty", !names.length)
   $("pm-provider-options").querySelectorAll("[data-provider]").forEach((button) => {
     button.onclick = () => {
       const name = button.dataset.provider
-      pmState = { provider: name, ids: [...(cfg.providers[name].models ?? [])], filter: "", loading: false, error: null }
+      // The model search stays (picking a provider must not wipe what was
+      // typed); only the provider search resets so the whole list is visible.
+      pmState = { provider: name, ids: [...(cfg.providers[name].models ?? [])], filter: pmState.filter, loading: false, error: null }
       pmProviderFilter = ""
       $("pm-provider-filter").value = ""
       renderProviderModels()
@@ -368,6 +381,7 @@ function renderPmList() {
   $("pm-list").innerHTML = shown.length
     ? modelCardsHtml(pmState.provider, shown, { checked: (id) => saved.includes(id), disabled: auto, settings: true })
     : emptyStateHtml(pmState.ids.length ? "ничего не найдено" : "список пуст — обнови его или добавь модель вручную")
+  $("pm-list").classList.toggle("is-empty", shown.length === 0)
   // No redraw per click — only counters, otherwise the list scroll jumps to the top.
   $("pm-list").querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.onchange = () => {
@@ -394,45 +408,4 @@ function renderPmList() {
     button.onclick = () => openModelSettings(pmState.provider, button.dataset.modelSettings)
   })
   applyPmColumns($("pm-list"))
-}
-
-// Cards per row: as many as fit without clipping a card's content. The probe
-// measures each card's full natural width (id + badges); if even one card would
-// be squeezed, the column count drops until it fits.
-function pmColumnCount(available, cardWidth, gap = 8) {
-  return Math.max(1, Math.min(4, Math.floor((available + gap) / (cardWidth + gap))))
-}
-let pmColumnsObserver = null
-function applyPmColumns(box) {
-  // Measured once per render: a max-content copy reports the width the card
-  // wants, badges and all. One pathologically long id must not collapse the
-  // grid to a single column, hence the cap.
-  const MAX_CARD = 320
-  const probe = document.createElement("div")
-  probe.className = "provider-model-card"
-  probe.style.cssText = "position:absolute;visibility:hidden;left:-9999px;top:0;width:max-content"
-  document.body.append(probe)
-  let widest = 0
-  for (const card of box.querySelectorAll(".provider-model-card")) {
-    probe.replaceChildren(...[...card.childNodes].map((node) => node.cloneNode(true)))
-    widest = Math.max(widest, Math.ceil(probe.getBoundingClientRect().width))
-  }
-  probe.remove()
-  // The card cannot shrink below its fixed chrome (tick, gap, ⋮ button), so a
-  // very long id is capped rather than forcing one column.
-  const MIN_CARD = 210
-  const needed = Math.max(MIN_CARD, Math.min(MAX_CARD, widest))
-  const grid = box.querySelector(".pm-grid") ?? box
-  const fit = () => {
-    const available = grid.clientWidth
-    if (!available) return // hidden tab: the observer fires once it has width
-    const cols = pmColumnCount(available, needed)
-    if (grid.dataset.pmCols === String(cols)) return
-    grid.dataset.pmCols = String(cols)
-    grid.style.setProperty("--pm-cols", cols)
-  }
-  fit()
-  pmColumnsObserver?.disconnect()
-  pmColumnsObserver = new ResizeObserver(() => requestAnimationFrame(fit))
-  pmColumnsObserver.observe(grid)
 }

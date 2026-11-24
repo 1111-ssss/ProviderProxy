@@ -95,6 +95,10 @@
   .direct-model-dialog-body .pm-splitter, .chain-dialog-body .pm-splitter { margin: 10px 0; }
   .direct-model-dialog-body .pm-filter-row { margin: 0 0 8px; }
   .direct-model-dialog-body .pm-filter-row > label { margin-bottom: 0; }
+  /* Narrow cards use an ellipsis only while they actually fit in a multi-column
+     grid. A single column has room for the full model id. */
+  .direct-model-grid .pm-grid[data-pm-cols="1"] .provider-model-card-body code,
+  #dom-model-list .pm-grid[data-pm-cols="1"] .provider-model-card-body code { overflow: visible; text-overflow: clip; }
   /* The dialog's ⋮ sits next to the search field, not in a toolbar: no frame. */
   .direct-model-dialog-body .pm-filter-row .pm-icon-button { border-color: transparent; background: transparent; }
   .direct-model-dialog-body .pm-filter-row .pm-icon-button:hover:not(:disabled) { border-color: var(--border); background: var(--surface); }
@@ -224,7 +228,13 @@
   .tile-limit .tile-icon { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
   .tile-errors .tile-icon { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
   .tile-body { display: grid; gap: 2px; min-width: 0; }
-  .tile .v { font-size: 19px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .tile .v { font-size: 19px; font-weight: 650; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  /* A favourite model id is long ("provider/deepseek/…"): give that tile three
+     columns and cut it with an ellipsis instead of letting the text spill out
+     of the card. The full value stays in the shared tip. */
+  .tile-wide { grid-column: span 3; }
+  .tile-wide .v { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tile-wide .k { white-space: nowrap; }
   .tile .k { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
   .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
   .chart-card { min-width: 0; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
@@ -347,6 +357,8 @@
       itself is hidden — the wheel and trackpad scroll it — because a visible bar
       under the tabs looked like a second control row. */
     .usage-days { display: flex; gap: 7px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; margin: 14px 0 2px; padding: 5px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-inset); }
+    /* `display: flex` above would otherwise beat the hidden attribute. */
+    .usage-days[hidden] { display: none; }
     .usage-days:not(.is-overflowing) { overflow-x: hidden; }
    .usage-days::-webkit-scrollbar { display: none; }
    .usage-day { flex: 1 1 120px; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 120px; min-height: 52px; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; }
@@ -355,7 +367,10 @@
    .usage-day:hover:not(:disabled) { background: var(--surface); border-color: var(--border); color: var(--text); }
    .usage-day.active { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--text); }
    .usage-day.empty { opacity: .58; }
-  .search-field { position: relative; flex: 1 1 220px; min-width: 180px; }
+  /* `label` is inline by default, which made `width: 100%` on the input
+     resolve against the label's own inline width; inside a block pane the
+     field collapsed and its absolute buttons fell below the box. */
+  .search-field { display: block; position: relative; flex: 1 1 220px; min-width: 180px; }
   .search-field input { width: 100%; padding-right: 32px; }
   /* One centered glyph instead of a circle plus a separately rotated handle:
      the two pieces drifted apart and the circle sat above the field center. */
@@ -386,6 +401,23 @@
   .search-field:has(.search-filter) input { padding-right: 64px; }
   .search-menu { position: fixed; z-index: 70; display: grid; gap: 2px; min-width: 200px; max-width: min(300px, calc(100vw - 16px)); padding: 5px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
   .search-menu[hidden] { display: none; }
+  /* Logs filter: three tabs on top, a paged facet list below, controls at the
+     bottom. The list scrolls; the tabs and footer stay put. */
+  .log-filter-menu { width: min(300px, calc(100vw - 16px)); gap: 6px; }
+  .log-filter-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 2px; border-radius: 8px; background: var(--surface-inset); }
+  .log-filter-tabs button { min-height: 28px; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; }
+  .log-filter-tabs button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+  .log-filter-tabs button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+  .log-facet-search { min-height: 32px; }
+  .log-facet-options { display: grid; gap: 1px; max-height: 264px; overflow-y: auto; overflow-x: hidden; }
+  .log-facet-option { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 10px; border-radius: 7px; color: var(--text); font-size: 13px; cursor: pointer; user-select: none; min-width: 0; }
+  .log-facet-option:hover { background: var(--surface-hover); }
+  .log-facet-option span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-facet-footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .log-facet-footer button { display: inline-grid; place-items: center; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+  .log-facet-footer button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .log-facet-footer button:hover:not(:disabled), .log-facet-footer button[aria-pressed="true"] { background: var(--surface-hover); color: var(--accent); }
+  .log-facet-footer button:disabled { opacity: .4; }
   .search-menu-switch { display: flex; align-items: center; gap: 8px; justify-content: flex-start; min-height: 32px; margin: 0; padding: 6px 10px; border-radius: 7px; color: var(--text); font-size: 13px; cursor: pointer; }
   .search-menu-switch:hover { background: var(--surface-hover); }
   .search-menu-item { display: flex; align-items: center; gap: 8px; justify-content: flex-start; min-height: 32px; padding: 6px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font-size: 13px; text-align: left; white-space: normal; }
@@ -405,6 +437,13 @@
   section[data-tab="connections"].connections-page { display: flex; flex-direction: column; overflow: hidden; }
   .pm-providers-pane { flex: 1 1 35%; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
   .pm-providers-pane .filter-bar { margin-bottom: 0; flex: 0 0 auto; }
+  /* An empty state inside the provider grid would land in the first cell; as a
+     plain box it centers in the whole pane. */
+  .pm-providers-pane .provider-options.is-empty { display: flex; align-items: center; justify-content: center; }
+  .pm-providers-pane .provider-options.is-empty .sessions-empty { min-height: 0; }
+  /* The empty state must not stretch: it centers inside the list pane instead. */
+  #pm-list.is-empty { justify-content: center; }
+  #pm-list.is-empty .sessions-empty { flex: 0 0 auto; }
   .pm-providers-pane .provider-options { flex: 1 1 auto; min-height: 0; overflow-y: auto; align-content: start; padding-right: 2px; scrollbar-gutter: stable; }
   .pm-splitter { flex: 0 0 auto; height: 0; margin: 12px 0; border-top: 1px solid var(--border-strong); }
   .pm-models-pane { flex: 1 1 65%; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -606,7 +645,7 @@
   .provider-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 7px; padding: 1px 2px 2px; }
   .provider-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 38px; text-align: left; }
   .provider-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .provider-option small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .provider-option small { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .provider-option.active { border-color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
   .provider-current { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
   .provider-current strong { color: var(--text); }

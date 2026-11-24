@@ -18,10 +18,8 @@ function renderProviders() {
     ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query))
     : allEntries
   t.innerHTML = shown.length ? "<tr><th>имя</th><th>baseURL</th><th>модели</th><th></th></tr>" : ""
-  let anyCheckin = false
   for (const [name, p] of shown) {
     const models = p.models ?? []
-    if (p.checkin) anyCheckin = true
     const tr = t.insertRow()
     tr.innerHTML = `
       <td><b>${esc(name)}</b>${p.homepage || p.checkin ? `<span class="provider-links">${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" data-tip="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" data-tip="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}</span>` : ""}</td>
@@ -34,7 +32,9 @@ function renderProviders() {
     if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
     tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
   }
-  $("p-checkins").style.display = anyCheckin ? "" : "none"
+  // Clicking the checkin button must also cover providers the table filter hides:
+  // the button is about every configured checkin, not what is on screen.
+  $("p-checkins").style.display = allEntries.some(([, p]) => p.checkin) ? "" : "none"
   if (!shown.length) {
     $("providers-empty").innerHTML = emptyStateHtml(allEntries.length ? "ничего не найдено" : "провайдеров пока нет — нажми «Добавить»")
   } else {

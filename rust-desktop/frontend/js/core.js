@@ -5,11 +5,14 @@ const plural = (n, one, few, many) =>
   `${n} ${n % 10 === 1 && n % 100 !== 11 ? one : n % 10 > 1 && n % 10 < 5 && (n % 100 < 10 || n % 100 > 20) ? few : many}`
 const openUrl = (u) => window.open(/^https?:\/\//.test(u) ? u : "https://" + u, "_blank")
 
-// The webview window is undecorated (see main.rs): these buttons are the only
-// way to minimize, maximize and close it. The bar stays hidden in a browser,
-// where getCurrentWindow is absent.
+// The desktop window is undecorated (see main.rs), so the page draws the caption
+// bar and these buttons are its only window controls. The flag is set here and
+// not by a Tauri init script: on Windows that script runs before <html> exists,
+// threw on documentElement, and the buttons stayed hidden. A plain browser has
+// no app window, so it keeps its own frame and hides the buttons.
 const appWindow = window.__TAURI__?.window?.getCurrentWindow?.()
 if (appWindow) {
+  document.documentElement.dataset.frame = "custom"
   $("titlebar-minimize").onclick = () => appWindow.minimize()
   $("titlebar-maximize").onclick = () => appWindow.toggleMaximize()
   $("titlebar-close").onclick = () => appWindow.close()
@@ -243,17 +246,43 @@ function askConfirm(message, { title = "Подтверждение", okLabel = "
 // any page-level element.
 const searchMenu = $("search-menu")
 let searchMenuAnchor = null
+// Optional teardown for a custom menu body (logs keeps a draft of its filters).
+let searchMenuOnClose = null
 function closeSearchMenu() {
   searchMenu.hidden = true
   searchMenuAnchor?.setAttribute("aria-expanded", "false")
   searchMenuAnchor = null
+  const onClose = searchMenuOnClose
+  searchMenuOnClose = null
+  onClose?.()
 }
-function openSearchMenu(anchor, items) {
+function positionSearchMenu(anchor) {
+  const anchorBox = anchor.getBoundingClientRect()
+  const box = searchMenu.getBoundingClientRect()
+  const margin = 8
+  let left = Math.min(anchorBox.right - box.width, window.innerWidth - box.width - margin)
+  if (left < margin) left = margin
+  const aboveTop = anchorBox.top - box.height - 6
+  let top = aboveTop >= margin ? aboveTop : anchorBox.bottom + 6
+  if (top + box.height > window.innerHeight - margin) top = Math.max(margin, aboveTop)
+  searchMenu.style.left = `${left}px`
+  searchMenu.style.top = `${top}px`
+}
+function openSearchMenuContent(anchor, render, onClose = null) {
   if (searchMenuAnchor === anchor && !searchMenu.hidden) return closeSearchMenu()
   closeSearchMenu()
   searchMenuAnchor = anchor
+  searchMenuOnClose = onClose
   anchor.setAttribute("aria-expanded", "true")
-  searchMenu.replaceChildren(...items.map((item) => {
+  const host = anchor.closest("dialog") ?? document.body
+  if (searchMenu.parentElement !== host) host.append(searchMenu)
+  searchMenu.className = "search-menu"
+  searchMenu.hidden = false
+  render(searchMenu)
+  positionSearchMenu(anchor)
+}
+function openSearchMenu(anchor, items) {
+  openSearchMenuContent(anchor, (menu) => menu.replaceChildren(...items.map((item) => {
     if (item.toggle) {
       const label = document.createElement("label")
       label.className = "search-menu-switch"
@@ -274,23 +303,13 @@ function openSearchMenu(anchor, items) {
     button.textContent = item.label
     button.onclick = () => { closeSearchMenu(); item.action?.() }
     return button
-  }))
-  const host = anchor.closest("dialog") ?? document.body
-  if (searchMenu.parentElement !== host) host.append(searchMenu)
-  searchMenu.hidden = false
-  const anchorBox = anchor.getBoundingClientRect()
-  const box = searchMenu.getBoundingClientRect()
-  const margin = 8
-  let left = Math.min(anchorBox.right - box.width, window.innerWidth - box.width - margin)
-  if (left < margin) left = margin
-  const aboveTop = anchorBox.top - box.height - 6
-  let top = aboveTop >= margin ? aboveTop : anchorBox.bottom + 6
-  if (top + box.height > window.innerHeight - margin) top = Math.max(margin, aboveTop)
-  searchMenu.style.left = `${left}px`
-  searchMenu.style.top = `${top}px`
+  })))
 }
 document.addEventListener("click", (event) => {
   if (searchMenu.hidden) return
+  // A menu that re-renders itself on click removes the clicked node before the
+  // event reaches the document; a detached target belongs to the menu.
+  if (!event.target.isConnected) return
   if (event.target.closest?.("#search-menu") || event.target === searchMenuAnchor || searchMenuAnchor?.contains?.(event.target)) return
   closeSearchMenu()
 })
@@ -325,11 +344,15 @@ function toggleFilter(buttonId, filters, value) {
 const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
 const isImageModel = (provider, id) => {
   const info = modelDetails(provider, id)
-  // A manual choice in the model's ⋮ dialog wins over the heuristics below.
-  if (info?.image === true) return true
-  if (info?.image === false) return false
   const endpoints = Array.isArray(info?.endpoints) ? info.endpoints : []
-  return String(info?.type ?? "").toLowerCase() === "image" || endpoints.some((endpoint) => /images\/(generations|tasks)/i.test(String(endpoint))) || /image/i.test(String(id))
+  const imageEndpoints = endpoints.some((endpoint) => /images\/(generations|tasks|edits)/i.test(String(endpoint)))
+  // A manual choice in the model's ⋮ dialog wins over every heuristic.
+  if (info?.image === false) return false
+  // `image: true` is also written for auto-detected models, so a provider that
+  // lists only chat endpoints contradicts it: a chat model ("logfare/auto")
+  // was shown as an image one and dropped from chains.
+  if (info?.image === true && (!endpoints.length || imageEndpoints)) return true
+  return String(info?.type ?? "").toLowerCase() === "image" || imageEndpoints || /image/i.test(String(id))
 }
 const directModelIds = (provider, definition = cfg.opencodeModels?.[provider]) => {
   const ids = definition?.all === true ? (cfg.providers[provider]?.models ?? []) : (definition?.models ?? [])
@@ -484,7 +507,14 @@ function debugLog(event, details = {}) {
 window.addEventListener("error", (event) => {
   console.error("provider_proxy GUI error", event.error ?? event.message)
   debugLog("js-error", { message: event.message, filename: event.filename, line: event.lineno, column: event.colno })
-  if (typeof flash === "function") flash(false, "ошибка интерфейса — обнови страницу и проверь консоль")
+  // WebKit reports the browser's own layout throttling notice as an uncaught
+  // error; it is not a page failure, and alarming the user on every layout pass
+  // would be noise.
+  if (/ResizeObserver loop/i.test(String(event.message))) return
+  // Name the failure in the toast: "ошибка интерфейса" alone told the user
+  // nothing and made a cosmetic glitch look like data loss.
+  const reason = String(event.message || event.error?.message || "").replace(/\s+/g, " ").trim()
+  if (typeof flash === "function") flash(false, reason ? `ошибка интерфейса: ${reason.slice(0, 120)}` : "ошибка интерфейса — обнови страницу и проверь консоль")
 })
 
 function flash(ok, msg) {
