@@ -41,15 +41,16 @@ const TRAY_FLAG: &str = "--tray";
 /// CREATE_NO_WINDOW keeps the call silent, so the app no longer flashes a black
 /// box on start-up and on every autostart lookup.
 #[cfg(target_os = "windows")]
-pub(crate) fn quiet(command: &mut Command) -> &mut Command {
+pub(crate) fn quiet(mut command: Command) -> Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW)
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
 }
 
 #[cfg(not(target_os = "windows"))]
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))] // Windows-only call sites
-pub(crate) fn quiet(command: &mut Command) -> &mut Command {
+pub(crate) fn quiet(command: Command) -> Command {
     command
 }
 
