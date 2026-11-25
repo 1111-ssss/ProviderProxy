@@ -10,8 +10,18 @@ let logFacetView = "types"
 let logFacetSearchOpen = { chats: false, models: false }
 let logFacetSearch = { chats: "", models: "" }
 let logFacetPage = { chats: 0, models: 0 }
+// Recency ranks captured when the menu opens. Sorting once per opening keeps the
+// list from jumping under the pointer while a tab is switched or a query typed.
+let logFacetOrder = null
 let logPage = 0
+// One window of stored lines at a time. The day lives in SQLite; the GUI keeps
+// what it has displayed, plus whatever it had to load to page further back, so
+// searching and filtering still see every line the user has walked through.
+const LOG_WINDOW = 500
 let logLines = []
+let logIds = []
+let logHasMore = false
+let logTotal = 0
 let logSessionTitles = {}
 let logHasRenderedRecords = false
 
@@ -55,9 +65,23 @@ function logFacets(lines, titles = logSessionTitles) {
     if (model) models.add(model)
   }
   return {
-    chats: [...chats.values()].sort((a, b) => a.label.localeCompare(b.label, "ru")),
-    models: [...models].sort((a, b) => a.localeCompare(b, "ru")),
+    chats: [...chats.values()],
+    models: [...models],
   }
+}
+
+/// Recency rank per chat and model. Lines arrive newest first, so the first
+/// sighting of a value is its last activity; a lower rank means more recent.
+function logFacetOrderSnapshot(lines = logLines) {
+  const chats = new Map()
+  const models = new Map()
+  lines.forEach((line, index) => {
+    const id = logSessionId(line)
+    if (id && !chats.has(id)) chats.set(id, index)
+    const model = logRequestedModel(line)
+    if (model && !models.has(model)) models.set(model, index)
+  })
+  return { chats, models }
 }
 
 function logType(line) {
@@ -105,8 +129,11 @@ function applyLogFacetDraft() {
 function logFacetEntries(group) {
   const facets = logFacets(logLines)
   if (group === "types") return [["answer", "Ответы"], ["switch", "Переключения"], ["error", "Ошибки"], ["info", "Инфо"]].map(([value, label]) => ({ value, label, tip: label }))
-  if (group === "chats") return facets.chats.map(({ id, label, tip }) => ({ value: id, label, tip }))
-  return facets.models.map((model) => ({ value: model, label: model, tip: model }))
+  const order = logFacetOrder?.[group] ?? new Map()
+  // Entries that appeared after the snapshot are the newest ones, so they lead.
+  const byRecency = (a, b) => (order.get(a.value) ?? -1) - (order.get(b.value) ?? -1) || a.label.localeCompare(b.label, "ru")
+  if (group === "chats") return facets.chats.map(({ id, label, tip }) => ({ value: id, label, tip })).sort(byRecency)
+  return facets.models.map((model) => ({ value: model, label: model, tip: model })).sort(byRecency)
 }
 
 function logFacetSelection(group) {
@@ -202,6 +229,8 @@ function renderLogs() {
   const boxOverflow = getComputedStyle(box).overflowY
   const host = /auto|scroll/.test(boxOverflow) ? box : box.closest("section")
   const matching = logLines.filter(logMatches)
+  // Only the loaded window is shown; the pager says how far back it goes and
+  // loads the next window when the user reaches its end.
   const pages = Math.max(1, Math.ceil(matching.length / LOG_PAGE_SIZE))
   if (logPage >= pages) logPage = pages - 1
   const slice = logPageSlice(matching, logPage)
@@ -217,22 +246,62 @@ function renderLogs() {
     if (anchor) host.scrollTop += anchor.getBoundingClientRect().top - host.getBoundingClientRect().top - anchorOffset
   }
   if (slice.length) logHasRenderedRecords = true
-  $("log-pager").innerHTML = pages > 1
-    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Новее</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 ? " disabled" : ""}>Старее</button>`
+  const totalLabel = logTotal ? ` · ${logTotal.toLocaleString("ru-RU")} за сутки` : ""
+  $("log-pager").innerHTML = pages > 1 || logHasMore
+    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Новее</button><span class="muted">${logPage + 1} / ${pages}${totalLabel}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 && !logHasMore ? " disabled" : ""}>Старее</button>`
     : ""
-  $("log-pager").querySelectorAll("[data-page]").forEach((button) => button.onclick = () => {
-    logPage = Number(button.dataset.page) || 0
+  $("log-pager").querySelectorAll("[data-page]").forEach((button) => button.onclick = async () => {
+    const target = Number(button.dataset.page) || 0
+    // Walking past the loaded window fetches the next slice of the day first.
+    if (target >= pages && logHasMore) await loadOlderLogs()
+    logPage = Math.min(target, Math.max(0, Math.ceil(logLines.filter(logMatches).length / LOG_PAGE_SIZE) - 1))
     renderLogs()
     const scrollHost = /auto|scroll/.test(getComputedStyle(box).overflowY) ? box : box.closest("section")
     scrollHost.scrollTop = 0
   })
 }
 
+async function loadOlderLogs() {
+  if (!logHasMore) return
+  const before = logIds[logIds.length - 1]
+  try {
+    const j = await (await api(`/api/logs?before=${before}&limit=${LOG_WINDOW}`)).json()
+    const older = Array.isArray(j.lines) ? j.lines : []
+    // Same order as the first load: newest first.
+    logLines = [...logLines, ...older.map((row) => row.line)]
+    logIds = [...logIds, ...older.map((row) => row.id)]
+    logHasMore = older.length >= LOG_WINDOW
+    logSessionTitles = { ...logSessionTitles, ...(j.sessionTitles ?? {}) }
+  } catch {
+    /* прокси недоступен — следующий опрос повторит */
+  }
+}
+
 async function loadLogs() {
   try {
-    const j = await (await api("/api/logs")).json()
-    logLines = (j.lines ?? []).slice().reverse()
+    const j = await (await api(`/api/logs?limit=${LOG_WINDOW}`)).json()
+    const rows = Array.isArray(j.lines) ? j.lines : []
+    logTotal = Number(j.total) || 0
     logSessionTitles = j.sessionTitles ?? {}
+    if (!logIds.length) {
+      logLines = rows.map((row) => row.line)
+      logIds = rows.map((row) => row.id)
+      logHasMore = Boolean(j.next)
+    } else {
+      // Poll only adds records that appeared since the last load. Rebuilding the
+      // window would drop the older pages the user walked back to and shift the
+      // page they are reading.
+      const newest = logIds[0] ?? 0
+      const fresh = rows.filter((row) => row.id > newest)
+      if (fresh.length) {
+        logLines = [...fresh.map((row) => row.line), ...logLines]
+        logIds = [...fresh.map((row) => row.id), ...logIds]
+        // Keep memory bounded: the window is a view, not a cache of the day.
+        logLines = logLines.slice(0, LOG_WINDOW * 4)
+        logIds = logIds.slice(0, LOG_WINDOW * 4)
+      }
+      logHasMore = logHasMore || Boolean(j.next)
+    }
     // Old lines leave the buffer; a selection that no longer exists would hide
     // every record forever, so keep only values the new lines still contain.
     const facets = logFacets(logLines)
@@ -275,10 +344,13 @@ $("log-search-clear").onclick = () => {
   $("log-search").focus()
 }
 $("log-filter-menu").onclick = () => {
+  // One ordering per opening: recency at the moment the menu was opened.
+  logFacetOrder = logFacetOrderSnapshot()
   // Closing throws the draft away: reopening starts from the applied filters.
   openSearchMenuContent($("log-filter-menu"), renderLogFilterMenu, () => {
     logFacetDraft = null
     logFacetDrag = null
+    logFacetOrder = null
   })
 }
 

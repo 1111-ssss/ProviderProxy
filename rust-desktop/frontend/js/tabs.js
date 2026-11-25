@@ -1,4 +1,4 @@
-const TABS = ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "settings"]
+const TABS = ["providers", "connections", "integrations", "chains", "models", "images", "logs", "usage", "uptime", "settings"]
 let tab = localStorage.getItem("pp_tab") ?? "providers"
 
 const navigation = document.querySelector("main")
@@ -75,7 +75,7 @@ document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = 
 // 9 has no tab and is ignored. A second press of the same digit within 200ms
 // targets tab 11..19, so "22" means tab 2: the tenth tab does not exist and the
 // pressed digit is the best match.
-const TAB_KEYS = { "1": "providers", "2": "connections", "3": "integrations", "4": "chains", "5": "models", "6": "images", "7": "logs", "8": "usage", "0": "settings" }
+const TAB_KEYS = { "1": "providers", "2": "connections", "3": "integrations", "4": "chains", "5": "models", "6": "images", "7": "logs", "8": "usage", "9": "uptime", "0": "settings" }
 const DOUBLE_TAP_MS = 200
 let lastDigit = ""
 let lastDigitAt = 0

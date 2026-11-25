@@ -3,6 +3,7 @@ use super::config::{
     open_storage, public_config,
 };
 use super::metrics::{hour_stat, load_usage, model_stat, now_ms, tally_usage, USAGE_RETENTION_DAYS};
+use super::handlers::{list_skills, skill_frontmatter};
 use super::routing::{build_chains, model_label, with_model};
 use super::server::{shutdown_running_instance, start_server};
 use super::types::{AppState, ProviderUsage, Usage};
@@ -192,7 +193,6 @@ fn hourly_buckets_survive_the_day_rollover() {
         config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
         chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
         cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
-        logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
@@ -202,7 +202,6 @@ fn hourly_buckets_survive_the_day_rollover() {
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
-        log_max: 10,
     };
     // The running process knows which day it is; an empty key would look like
     // a rollover and swap the counters for the (still empty) stored snapshot.
@@ -267,7 +266,6 @@ fn lifetime_totals_outlive_the_seven_day_window() {
         config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
         chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
         cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
-        logs: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
@@ -277,7 +275,6 @@ fn lifetime_totals_outlive_the_seven_day_window() {
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
-        log_max: 10,
     };
     {
         let mut lifetime = state.lifetime.lock().unwrap();
@@ -1075,4 +1072,42 @@ async fn fails_over_when_a_stream_carries_only_reasoning() {
     let _ = fs::remove_file(&path);
     let _ = fs::remove_file(database);
     let _ = fs::remove_file(&opencode);
+}
+
+#[test]
+fn lists_every_skill_folder_and_reads_its_frontmatter() {
+    let root = std::env::temp_dir().join(format!("provider-proxy-skills-{}", now_ms()));
+    let write = |folder: &str, body: &str| {
+        let directory = root.join(folder);
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("SKILL.md"), body).unwrap();
+    };
+    write(
+        "zeta",
+        "---\nname: zeta-skill\ndescription: \"Second, quoted\"\n---\n# body\n",
+    );
+    write("alpha", "---\nname: alpha\n---\n# body\n");
+    // A folder without a SKILL.md and a stray file are not skills.
+    fs::create_dir_all(root.join("empty")).unwrap();
+    fs::write(root.join("notes.txt"), "x").unwrap();
+    write("image-generation", "---\nname: image-generation\ndescription: bundled\n---\n");
+
+    let skills = list_skills(&root);
+    let names: Vec<&str> = skills.iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["alpha", "image-generation", "zeta-skill"]);
+    assert_eq!(skills[2]["description"], "Second, quoted");
+    assert_eq!(skills[0]["description"], "", "a missing description is empty");
+    assert_eq!(skills[1]["bundled"], true);
+    assert_eq!(skills[0]["bundled"], false);
+    assert_eq!(skills[0]["folder"], "alpha", "the folder keeps the on-disk name");
+
+    // A file without frontmatter still lists under its folder name.
+    assert_eq!(
+        skill_frontmatter("# just markdown\n", "loose"),
+        ("loose".to_string(), String::new())
+    );
+
+    let missing = list_skills(&root.join("nope"));
+    assert!(missing.is_empty(), "a missing root is an empty list, not a panic");
+    fs::remove_dir_all(&root).unwrap();
 }

@@ -19,6 +19,7 @@ const ASSETS: &[(&str, &str, &str)] = &[
     ("/css/components.css", include_str!("../../frontend/css/components.css"), "text/css; charset=utf-8"),
     ("/css/pages.css", include_str!("../../frontend/css/pages.css"), "text/css; charset=utf-8"),
     ("/js/core.js", include_str!("../../frontend/js/core.js"), "text/javascript; charset=utf-8"),
+    ("/js/tags.js", include_str!("../../frontend/js/tags.js"), "text/javascript; charset=utf-8"),
     ("/js/providers.js", include_str!("../../frontend/js/providers.js"), "text/javascript; charset=utf-8"),
     ("/js/dialogs-provider.js", include_str!("../../frontend/js/dialogs-provider.js"), "text/javascript; charset=utf-8"),
     ("/js/dialogs-chain.js", include_str!("../../frontend/js/dialogs-chain.js"), "text/javascript; charset=utf-8"),
@@ -29,6 +30,7 @@ const ASSETS: &[(&str, &str, &str)] = &[
     ("/js/tabs.js", include_str!("../../frontend/js/tabs.js"), "text/javascript; charset=utf-8"),
     ("/js/logs.js", include_str!("../../frontend/js/logs.js"), "text/javascript; charset=utf-8"),
     ("/js/usage.js", include_str!("../../frontend/js/usage.js"), "text/javascript; charset=utf-8"),
+    ("/js/uptime.js", include_str!("../../frontend/js/uptime.js"), "text/javascript; charset=utf-8"),
 ];
 
 /// Serve one embedded asset. Unknown paths fall through to a 404.

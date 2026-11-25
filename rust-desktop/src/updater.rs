@@ -466,7 +466,7 @@ fn schedule_update(update: StagedUpdate) -> Result<(), String> {
                 .flat_map(u16::to_le_bytes)
                 .collect::<Vec<_>>(),
         );
-        Command::new("powershell.exe")
+        crate::platform::quiet(Command::new("powershell.exe"))
             .args([
                 "-NoProfile",
                 "-WindowStyle",

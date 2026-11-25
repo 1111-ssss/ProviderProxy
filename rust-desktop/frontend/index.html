@@ -59,11 +59,12 @@
           <button data-tab="images"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span><span class="tab-label">Изображения</span></button>
         </div>
       </div>
-      <div class="tab-group" role="group" aria-label="Статистика и логи">
-        <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Статистика и логи</span></button>
+      <div class="tab-group" role="group" aria-label="Информация">
+        <button class="tab-group-toggle" type="button" data-group="stats" aria-expanded="true"><span>Информация</span></button>
         <div class="tab-group-tabs">
           <button data-tab="logs"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></span><span class="tab-label">Логи</span></button>
           <button data-tab="usage"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span><span class="tab-label">Статистика</span></button>
+          <button data-tab="uptime"><span class="tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"/></svg></span><span class="tab-label">Аптайм</span></button>
         </div>
       </div>
       <button id="update-nav-button" class="update-nav-button" type="button" hidden aria-label="Доступно обновление"><span class="update-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg></span><span id="update-nav-label">Обновление</span><span class="update-progress" id="update-progress" hidden><span class="update-progress-fill" id="update-progress-fill"></span></span></button>
@@ -153,8 +154,25 @@
         <span id="oc-status" class="muted"></span>
       </div>
       <div id="oc-preview" class="opencode-preview"></div>
+      <div class="skill-card integration-skill-card">
+        <div class="skill-card-head">
+          <div>
+            <h4>Skill генерации изображений</h4>
+            <p>Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
+          </div>
+          <span class="skill-status image-skill-status">проверяю…</span>
+        </div>
+        <div class="skill-path image-skill-path">-</div>
+        <div class="row">
+          <button type="button" class="primary image-skill-install">Добавить скилл</button>
+          <button type="button" class="settings-button image-skill-settings" aria-label="Настройки skill" data-tip="Модель по умолчанию для skill">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+          </button>
+          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
+        </div>
+      </div>
       <div class="row" style="margin-top:12px">
-        <button type="button" id="integrations-advanced">Расширенные настройки</button>
+        <button type="button" id="integrations-advanced">Скиллы</button>
       </div>
     </div>
   </section>
@@ -168,6 +186,7 @@
       <label class="search-field"><span class="sr-only">Поиск цепочек</span><input id="m-search" type="search" placeholder="Поиск" autocomplete="off"><button id="m-search-filter" class="search-filter" type="button" aria-label="Фильтр цепочек" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="m-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
       <button class="primary" id="m-add" type="button"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
     </div>
+    <div id="m-tag-bar" class="tag-category-bar" role="group" aria-label="Категории цепочек" hidden></div>
     <div id="models"></div>
   </section>
 
@@ -180,6 +199,7 @@
       <label class="search-field"><span class="sr-only">Поиск моделей</span><input id="om-search" type="search" placeholder="Поиск" autocomplete="off"><button id="om-search-filter" class="search-filter" type="button" aria-label="Фильтр моделей" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="om-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
       <button class="primary" id="om-add" type="button"><svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить</button>
     </div>
+    <div id="om-tag-bar" class="tag-category-bar" role="group" aria-label="Категории моделей" hidden></div>
     <div id="opencode-models" class="provider-models"></div>
   </section>
 
@@ -200,7 +220,7 @@
     </div>
     <div class="row" style="margin-top:10px">
       <span class="muted">выбран:</span>
-      <span id="ig-provider-current" class="provider-current"><strong>—</strong></span>
+      <span id="ig-provider-current" class="provider-current"><strong>-</strong></span>
     </div>
     <div class="image-layout" style="margin-top:16px">
       <form id="ig-form" class="image-form">
@@ -254,7 +274,7 @@
     <div class="log-controls">
       <label class="search-field"><span class="sr-only">Поиск по логам</span><input id="log-search" type="search" placeholder="Поиск" aria-label="Поиск"><button id="log-filter-menu" class="search-filter" type="button" aria-label="Фильтр событий" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="log-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
     </div>
-    <div class="logbox" id="logbox">—</div>
+    <div class="logbox" id="logbox">-</div>
     <div class="log-pager" id="log-pager"></div>
   </section>
 
@@ -331,12 +351,29 @@
     <div class="usage-panel" data-panel="images">
       <h3>Генерация изображений</h3>
       <div class="tiles" id="u-image-tiles"></div>
-      <div class="card" id="u-image-recent" style="margin-top:10px"></div>
-      <table id="u-images"></table>
+      <div class="last-models">
+        <article class="card last-model-card" id="u-image-last-generate"></article>
+        <article class="card last-model-card" id="u-image-last-edit"></article>
+      </div>
     </div>
     <div class="usage-panel" data-panel="lifetime">
       <div class="tiles" id="u-lifetime-tiles"></div>
     </div>
+  </section>
+
+  <section data-tab="uptime">
+    <div class="section-head">
+      <h2>Аптайм</h2>
+      <button type="button" class="field-help" data-hint="Доступность провайдеров и моделей по данным скрипта аптайма." aria-label="Что на вкладке «Аптайм»">?</button>
+    </div>
+    <!-- Both views are placeholders: the tab exists so the section has a home,
+         the contents land in a later change. -->
+    <div id="uptime-groups" class="usage-groups" role="tablist" aria-label="Разрезы аптайма">
+      <button type="button" class="usage-group active" data-uptime-group="providers" role="tab" aria-selected="true">По провайдерам</button>
+      <button type="button" class="usage-group" data-uptime-group="models" role="tab" aria-selected="false">По моделям</button>
+    </div>
+    <div class="uptime-panel active" data-uptime-panel="providers"></div>
+    <div class="uptime-panel" data-uptime-panel="models"></div>
   </section>
 
   <section data-tab="settings" class="settings-page">
@@ -370,7 +407,7 @@
           <span class="field-label">Base URL прокси
             <button type="button" class="field-help" data-hint="Этот адрес вписывается в клиент как OpenAI-совместимый endpoint." aria-label="Что такое Base URL прокси">?</button>
           </span>
-          <code id="s-base-url" class="settings-value">—</code>
+          <code id="s-base-url" class="settings-value">-</code>
         </div>
       </div>
       <div class="settings-block wide">
@@ -438,6 +475,10 @@
             </span>
             <button type="button" id="s-theme-open" class="theme-open-button"><span id="s-theme-current">Тёмная</span></button>
           </label>
+          <label class="setting-option" id="s-tag-categories-wrap">
+            <input id="s-tag-categories" type="checkbox">
+            <span>Показывать теги как категории<small>Ряд тегов под поиском на вкладках «Цепочки» и «Модели»: один клик фильтрует список.</small></span>
+          </label>
           <label class="setting-option" id="s-autostart-wrap">
             <input id="s-autostart" type="checkbox">
             <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
@@ -495,7 +536,7 @@
     <div class="settings-page-actions">
       <button type="button" id="settings-shutdown" class="danger">Выйти из приложения</button>
     </div>
-    <div class="settings-version">Версия <span id="s-version">—</span></div>
+    <div class="settings-version">Версия <span id="s-version">-</span></div>
   </section>
 
   <div class="status" id="status" role="status" aria-live="polite"></div>
@@ -524,20 +565,42 @@
         <span class="field-label">Ключ API
           <button type="button" class="field-help" data-hint="Секретный ключ доступа к провайдеру." aria-label="Что значит «Ключ API»">?</button>
         </span>
-        <input id="dp-key" type="password" placeholder="sk-...">
-      </label>
-      <label for="dp-homepage">
-        <span class="field-label">Домашняя страница (опционально)
-          <button type="button" class="field-help" data-hint="Добавляет кнопку открытия страницы." aria-label="Что значит «Домашняя страница»">?</button>
+        <span class="reset-input">
+          <input id="dp-key" type="password" placeholder="sk-...">
+          <button type="button" id="dp-key-reveal" class="field-reset" aria-label="Показать ключ" aria-pressed="false" data-tip="Показать ключ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
         </span>
-        <input id="dp-homepage" placeholder="https://provider.example">
       </label>
-      <label for="dp-checkin">
-        <span class="field-label">Страница чек-ина (опционально)
-          <button type="button" class="field-help" data-hint="добавляет кнопку для открытия страницы чек-ина (ежедневного бонуса)." aria-label="Что значит «Страница чек-ина»">?</button>
-        </span>
-        <input id="dp-checkin" placeholder="https://provider.example/checkin">
-      </label>
+      <!-- Everything past the three required fields stays folded: the common
+           edit is the URL or the key, and an open wall of optional inputs
+           buried them. -->
+      <details id="dp-more" class="dialog-more">
+        <summary><svg class="dialog-more-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg><span>Дополнительно</span></summary>
+        <label for="dp-homepage">
+          <span class="field-label">Домашняя страница (опционально)
+            <button type="button" class="field-help" data-hint="Добавляет кнопку открытия страницы." aria-label="Что значит «Домашняя страница»">?</button>
+          </span>
+          <input id="dp-homepage" placeholder="https://provider.example">
+        </label>
+        <label for="dp-checkin">
+          <span class="field-label">Страница чек-ина (опционально)
+            <button type="button" class="field-help" data-hint="добавляет кнопку для открытия страницы чек-ина (ежедневного бонуса)." aria-label="Что значит «Страница чек-ина»">?</button>
+          </span>
+          <input id="dp-checkin" placeholder="https://provider.example/checkin">
+        </label>
+        <div class="field-block">
+          <span class="field-label">Скрипт аптайма (опционально)
+            <button type="button" class="field-help" data-hint="Python-скрипт, который печатает JSON вида {&quot;bars&quot;:[{&quot;label&quot;:&quot;модель&quot;,&quot;percent&quot;:97.5}]} в stdout. Переменные окружения: PP_PROXY_URL, PP_PROXY_TOKEN, PP_PROVIDER, PP_MODELS_API." aria-label="Что значит «Скрипт аптайма»">?</button>
+          </span>
+          <div class="file-pick">
+            <label class="file-pick-button">
+              <input id="dp-uptime-file" type="file" accept=".py,.python,.txt,text/x-python,text/plain">
+              <span>Выбрать файл</span>
+            </label>
+            <span id="dp-uptime-name" class="file-pick-name muted">файл не выбран</span>
+            <button type="button" id="dp-uptime-clear" class="icon-action" data-tip="Убрать скрипт" aria-label="Убрать скрипт" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
+          </div>
+        </div>
+      </details>
     </div>
       <div class="dialog-actions">
       <button type="button" id="dp-delete" class="danger" hidden>Удалить</button>
@@ -557,6 +620,10 @@
       <label>Название цепочки
         <input id="dm-name" required placeholder="claude-sonnet" aria-label="Название цепочки">
       </label>
+      <div class="dialog-tag-row">
+        <span class="field-label">Теги</span>
+        <div id="dm-tags" class="tag-picker" role="group" aria-label="Теги цепочки"></div>
+      </div>
       <div class="dm-current-line" id="dm-current-line"><strong>Порядок цепочки</strong></div>
       <div id="dm-chain" class="chain-editor" aria-live="polite"></div>
       <div class="pm-splitter" aria-hidden="true"></div>
@@ -578,13 +645,17 @@
   <form method="dialog" id="dom-form" class="dialog-form">
     <div class="dialog-header"><h3 id="dom-title">Добавить модель</h3></div>
     <div class="dialog-body direct-model-dialog-body">
+      <div class="dialog-tag-row">
+        <span class="field-label">Теги</span>
+        <div id="dom-tags" class="tag-picker" role="group" aria-label="Теги модели"></div>
+      </div>
       <div class="dom-providers-pane">
         <label class="search-field"><span class="sr-only">Поиск провайдера</span><input id="dom-provider-filter" placeholder="Поиск провайдера" autocomplete="off"><button id="dom-provider-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
         <div id="dom-provider-options" class="provider-options" role="listbox" aria-label="Провайдеры для модели"></div>
       </div>
       <div class="pm-splitter" aria-hidden="true"></div>
       <div class="dom-models-pane">
-        <div id="dom-provider-current" class="dom-current-line"><strong>—</strong></div>
+        <div id="dom-provider-current" class="dom-current-line"><strong>-</strong></div>
         <div class="filter-bar pm-filter-row">
           <label class="search-field"><span class="sr-only">Поиск моделей</span><input id="dom-filter" placeholder="Поиск"><button id="dom-filter-tick" class="search-filter" type="button" aria-label="Фильтр моделей" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="dom-filter-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
           <button id="dom-filter-menu" class="pm-icon-button" type="button" aria-label="Действия с моделями" data-tip="Действия" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg></button>
@@ -613,13 +684,9 @@
         <span class="filter-result" id="all-sessions-count"></span>
       </div>
       <div id="all-sessions-table"></div>
-      <!-- Page controls sit in a drawer so a short table keeps no empty pager row. -->
-      <div class="pager-drawer" id="all-sessions-drawer" hidden>
-        <button type="button" class="pager-drawer-toggle" id="all-sessions-drawer-toggle" aria-expanded="false" aria-controls="all-sessions-pager">Страницы</button>
-        <div class="pager-drawer-body" id="all-sessions-pager" hidden></div>
-      </div>
     </div>
     <div class="dialog-actions">
+      <div id="all-sessions-pager"></div>
       <button value="close">Закрыть</button>
     </div>
   </form>
@@ -632,7 +699,7 @@
       <h3 id="dms-title">Параметры модели</h3>
     </div>
     <div class="dialog-body">
-      <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">—</strong></div>
+      <div class="provider-current" style="margin-bottom:14px"><strong id="dms-model">-</strong></div>
       <label>Тип модели
         <select id="dms-kind">
           <option value="chat">Обычная (chat)</option>
@@ -651,28 +718,17 @@
   </form>
 </dialog>
 
-<!-- Диалог: расширенные настройки интеграций -->
+<!-- Диалог: скиллы -->
 <dialog id="dlg-integrations-advanced" aria-labelledby="integrations-advanced-title">
   <form method="dialog" class="dialog-form">
-    <div class="dialog-header"><h3 id="integrations-advanced-title">Расширенные настройки</h3></div>
+    <div class="dialog-header"><h3 id="integrations-advanced-title">Скиллы</h3></div>
     <div class="dialog-body">
-      <div class="skill-card integration-skill-card">
-        <div class="skill-card-head">
-          <div>
-            <h3>Skill генерации изображений</h3>
-            <p>Добавь глобальный skill, чтобы harness понимал, когда и как вызывать генерацию изображений.</p>
-          </div>
-          <span id="image-skill-status" class="skill-status">проверяю…</span>
-        </div>
-        <div id="image-skill-path" class="skill-path">—</div>
-        <div class="row">
-          <button type="button" id="image-skill-install" class="primary">Добавить скилл</button>
-          <button type="button" id="image-skill-settings" class="settings-button" aria-label="Настройки skill" data-tip="Модель по умолчанию для skill">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h5m6 0h5M4 12h2m6 0h8M4 18h8m6 0h2"/><circle cx="12" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-          </button>
-          <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
-        </div>
+      <div class="log-filter-tabs" role="tablist" aria-label="Разделы скиллов">
+        <button type="button" data-skills-tab="installed" class="active" role="tab" aria-selected="true">Установленные</button>
+        <button type="button" data-skills-tab="browse" role="tab" aria-selected="false">Браузер</button>
       </div>
+      <div class="skills-panel" data-skills-panel="installed"></div>
+      <div class="skills-panel" data-skills-panel="browse" hidden></div>
     </div>
     <div class="dialog-actions">
       <button value="close">Закрыть</button>
@@ -685,11 +741,11 @@
   <form method="dialog" id="image-settings-form" class="dialog-form settings-form">
     <div class="dialog-header">
       <h3 id="image-settings-title">Модель по умолчанию для skill</h3>
-      <p id="image-settings-help">Провайдер и модель, которые skill генерации изображений использует, если в задаче не указана другая модель.</p>
+      <p id="image-settings-help">Провайдер и модель, которые skill генерации изображений использует по умолчанию: и на вкладке изображений, и при запуске skill, если в задаче не указана другая модель.</p>
     </div>
     <div class="dialog-body">
       <div class="skill-card">
-        <div class="skill-card-head"><div><h4>Модель по умолчанию</h4><p>Будет выбрана на вкладке изображений при открытии приложения.</p></div></div>
+        <div class="skill-card-head"><div><h4>Модель по умолчанию</h4><p>Эта модель выбирается на вкладке изображений при открытии приложения и используется, когда skill запускается без явной модели.</p></div></div>
         <div class="row"><label style="flex:1">Провайдер<select id="ig-default-provider"></select></label><label style="flex:1">Модель<select id="ig-default-model"></select></label></div>
       </div>
     </div>
@@ -815,6 +871,47 @@
   </div>
 </dialog>
 
+<!-- Диалог: аптайм моделей провайдера -->
+<dialog id="dlg-uptime" aria-labelledby="uptime-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="uptime-title">Аптайм</h3>
+      <span id="uptime-meta" class="muted"></span>
+    </div>
+    <div class="dialog-body" id="uptime-body"></div>
+    <div class="dialog-actions">
+      <button type="button" id="uptime-refresh">Обновить</button>
+      <button type="button" id="uptime-close">Закрыть</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: теги -->
+<dialog id="dlg-tags" aria-labelledby="tags-title">
+  <form method="dialog" id="tags-form" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="tags-title">Теги</h3>
+    </div>
+    <div class="dialog-body">
+      <div id="tags-list" class="tag-registry"></div>
+      <div class="tag-registry-search">
+        <label class="search-field">
+          <input id="tags-search" type="search" placeholder="Поиск" aria-label="Поиск тега" autocomplete="off">
+        </label>
+        <div class="tag-registry-pager" id="tags-pager" hidden></div>
+      </div>
+      <div class="row tag-registry-add">
+        <input id="tags-new" placeholder="новый тег" aria-label="Новый тег" autocomplete="off">
+        <button type="button" id="tags-add" class="icon-action" aria-label="Добавить тег" data-tip="Добавить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="tags-cancel">Отмена</button>
+      <button value="save" class="primary">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Меню поиска: фильтры или действия, открывается кнопкой внутри поля -->
 <div id="search-menu" class="search-menu" role="menu" hidden></div>
 
@@ -825,6 +922,7 @@
 <link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/pages.css">
 <script src="/js/core.js"></script>
+<script src="/js/tags.js"></script>
 <script src="/js/providers.js"></script>
 <script src="/js/dialogs-provider.js"></script>
 <script src="/js/dialogs-chain.js"></script>
@@ -835,5 +933,6 @@
 <script src="/js/tabs.js"></script>
 <script src="/js/logs.js"></script>
 <script src="/js/usage.js"></script>
+<script src="/js/uptime.js"></script>
 </body>
 </html>

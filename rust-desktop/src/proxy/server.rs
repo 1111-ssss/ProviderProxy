@@ -16,7 +16,7 @@ use tokio::net::TcpListener as TokioTcpListener;
 use super::{
     assets,
     chat,
-    config::{load_config, open_storage, LOG_MAX_DEFAULT},
+    config::{load_config, open_storage},
     handlers,
     metrics::{load_lifetime, load_usage, push_log},
     routing::build_chains,
@@ -115,10 +115,12 @@ pub fn start_server(
         .get("port")
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(8787) as u16;
-    let log_max = std::env::var("PP_LOG_LINES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(LOG_MAX_DEFAULT);
+    // Bind before the state is built: with `port: 0` the kernel picks a free
+    // port, and everything downstream (the uptime script's own URL, the
+    // opencode config) must use the port that is really listening.
+    let listener = TcpListener::bind(("127.0.0.1", port))?;
+    listener.set_nonblocking(true)?;
+    let actual_port = listener.local_addr()?.port();
     let legacy_stats_path = std::env::var_os("PP_STATS_FILE")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
@@ -135,9 +137,6 @@ pub fn start_server(
         config,
         chains,
         cooldowns: Arc::new(Mutex::new(HashMap::new())),
-        logs: Arc::new(Mutex::new(std::collections::VecDeque::with_capacity(
-            log_max,
-        ))),
         usage: Arc::new(Mutex::new(usage)),
         usage_history: Arc::new(Mutex::new(usage_history)),
         usage_persisted: Arc::new(Mutex::new(HashMap::new())),
@@ -154,12 +153,11 @@ pub fn start_server(
             .pool_max_idle_per_host(32)
             .pool_idle_timeout(std::time::Duration::from_secs(90))
             .build()?,
-        port,
-        log_max,
+        port: actual_port,
     };
     push_log(
         &state,
-        format!("provider_proxy Rust on http://127.0.0.1:{port}/v1 — desktop GUI"),
+        format!("provider_proxy Rust on http://127.0.0.1:{actual_port}/v1 — desktop GUI"),
     );
     let persistence_state = state.clone();
     std::thread::Builder::new()
@@ -170,9 +168,6 @@ pub fn start_server(
             super::metrics::persist_lifetime(&persistence_state);
         })?;
 
-    let listener = TcpListener::bind(("127.0.0.1", port))?;
-    listener.set_nonblocking(true)?;
-    let actual_port = listener.local_addr()?.port();
     let app = router(state);
     std::thread::Builder::new()
         .name("provider-proxy-http".into())
@@ -232,10 +227,19 @@ fn router(state: AppState) -> Router {
         .route("/api/config/export", get(handlers::export_config_handler))
         .route("/api/config/import", post(handlers::import_config))
         .route(
+            "/api/skills",
+            get(handlers::skills_get),
+        )
+        .route(
             "/api/skills/image-generation",
             get(handlers::image_skill_get).post(handlers::image_skill_install),
         )
         .route("/api/provider-models", post(handlers::provider_models))
+        .route(
+            "/api/provider-models-list",
+            get(handlers::provider_models_list),
+        )
+        .route("/api/uptime/run", post(handlers::run_uptime))
         .route("/api/image-tasks", post(handlers::image_task_create))
         .route(
             "/api/image-tasks/{provider}/{task_id}",

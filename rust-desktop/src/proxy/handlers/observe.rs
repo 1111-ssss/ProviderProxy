@@ -1,5 +1,11 @@
 use super::*;
 
+#[derive(Deserialize)]
+pub(crate) struct LogsQuery {
+    before: Option<i64>,
+    limit: Option<usize>,
+}
+
 pub(crate) async fn v1_models(State(state): State<AppState>, headers: HeaderMap) -> Response {
     if !authorized(&state, &headers) {
         return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
@@ -13,21 +19,41 @@ pub(crate) async fn v1_models(State(state): State<AppState>, headers: HeaderMap)
     Json(json!({ "object": "list", "data": data })).into_response()
 }
 
-pub(crate) async fn get_logs(State(state): State<AppState>, headers: HeaderMap) -> Response {
+pub(crate) async fn get_logs(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<LogsQuery>,
+) -> Response {
     if !authorized(&state, &headers) {
         return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
     }
-    let lines: Vec<String> = state
-        .logs
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|line| !line.contains("gui:"))
-        .cloned()
+    // `before` walks back through the stored day; without it the first page is
+    // the newest records. The GUI never holds more than one page of lines.
+    let limit = query.limit.unwrap_or(200);
+    let mut page: Vec<(i64, String)> = log_page(&state.storage, query.before, limit)
+        .into_iter()
+        // The GUI's own chatter would drown the real records.
+        .filter(|(_, line)| !line.contains("gui:"))
+        .collect();
+    // `next` is the cursor for the following page; absent when the day ends.
+    let next = if page.len() == limit.clamp(1, 500) {
+        page.last().map(|(id, _)| *id)
+    } else {
+        None
+    };
+    let lines: Vec<Value> = page
+        .drain(..)
+        .map(|(id, line)| json!({ "id": id, "line": line }))
         .collect();
     // Titles travel with the lines so hovering an id can name the session and
     // the search can match that name without a second request.
-    Json(json!({ "lines": lines, "max": state.log_max, "sessionTitles": session_titles(&state) })).into_response()
+    Json(json!({
+        "lines": lines,
+        "next": next,
+        "total": log_count(&state.storage),
+        "sessionTitles": session_titles(&state),
+    }))
+    .into_response()
 }
 
 /// Titles for every session the seven-day window knows, so the GUI can show a

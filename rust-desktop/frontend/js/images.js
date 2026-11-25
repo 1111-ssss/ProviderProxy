@@ -21,7 +21,7 @@ function renderImageGenerator() {
         .map((name) => `<button type="button" class="provider-option ${name === imageState.provider ? "active" : ""}" data-provider="${esc(name)}" role="option" aria-selected="${name === imageState.provider}"><strong>${esc(name)}</strong></button>`)
         .join("")
     : emptyStateHtml(allNames.length ? "ничего не найдено" : "моделей изображений пока нет — обнови список на вкладке «Подключения» и отметь image-модель")
-  $("ig-provider-current").innerHTML = imageState.provider ? `<strong>${esc(imageState.provider)}</strong>` : "<strong>—</strong>"
+  $("ig-provider-current").innerHTML = imageState.provider ? `<strong>${esc(imageState.provider)}</strong>` : "<strong>-</strong>"
   const ids = imageState.provider ? imageModelIds(imageState.provider) : []
   const selectedModel = $("ig-model").value
   $("ig-model").innerHTML = ids.length ? ids.map((id) => `<option value="${esc(id)}">${esc(id)}</option>`).join("") : `<option value="">нет доступных моделей</option>`

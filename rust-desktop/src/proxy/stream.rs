@@ -777,6 +777,9 @@ pub(super) async fn stream_upstream_response(
         usage.stream_ms = usage.stream_ms.saturating_add(stream_ms);
         let mut provider_stat = usage.providers.remove(&provider).unwrap_or_default();
         let (tokens_in, tokens_out) = tally_usage(&tail, &mut usage, &mut provider_stat);
+        // The provider and the model rows need the streaming time too, or their
+        // «ток/с» column would have to borrow the day total and overstate both.
+        provider_stat.stream_ms = provider_stat.stream_ms.saturating_add(stream_ms);
         {
             let hour = hour_stat(&mut usage);
             hour.tokens_in += tokens_in;
@@ -791,6 +794,7 @@ pub(super) async fn stream_upstream_response(
             .or_default();
         row.tokens_in += tokens_in;
         row.tokens_out += tokens_out;
+        row.stream_ms = row.stream_ms.saturating_add(stream_ms);
         if let Some(row) = session_stat(&mut usage, session.as_deref()) {
             row.tokens_in += tokens_in;
             row.tokens_out += tokens_out;

@@ -93,6 +93,6 @@ rust-desktop/src/proxy/      HTTP-бэкенд (handlers/, chat, stream, routing
 - `PP_DB_FILE` — путь к SQLite (по умолчанию рядом с конфигом).
 - `PP_CONFIG_KEY` / `PP_CONFIG_KEY_FILE` — ключ шифрования секретов.
 - `PP_DISABLE_UPDATES` — выключить проверку обновлений (тесты/оффлайн).
-- `PP_LOG_LINES`, `PP_OPENCODE_SKILLS_DIR`, `PP_STATS_FILE` — лог, папка skill, старая статистика.
+- `PP_OPENCODE_SKILLS_DIR`, `PP_STATS_FILE` — папка skill, старая статистика.
 - Работа идёт через provider proxy: **не выключать и не закрывать прокси** — иначе разработка
   остановится.

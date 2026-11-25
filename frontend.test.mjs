@@ -137,7 +137,7 @@ test("only selected Connections image models are available", () => {
   run('cfg.providers.selected.models = ["chat"]; renderImageGenerator(); renderImageSettings()')
   assert.deepEqual(Array.from(run("imageProviders()")), [])
   assert.equal(element("ig-model").disabled, true)
-  assert.equal(element("ig-provider-current").innerHTML, "<strong>—</strong>")
+  assert.equal(element("ig-provider-current").innerHTML, "<strong>-</strong>")
   assert.equal(element("ig-default-model").innerHTML, '<option value="">нет image-моделей</option>')
   assert.match(element("ig-provider-options").innerHTML, /«Подключения»/)
 })
@@ -160,34 +160,6 @@ test("removing connection models cleans chains and direct models", () => {
   assert.equal(run("cfg.opencodeModels.unselected"), undefined)
 })
 
-test("provider filter reset and search by name/base URL", () => {
-  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
-  const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
-  const table = {
-    rows: [],
-    set innerHTML(html) { this.rows = html ? [{ html }] : [] },
-    insertRow() { const row = { innerHTML: "", querySelector() { return { onclick: null } } }; this.rows.push(row); return row },
-  }
-  const empty = { innerHTML: "" }
-  const sandbox = {
-    cfg: { providers: { alpha: { baseURL: "https://alpha.example/v1", models: [] }, beta: { baseURL: "https://beta.example/v1", models: [] } } },
-    providersFilter: "alpha",
-    esc: (value) => String(value ?? ""),
-    emptyStateHtml: (message) => message,
-    $: (id) => id === "providers" ? table : id === "providers-empty" ? empty : { style: {} },
-    openProviderDialog() {}, openUrl() {},
-  }
-  vm.createContext(sandbox)
-  vm.runInContext(source, sandbox)
-  vm.runInContext("renderProviders()", sandbox)
-  assert.equal(table.rows.length, 2, "one matching provider row plus header")
-  assert.match(table.rows[1].innerHTML, /alpha/)
-  sandbox.providersFilter = "beta.example"
-  vm.runInContext("renderProviders()", sandbox)
-  assert.equal(table.rows.length, 2)
-  assert.match(table.rows[1].innerHTML, /beta/)
-})
-
 test("lifetime panel shows request-based favourites and generated images, not speed", () => {
   const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
   const source = usage.slice(usage.indexOf("function renderLifetimePanel"), usage.indexOf("const usageDayLabel"))
@@ -197,18 +169,30 @@ test("lifetime panel shows request-based favourites and generated images, not sp
     fmtTok: String,
     esc: (value) => String(value ?? ""),
     statTile: (kind, value, label) => `[${kind}|${value}|${label}]`,
+    TILE_ICONS: { providers: "", models: "" },
     $: () => tiles,
   }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   vm.runInContext('renderLifetimePanel({lifetimeTokens:{requests:15,tokensIn:100,tokensOut:200,streamMs:9000,imagesGenerated:7,providers:{alpha:8,beta:7},models:{"alpha/m1":9,"beta/m2":6}}})', sandbox)
-  assert.match(tiles.innerHTML, /любимая модель/)
+  // One card holds both favourites: a separate wide tile for the model used to
+  // leave a hole exactly one small tile wide in front of the last tile.
+  assert.match(tiles.innerHTML, /tile-favourites/, "both favourites live in one block")
+  assert.match(tiles.innerHTML, /Любимые за всё время/)
   assert.match(tiles.innerHTML, /alpha\/m1/)
-  assert.match(tiles.innerHTML, /любимый провайдер/)
-  assert.match(tiles.innerHTML, /alpha/)
+  assert.match(tiles.innerHTML, /"alpha"/)
+  assert.match(tiles.innerHTML, /9 запросов/)
+  // 9 against an average of 6 for the rest is +50%.
+  assert.match(tiles.innerHTML, /\+50% к среднему/)
+  // 8 against 7 is +14%.
+  assert.match(tiles.innerHTML, /\+14% к среднему/)
   assert.match(tiles.innerHTML, /изображений сгенерировано/)
   assert.match(tiles.innerHTML, /\|7\|/)
   assert.doesNotMatch(tiles.innerHTML, /в секунду/)
+  // One entry is the whole field: no "average of the rest" to compare against.
+  vm.runInContext('renderLifetimePanel({lifetimeTokens:{providers:{only:5},models:{}}})', sandbox)
+  assert.doesNotMatch(tiles.innerHTML, /к среднему/)
+  assert.match(tiles.innerHTML, />-</, "an empty favourite is a dash, not a blank tile")
 })
 
 test("provider model grid drops columns instead of cutting ids", () => {
@@ -317,17 +301,17 @@ test("a manual model type overrides the image heuristic", () => {
   assert.equal(sandbox.result.imageAuto, true, "image endpoints still mean an image model")
 })
 
-test("digit shortcuts map to the nine tabs", () => {
-  // 1..8 pick tabs in order and 0 opens settings; 9 has no tab.
+test("digit shortcuts map to the ten tabs", () => {
+  // 1..9 pick tabs in order and 0 opens settings.
   const line = scripts.match(/const TAB_KEYS = \{([^}]*)\}/)[1]
   const keys = Object.fromEntries([...line.matchAll(/"(\d)":\s*"([a-z-]+)"/g)].map((m) => [m[1], m[2]]))
   assert.deepEqual(keys, {
     "1": "providers", "2": "connections", "3": "integrations", "4": "chains",
-    "5": "models", "6": "images", "7": "logs", "8": "usage", "0": "settings",
+    "5": "models", "6": "images", "7": "logs", "8": "usage", "9": "uptime", "0": "settings",
   })
   const tabs = JSON.parse(scripts.match(/const TABS = (\[[^\]]*\])/)[1].replace(/'/g, '"'))
   for (const name of Object.values(keys)) assert.ok(tabs.includes(name), `${name} must be a tab`)
-  assert.equal("9" in keys, false, "9 has no tab")
+  assert.equal(keys["9"], "uptime", "9 opens the uptime tab")
 })
 
 test("a quick second digit reaches tabs 11..19", () => {
@@ -544,34 +528,49 @@ test("reset buttons appear only for non-default values, using the backend defaul
   assert.equal(buttons["s-limit"].hidden, true)
 })
 
-test("provider table keeps four columns, the model count and a dialog-only delete", () => {
+test("the provider table shows the name and its actions, not baseURL or a model count", () => {
   const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
   const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
-  const table = {
-    rows: [],
-    set innerHTML(html) { this.rows = html ? [{ cells: [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1]) }] : [] },
-    insertRow() { const row = { cells: [], querySelector: () => ({}), set innerHTML(html) { this.html = html; this.cells = [...html.matchAll(/<td\b([^>]*)>/g)].map((m) => m[1]) } }; this.rows.push(row); return row },
-  }
+  const box = { innerHTML: "", querySelectorAll: () => [] }
   const emptyBox = { innerHTML: "" }
+  const checkins = { style: {} }
   const sandbox = {
-    cfg: { providers: { alpha: { baseURL: "https://a.example/v1", models: ["m1", "m2"] } } },
+    cfg: { providers: {
+      alpha: { baseURL: "https://a.example/v1", models: ["m1", "m2"], homepage: "https://a.example" },
+      beta: { baseURL: "https://b.example/v1", models: ["m3"], checkin: "https://b.example/checkin" },
+    } },
     providersFilter: "",
     esc: (s) => String(s ?? ""),
     emptyStateHtml: (message) => `<div class="sessions-empty"><strong>${message}</strong></div>`,
-    $: (id) => id === "providers" ? table : id === "providers-empty" ? emptyBox : { style: {} },
+    $: (id) => id === "providers" ? box : id === "providers-empty" ? emptyBox : checkins,
     openProviderDialog() {}, openUrl() {},
   }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   vm.runInContext("renderProviders()", sandbox)
-  assert.deepEqual(table.rows[0].cells, ["имя", "baseURL", "модели", ""], "header has four columns")
-  assert.equal(table.rows[1].cells.length, 4, "data row has four cells")
-  assert.match(table.rows[1].html, /<td class="muted">2<\/td>/, "model count is rendered")
-  assert.doesNotMatch(table.rows[1].html, /data-a="del"/, "delete lives in the edit dialog, not the row")
+  // A table row, one line per provider: the name with its icons right after it,
+  // the URL in its own column and a bare edit icon at the end.
+  assert.match(box.innerHTML, /<tr data-provider="alpha"/, "providers render as table rows")
+  assert.match(box.innerHTML, /<th>имя<\/th><th>baseURL<\/th>/, "the URL has its own column")
+  assert.match(box.innerHTML, /<b>alpha<\/b><span class="provider-links">/, "the action icons follow the name, not a separate column")
+  assert.match(box.innerHTML, /data-a="edit"[^>]*aria-label="Изменить"/, "every row has an edit action")
+  assert.doesNotMatch(box.innerHTML, /<span>Изменить<\/span>/, "the edit action is an icon, not a label")
+  assert.match(box.innerHTML, /provider-url/, "the baseURL is shown")
+  assert.doesNotMatch(box.innerHTML, /provider-card/, "no card markup")
+  assert.doesNotMatch(box.innerHTML, />2</, "the model count is gone")
+  assert.match(box.innerHTML, /data-a="homepage"/, "homepage link is kept")
+  assert.match(box.innerHTML, /data-a="checkin"/, "checkin link is kept")
+  sandbox.providersFilter = "b.example"
+  vm.runInContext("renderProviders()", sandbox)
+  assert.match(box.innerHTML, /data-provider="beta"/, "search still matches the hidden baseURL")
+  assert.doesNotMatch(box.innerHTML, /data-provider="alpha"/)
   sandbox.providersFilter = "нет такого"
   vm.runInContext("renderProviders()", sandbox)
-  assert.equal(table.rows.length, 0, "search hides non-matching providers")
   assert.match(emptyBox.innerHTML, /ничего не найдено/)
+  // The URL takes the free track, the name and icons stay on one line.
+  const components = readFileSync(new URL("css/components.css", FRONTEND), "utf8")
+  assert.match(components, /#providers th:nth-child\(2\)[^}]*width: 100%/, "the URL takes the free width")
+  assert.match(components, /#providers th:not\(:nth-child\(2\)\)[^}]*white-space: nowrap/, "name and actions never wrap")
 })
 
 test("adding direct models hides delete even when that provider already has models", () => {
@@ -584,6 +583,7 @@ test("adding direct models hides delete even when that provider already has mode
     directModelIds: () => ["m"],
     directDraft: null,
     dlgOpenCodeModel: dialog,
+    tagPickerState: new Map(),
     renderOpenCodeModelDialog() {},
     $: (id) => id === "dom-delete" ? deleteButton : {},
   }
@@ -815,11 +815,42 @@ test("log facets collect chats and requested models from actual lines only", () 
   ]
   const facets = vm.runInContext(`JSON.stringify(logFacets(${JSON.stringify(lines)}))`, sandbox)
   const parsed = JSON.parse(facets)
-  assert.deepEqual(parsed.models, ["deepseek-v4", "router"], "only names left of the arrow, no upstream and no HTTP lines")
-  assert.deepEqual(parsed.chats.map((chat) => chat.id), ["ses_full1234", "ses_other"])
-  assert.equal(parsed.chats[0].label, "Починить меню", "a known title replaces the raw id")
-  assert.match(parsed.chats[0].tip, /ses_full1234/, "the tooltip keeps the full id")
-  assert.equal(parsed.chats[1].label, "ses_other", "without a title the id is shown")
+  assert.deepEqual(parsed.models.sort(), ["deepseek-v4", "router"], "only names left of the arrow, no upstream and no HTTP lines")
+  assert.deepEqual(parsed.chats.map((chat) => chat.id).sort(), ["ses_full1234", "ses_other"])
+  const titled = parsed.chats.find((chat) => chat.id === "ses_full1234")
+  assert.equal(titled.label, "Починить меню", "a known title replaces the raw id")
+  assert.match(titled.tip, /ses_full1234/, "the tooltip keeps the full id")
+  assert.equal(parsed.chats.find((chat) => chat.id === "ses_other").label, "ses_other", "without a title the id is shown")
+})
+
+test("the log facet list is ordered by last activity once per opening", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const source = logs.slice(logs.indexOf("function logSessionId"), logs.indexOf("function logFacetSelection"))
+  const sandbox = {}
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext('logSessionTitles = { ses_a: "Альфа", ses_b: "Бета" }', sandbox)
+  // Newest first, as the log window is delivered: "бета" was active last, then
+  // "Альфа", then the model nobody asked for alphabetically first.
+  const lines = [
+    "[2026-11-23 10:05:00] zeta → ответ: zeta (p/m) [ses:ses_b]",
+    "[2026-11-23 10:04:00] alpha → ответ: alpha (p/m) [ses:ses_a]",
+    "[2026-11-23 10:03:00] zeta → свитч: zeta (p/m) [ses:ses_a]",
+  ]
+  const snapshot = `const snap = logFacetOrderSnapshot(${JSON.stringify(lines)})
+    JSON.stringify([[...snap.chats.keys()], [...snap.models.keys()]])`
+  const [chatOrder, modelOrder] = JSON.parse(vm.runInContext(snapshot, sandbox))
+  assert.deepEqual(chatOrder, ["ses_b", "ses_a"], "the chat active last leads")
+  assert.deepEqual(modelOrder, ["zeta", "alpha"], "models follow the same rule, not the alphabet")
+
+  // The snapshot, not the live lines, decides the order: a newer line arriving
+  // while the menu is open must not reshuffle it.
+  vm.runInContext(`logFacetOrder = logFacetOrderSnapshot(${JSON.stringify(lines)})`, sandbox)
+  vm.runInContext(`logLines = ${JSON.stringify(["[2026-11-23 10:06:00] beta → ответ: beta (p/m) [ses:ses_c]", ...lines])}`, sandbox)
+  const entries = (group) => JSON.parse(vm.runInContext(`JSON.stringify(logFacetEntries("${group}").map((entry) => entry.value))`, sandbox))
+  assert.deepEqual(entries("chats").slice(-2), ["ses_b", "ses_a"], "a line that arrived after the opening does not reorder the list")
+  assert.equal(entries("chats")[0], "ses_c", "but a brand-new chat still shows, ahead of the older ones")
+  assert.deepEqual(entries("models").slice(-2), ["zeta", "alpha"])
 })
 
 test("log filters join groups with AND and values inside a group with OR", () => {
@@ -903,4 +934,682 @@ test("log search also matches the session title", () => {
   assert.equal(kind(["answer"], line), true)
   assert.equal(kind(["info", "answer"], line), true, "boxes combine")
   assert.equal(kind([], "config обновлён"), true, "no filter shows everything")
+})
+
+test("a tag keeps its colour and a rename rewrites every reference", () => {
+  const source = scripts.slice(scripts.indexOf("function tagColor("), scripts.indexOf("// --- Tag registry dialog"))
+  const sandbox = {
+    cfg: {
+      tags: ["быстрый", "дешёвый"],
+      models: { chain: { upstreams: [], tags: ["быстрый"] }, other: { upstreams: [], tags: ["дешёвый", "быстрый"] } },
+      opencodeModels: { p: { models: ["m"], tags: ["дешёвый"] } },
+    },
+    esc: (s) => String(s ?? ""),
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const colour = (name) => vm.runInContext(`tagColor(${JSON.stringify(name)})`, sandbox)
+  assert.equal(colour("быстрый"), colour("быстрый"), "the same tag keeps one colour")
+  assert.notEqual(colour("быстрый"), colour("дешёвый"), "different tags differ")
+  assert.match(vm.runInContext("tagChipsHtml(['быстрый'])", sandbox), /class="tag-chip"/)
+
+  // Rename the first tag: every holder follows, nothing points at the old name.
+  vm.runInContext("applyTagRegistry(['скорый', 'дешёвый'])", sandbox)
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.models.chain.tags)", sandbox)), ["скорый"])
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.models.other.tags)", sandbox)), ["дешёвый", "скорый"])
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.opencodeModels.p.tags)", sandbox)), ["дешёвый"])
+  // Dropping a tag removes it from the cards and empties arrays disappear.
+  vm.runInContext("applyTagRegistry(['скорый'])", sandbox)
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.models.other.tags)", sandbox)), ["скорый"], "a surviving tag stays")
+  assert.equal(vm.runInContext("'tags' in cfg.opencodeModels.p", sandbox), false, "an emptied tag list is not saved")
+  assert.deepEqual(JSON.parse(vm.runInContext("JSON.stringify(cfg.tags)", sandbox)), ["скорый"])
+  // Filter group: OR inside, and an empty selection shows everything.
+  const matches = (tags, selected) => vm.runInContext(
+    `tagFilterMatches(${JSON.stringify(tags)}, new Set(${JSON.stringify(selected)}))`, sandbox)
+  assert.equal(matches(["a"], []), true, "no picked tag shows everything")
+  assert.equal(matches(["a", "b"], ["b"]), true, "any picked tag matches")
+  assert.equal(matches(["a"], ["b"]), false)
+})
+
+test("the tag filter hides cards without a picked tag and cards show their chips", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("function renderModels()"), providers.indexOf("// The steps inside every chain"))
+  const box = { innerHTML: "", querySelectorAll: () => [], append() {}, querySelector: () => null }
+  const sandbox = {
+    cfg: {
+      tags: ["быстрый", "дешёвый"],
+      models: {
+        fast: { upstreams: [{ provider: "p", model: "m" }], tags: ["быстрый"] },
+        cheap: { upstreams: [{ provider: "p", model: "m" }], tags: ["дешёвый"] },
+        plain: { upstreams: [{ provider: "p", model: "m" }] },
+      },
+      providers: { p: { models: ["m"] } },
+    },
+    modelSearch: "",
+    chainFilters: new Set(),
+    chainTags: new Set(),
+    esc: (s) => String(s ?? ""),
+    tagChipsHtml: (tags) => (tags ?? []).map((tag) => `<span class="tag-chip">${tag}</span>`).join(""),
+    tagFilterMatches: (tags, selected) => !selected?.size || (tags ?? []).some((tag) => selected.has(tag)),
+    chainContextBadge: () => "",
+    debugLog() {},
+    applyStepColumns() {},
+    renderTagCategoryBar() {},
+    syncFilterButton() {},
+    emptyStateHtml: (message) => `<div class="sessions-empty">${message}</div>`,
+    document: { createElement: () => ({ dataset: {}, querySelector: () => ({ onclick: null }), set innerHTML(v) { this.html = v }, append() {} }) },
+    $: () => box,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  // The renderer creates each card and sets its innerHTML; capture that markup.
+  vm.runInContext(
+    `const created = []
+     document.createElement = () => { const el = { dataset: {}, querySelector: () => ({ onclick: null }), append() {}, set innerHTML(v) { this.html = v; created.push(v) } }; return el }
+     this.created = created`,
+    sandbox,
+  )
+  const html = () => { vm.runInContext("created.length = 0; renderModels()", sandbox); return vm.runInContext("created.join('')", sandbox) }
+  vm.runInContext("chainTags = new Set(['быстрый'])", sandbox)
+  const onlyFast = html()
+  assert.match(onlyFast, /fast/, "the tagged chain stays")
+  assert.doesNotMatch(onlyFast, /plain/, "an untagged chain is hidden")
+  assert.match(onlyFast, /<span class="tag-chip">быстрый<\/span>/, "the card shows its tag chip")
+  vm.runInContext("chainTags = new Set(['быстрый','дешёвый'])", sandbox)
+  const both = html()
+  assert.match(both, /cheap/, "tags inside the group are OR-ed")
+  vm.runInContext("chainTags.clear()", sandbox)
+  assert.match(html(), /plain/, "no picked tag shows every chain")
+})
+
+test("the tag category row follows the setting and filters on one click", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("function renderTagCategoryBar"), providers.indexOf("function renderModels()"))
+  const makeBox = () => {
+    const chips = []
+    return {
+      hidden: false,
+      html: "",
+      set innerHTML(v) {
+        this.html = v
+        chips.length = 0
+        for (const m of v.matchAll(/data-tag="([^"]+)"/g)) chips.push({ dataset: { tag: m[1] }, onclick: null })
+      },
+      get innerHTML() { return this.html },
+      querySelectorAll: () => chips,
+      chips,
+    }
+  }
+  let enabled = true
+  let box = makeBox()
+  const sandbox = {
+    picked: [],
+    cfg: { tags: ["быстрый", "дешёвый"] },
+    appSettings: () => ({ tagCategories: enabled }),
+    tagRegistryNames: () => ["быстрый", "дешёвый"],
+    tagColor: () => "#000",
+    esc: (v) => String(v ?? ""),
+    $: () => box,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const draw = () => vm.runInContext(`renderTagCategoryBar("bar", new Set(picked), (tag) => { picked.push(tag) })`, sandbox)
+
+  // Off by default: the row keeps no chips at all, so it cannot steal a click.
+  enabled = false
+  draw()
+  assert.equal(box.hidden, true, "the setting hides the row")
+  assert.equal(box.innerHTML, "", "a hidden row renders nothing")
+  enabled = true
+  draw()
+  assert.equal(box.hidden, false)
+  assert.equal(box.chips.length, 2, "one chip per registry tag")
+  // A click picks the tag through the same filter set the flyout uses.
+  box.chips[1].onclick()
+  assert.deepEqual(sandbox.picked, ["дешёвый"])
+  draw()
+  assert.match(box.innerHTML, /class="tag-chip tag-toggle is-on" data-tag="дешёвый"/, "the picked chip stays lit")
+})
+
+test("the uptime button appears only for a provider with a script and draws its bars", async () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
+  const box = { innerHTML: "", querySelectorAll: () => [] }
+  const sandbox = {
+    cfg: { providers: {
+      scripted: { baseURL: "https://a.example/v1", models: ["m"], uptimeScript: "print(1)" },
+      plain: { baseURL: "https://b.example/v1", models: ["m"] },
+    } },
+    providersFilter: "",
+    esc: (s) => String(s ?? ""),
+    emptyStateHtml: () => "",
+    $: (id) => id === "providers" ? box : { style: {}, innerHTML: "" },
+    openProviderDialog() {}, openUrl() {}, openUptimeDialog() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext("renderProviders()", sandbox)
+  const rows = box.innerHTML.split("<tr data-provider=")
+  const scripted = rows.find((html) => html.startsWith('"scripted"'))
+  const plain = rows.find((html) => html.startsWith('"plain"'))
+  assert.match(scripted, /data-a="uptime"/, "a script adds the uptime button")
+  assert.doesNotMatch(plain, /data-a="uptime"/, "without a script there is no dead button")
+
+  // The dialog maps the script's answer onto the shared bar markup.
+  const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
+  const draw = uptime.slice(uptime.indexOf("async function loadUptime"), uptime.indexOf('$("uptime-refresh").onclick'))
+  const body = { innerHTML: "" }
+  const meta = { textContent: "" }
+  const drawSandbox = {
+    uptimeProvider: "p",
+    esc: (s) => String(s ?? ""),
+    plural: (n, one, few, many) => `${n} ${one}`,
+    apiErrorMessage: (payload, fallback) => payload?.error?.message ?? fallback,
+    api: async () => ({ ok: true, status: 200, json: async () => ({ bars: [
+      { label: "m1", percent: 99.5 },
+      { label: "m2", percent: 40 },
+    ] }) }),
+    $: (id) => (id === "uptime-body" ? body : meta),
+  }
+  vm.createContext(drawSandbox)
+  vm.runInContext(draw, drawSandbox)
+  await vm.runInContext("loadUptime()", drawSandbox)
+  assert.match(body.innerHTML, /m1/, "every bar is drawn")
+  assert.match(body.innerHTML, /99\.5%/, "the percentage is shown as the script reported it")
+  assert.match(body.innerHTML, /token-fill success/, "a healthy model gets the success colour")
+  assert.match(body.innerHTML, /token-fill error/, "a low one gets the problem colour")
+  assert.match(meta.textContent, /2 модель/, "the header counts the bars")
+})
+
+test("changing the auth token saves under the old token, then switches", async () => {
+  // The token form used to swap the local token before the PUT, so the save
+  // itself returned 401 and every request after it did too. The save must go
+  // out with the token the server still knows.
+  const source = scripts.slice(
+    scripts.indexOf("let pendingAuth = null"),
+    scripts.indexOf("function modelHasLocalReference"),
+  )
+  const requests = []
+  let saved = 0
+  let savePromise = Promise.resolve()
+  const sandbox = {
+    cfg: { authToken: "", authTokenConfigured: true, models: {} },
+    token: "old",
+    localStorage: { items: {}, setItem(k, v) { this.items[k] = v }, getItem(k) { return this.items[k] ?? null } },
+    api: async (path, opts) => {
+      requests.push({ path, auth: sandbox.token, body: JSON.parse(opts.body) })
+      return { ok: sandbox.nextSaveOk !== false, status: 200, json: async () => ({}) }
+    },
+    renderSettings() { saved++ },
+    flash() {},
+    debugLog() {},
+    $: () => ({}),
+    // Stands in for the debounced save: one PUT, then the settle call.
+    save() {
+      savePromise = (async () => {
+        const r = await sandbox.api("/api/config", { method: "PUT", body: JSON.stringify(sandbox.cfg) })
+        sandbox.settlePendingAuth(r.ok)
+      })()
+    },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + "\nthis.setAuthToken = setAuthToken; this.settlePendingAuth = settlePendingAuth", sandbox)
+  vm.runInContext("setAuthToken('new')", sandbox)
+
+  await savePromise
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].auth, "old", "the PUT uses the token the server still accepts")
+  assert.equal(requests[0].body.authToken, "new", "the config carries the new token")
+  assert.equal(sandbox.token, "new", "a successful save switches the GUI token")
+  assert.equal(sandbox.localStorage.items.pp_token, "new")
+  assert.equal(sandbox.cfg.authToken, "", "the saved token is no longer echoed in the field")
+  assert.equal(sandbox.cfg.authTokenConfigured, true)
+
+  // A rejected save must not leave the GUI claiming the token changed.
+  sandbox.cfg = { authToken: "", authTokenConfigured: true, models: {} }
+  sandbox.token = "old"
+  sandbox.nextSaveOk = false
+  vm.runInContext("setAuthToken('never-saved')", sandbox)
+  await savePromise
+  assert.equal(sandbox.token, "old", "a failed save keeps the working token")
+  assert.equal(sandbox.cfg.authTokenConfigured, true, "the field falls back to 'token configured'")
+  assert.equal(saved, 2, "the form is re-rendered after the save and after the failure")
+})
+
+test("the settings token field goes through the deferred save", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const handler = providers.slice(providers.indexOf('$("s-auth").onchange'), providers.indexOf('$("u-session-search").oninput'))
+  assert.match(handler, /setAuthToken\(/, "the field must not swap the token itself")
+  assert.doesNotMatch(handler, /localStorage\.setItem/, "the token switch happens only after a successful save")
+})
+
+test("provider and model rows show tokens per second from their own stream time", () => {
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const source = usage.slice(usage.indexOf("function usageCompactTable"), usage.indexOf("function usageTable"))
+  const table = (obj) => {
+    const sandbox = {
+      esc: (s) => String(s ?? ""),
+      fmtNum: (n) => String(n ?? 0),
+      fmtTok: (n) => String(n ?? 0),
+      problemColor: () => "green",
+      fmtSpeed: (tokens, ms) => {
+        const seconds = (Number(ms) || 0) / 1000
+        return seconds > 0 ? ((Number(tokens) || 0) / seconds).toFixed(1) : "-"
+      },
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(source, sandbox)
+    return vm.runInContext(`usageCompactTable(${JSON.stringify(obj)})`, sandbox)
+  }
+  const html = table({
+    fast: { requests: 2, ok: 2, tokensIn: 100, tokensOut: 500, streamMs: 1000 },
+    never: { requests: 1, ok: 1, tokensIn: 10, tokensOut: 0 },
+  })
+  assert.match(html, /<th>Запросы<\/th><th>Ток\/с<\/th>/, "speed follows the request count")
+  assert.match(html, /500\.0\/с/, "speed is output tokens over that row's stream time")
+  // A row that never streamed shows a dash rather than a misleading 0.0.
+  assert.match(html, /<td class="muted">-<\/td>/)
+})
+
+test("the images panel has two separate last-model cards and no history table", () => {
+  assert.doesNotMatch(indexHtml, /u-image-recent/, "the mixed block is gone")
+  assert.doesNotMatch(indexHtml, /id="u-images"/, "the history table is gone")
+  assert.match(indexHtml, /id="u-image-last-generate"/)
+  assert.match(indexHtml, /id="u-image-last-edit"/)
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const drawer = usage.slice(usage.indexOf('$("u-image-last-generate")'), usage.indexOf("// The 3-second poll"))
+  assert.match(drawer, /Последняя модель для генерации/)
+  assert.match(drawer, /Последняя модель для редактирования/)
+  assert.doesNotMatch(drawer, /recentImages/, "the history list is not rendered")
+  // The two cards sit on one row when there is room and stack when there is not.
+  assert.match(styles, /\.last-models \{[^}]*auto-fit/, "the block is responsive")
+})
+
+test("the information group holds logs, statistics and uptime", () => {
+  assert.match(indexHtml, /<span>Информация<\/span>/, "the group is renamed")
+  assert.doesNotMatch(indexHtml, /Статистика и логи/)
+  assert.match(indexHtml, /data-tab="uptime"/)
+  const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
+  assert.match(uptime, /renderUptimeTab/, "the tab draws its placeholders")
+  // Both views are placeholders, and neither fetches anything yet.
+  const tab = uptime.slice(uptime.indexOf("function renderUptimeTab"))
+  assert.match(tab, /в разработке/)
+  assert.doesNotMatch(tab, /api\(/, "the placeholder makes no requests")
+  assert.match(indexHtml, /data-uptime-group="providers"/)
+  assert.match(indexHtml, /data-uptime-group="models"/)
+})
+
+test("the provider dialog hides optional fields and picks the uptime script from a file", () => {
+  const providers = readFileSync(new URL("js/dialogs-provider.js", FRONTEND), "utf8")
+  const htmlBlock = indexHtml.slice(indexHtml.indexOf('id="dlg-provider"'), indexHtml.indexOf('id="dlg-model"'))
+  assert.match(htmlBlock, /<details id="dp-more"/, "optional fields fold away")
+  assert.match(htmlBlock, /id="dp-uptime-file" type="file"/, "the script is a file input")
+  assert.doesNotMatch(htmlBlock, /id="dp-uptime"/, "the code textarea is gone")
+  // The three required fields stay outside the fold.
+  const beforeFold = htmlBlock.slice(0, htmlBlock.indexOf("<details"))
+  for (const id of ["dp-name", "dp-url", "dp-key"]) assert.match(beforeFold, new RegExp(`id="${id}"`), `${id} stays visible`)
+  assert.match(providers, /uptimeScriptFile/, "the picked file name is stored")
+  assert.match(providers, /file\.text\(\)/, "the file content becomes the script")
+  // Clearing removes both halves, so no dead button is left behind.
+  const clear = providers.slice(providers.indexOf('$("dp-uptime-clear").onclick'), providers.indexOf('$("dp-delete").onclick'))
+  assert.match(clear, /uptimeDraft = \{ script: "", file: "" \}/)
+})
+
+test("the config preview shows two rows and hides the toggle when nothing else is left", async () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("const previewEntries = new Map()"), providers.indexOf(" function renderOpenCode() {"))
+  const run = (tops, expanded = false) => {
+    const chips = tops.map((top) => ({ offsetTop: top, hidden: false }))
+    let toggle = null
+    const box = {
+      querySelectorAll: () => chips,
+      querySelector: () => toggle,
+      append: (node) => { toggle = node },
+    }
+    const sandbox = {
+      $: () => box,
+      esc: (s) => String(s ?? ""),
+      previewExpanded: { has: () => expanded, add() {}, delete() {} },
+      renderOpenCode() {},
+      document: { createElement: () => ({ classList: {}, remove() {} }) },
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(source + "\nthis.fit = fitPreviewRows", sandbox)
+    // `previewEntries` lives in the slice, so fill it from inside that context.
+    vm.runInContext(`previewEntries.set("oc-preview", ${JSON.stringify(tops.map((_, i) => [`m${i}`, ""]))})`, sandbox)
+    vm.runInContext(`fit("oc-preview", ${expanded})`, sandbox)
+    return { chips, toggle }
+  }
+  // Two rows of three: everything fits, no dead "показать ещё".
+  const fits = run([0, 0, 0, 40, 40, 40])
+  assert.equal(fits.chips.filter((chip) => !chip.hidden).length, 6)
+  assert.equal(fits.toggle, null, "no toggle when every chip is already visible")
+
+  // A third row is folded away and the toggle counts only what is hidden.
+  const folded = run([0, 0, 0, 40, 40, 40, 80, 80])
+  assert.deepEqual(folded.chips.map((chip) => chip.hidden), [false, false, false, false, false, false, true, true])
+  assert.match(folded.toggle.innerHTML, /Показать ещё 2/)
+
+  // Expanded means no hidden chips at all; the toggle only collapses.
+  const expanded = run([0, 0, 0, 40, 40, 40, 80], true)
+  assert.equal(expanded.chips.filter((chip) => chip.hidden).length, 0)
+  assert.match(expanded.toggle.innerHTML, /Свернуть/)
+})
+
+test("the filter flyout ticks its own filters and the hint sits above the button", () => {
+  // `checks` is an array; reading `checks.checked` threw the interface error on
+  // every filter open ("checks.checked is not a function").
+  const tags = readFileSync(new URL("js/tags.js", FRONTEND), "utf8")
+  const flyout = tags.slice(tags.indexOf("function openTagFilterMenu"), tags.indexOf("// --- Tag registry dialog"))
+  assert.match(flyout, /\$\{checked\(value\) \? "checked" : ""\}/, "the checkbox state comes from the checked callback")
+  assert.doesNotMatch(flyout, /checks\.checked/)
+
+  const core = readFileSync(new URL("js/core.js", FRONTEND), "utf8")
+  const hint = core.slice(core.indexOf("function showFieldHint"), core.indexOf("function hideFieldHint"))
+  assert.match(hint, /above/, "the hint prefers the space above the button")
+  assert.doesNotMatch(hint, /let left = anchor\.right \+ 8/, "it no longer opens beside the button over a neighbour")
+})
+
+test("the tag row keeps one line and the search brings the hidden tags back", () => {
+  const tags = readFileSync(new URL("js/tags.js", FRONTEND), "utf8")
+  const source = tags.slice(tags.indexOf("const tagPickerState = new Map()"), tags.indexOf("function wireTagPicker"))
+  const run = (names, room, query = "") => {
+    const chips = names.map((tag) => ({ dataset: { tag }, offsetWidth: 30, hidden: false }))
+    const empty = { hidden: true }
+    const list = { clientWidth: room, querySelectorAll: () => chips, querySelector: () => empty }
+    const sandbox = {
+      $: () => ({ querySelector: (selector) => (selector === ".tag-picker-list" ? list : null) }),
+      esc: (s) => String(s ?? ""),
+      tagRegistryNames: () => names,
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(source + "\nthis.sync = syncTagPicker", sandbox)
+    vm.runInContext(`tagPickerState.set("dm-tags", { query: ${JSON.stringify(query)}, search: false })`, sandbox)
+    vm.runInContext('sync("dm-tags")', sandbox)
+    return { chips, empty }
+  }
+  // 100px holds two 30px chips plus their gaps; the rest fold away.
+  const narrow = run(["a1", "b2", "c3", "d4"], 100)
+  assert.deepEqual(narrow.chips.map((chip) => chip.hidden), [false, false, true, true])
+  assert.equal(narrow.empty.hidden, true, "there is still something to show")
+  // The query decides visibility, not just the width: a chip that was folded
+  // away is the one the search brings back.
+  const found = run(["a1", "b2", "c3", "d4"], 100, "d4")
+  assert.deepEqual(found.chips.map((chip) => chip.hidden), [true, true, true, false])
+  // No match means the empty line, not a blank row.
+  const none = run(["a1"], 100, "zz")
+  assert.equal(none.chips[0].hidden, true)
+  assert.equal(none.empty.hidden, false)
+  // A closed dialog reports no width; nothing must be hidden before it opens.
+  assert.equal(run(["a1", "b2", "c3", "d4"], 0).chips.filter((chip) => !chip.hidden).length, 4)
+})
+
+test("the tag flyout pages through the registry and offers the editor", () => {
+  const tags = readFileSync(new URL("js/tags.js", FRONTEND), "utf8")
+  const source = tags.slice(tags.indexOf("const TAG_FACET_PAGE_SIZE"), tags.indexOf("// --- Tag registry dialog"))
+  const registry = ["a1", "b2", "c3", "d4", "e5", "f6", "g7", "h8"]
+  const makeMenu = () => ({
+    className: "",
+    _html: "",
+    _buttons: [],
+    get innerHTML() { return this._html },
+    set innerHTML(value) {
+      this._html = value
+      this._buttons = []
+      for (const m of value.matchAll(/data-view="([^"]+)"/g)) this._buttons.push({ selector: "[data-view]", dataset: { view: m[1] } })
+      for (const m of value.matchAll(/data-facet-page="(-?\d+)"/g)) this._buttons.push({ selector: "[data-facet-page]", dataset: { facetPage: m[1] } })
+      if (value.includes("data-tag-search-toggle")) this._buttons.push({ selector: "[data-tag-search-toggle]", dataset: {} })
+      if (value.includes("data-tag-manage")) this._buttons.push({ selector: "[data-tag-manage]", dataset: {} })
+      if (value.includes("log-facet-search")) this._buttons.push({ selector: ".log-facet-search", dataset: {}, focus() {}, addEventListener() {} })
+    },
+    querySelectorAll(selector) { return this._buttons.filter((button) => button.selector === selector) },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null },
+  })
+  const menu = makeMenu()
+  const sandbox = {
+    tagRegistryNames: () => registry,
+    tagColor: () => "#000",
+    esc: (s) => String(s ?? ""),
+    TAG_SEARCH_ICON: "",
+    TAG_EDIT_ICON: "",
+    searchMenu: menu,
+    openSearchMenuContent: (_anchor, render) => render(menu),
+    positionSearchMenu() {},
+    openTagRegistry() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + "\nthis.open = openTagFilterMenu", sandbox)
+  vm.runInContext('open({}, { tagSet: new Set(["b2"]) })', sandbox)
+  const click = (selector, data) => menu.querySelectorAll(selector).find((button) => Object.entries(data).every(([key, value]) => button.dataset[key] === value)).onclick()
+  click("[data-view]", { view: "tags" })
+  // Six per page: the seventh waits for the next page.
+  assert.match(menu.innerHTML, /a1[\s\S]*f6/)
+  assert.doesNotMatch(menu.innerHTML, /g7/)
+  assert.match(menu.innerHTML, /data-tag-manage/, "the editor sits next to the pager")
+  assert.doesNotMatch(menu.innerHTML, /data-facet-page="1"[^>]*disabled/, "there is a second page to go to")
+  click("[data-facet-page]", { facetPage: "1" })
+  assert.match(menu.innerHTML, /g7[\s\S]*h8/)
+  assert.doesNotMatch(menu.innerHTML, /a1/)
+  assert.match(menu.innerHTML, /data-facet-page="1"[^>]*disabled/, "the last page stops the pager")
+})
+
+test("the all-sessions pager shares the action row and the tables no longer scroll sideways", () => {
+  // Paging used to hide behind a "Страницы" drawer; it now sits in the footer
+  // next to "Закрыть", so it is always one click away.
+  const dialog = indexHtml.slice(indexHtml.indexOf('id="dlg-all-sessions"'), indexHtml.indexOf('id="dlg-model-settings"'))
+  const actions = dialog.slice(dialog.indexOf('<div class="dialog-actions">'))
+  assert.match(actions, /id="all-sessions-pager"[\s\S]*Закрыть/, "the pager sits in the action row")
+  assert.doesNotMatch(dialog, /pager-drawer/, "the drawer is gone")
+  assert.doesNotMatch(scripts, /all-sessions-drawer-toggle/, "no handler is left for the removed drawer")
+
+  // The statistics tables take the panel width; only the name column gives way.
+  assert.match(styles, /#u-providers, #u-models \{ width: 100%; table-layout: fixed; \}/)
+  assert.doesNotMatch(styles, /#u-providers, #u-models \{ display: block; overflow-x: auto; \}/)
+
+  // Two tabs (chains/Models) now fill the row like three do in the logs.
+  assert.match(styles, /\.log-filter-tabs \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(0, 1fr\)\)/)
+  // The chain editor is a single column, whatever the pane width.
+  assert.match(styles, /\.chain-editor \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/)
+  assert.doesNotMatch(scripts, /applyChainColumns/, "the column fitting code is gone")
+})
+
+test("the tag registry searches and pages without losing the row it edits", () => {
+  const tags = readFileSync(new URL("js/tags.js", FRONTEND), "utf8")
+  const source = tags.slice(tags.indexOf("let tagRegistryPage = 0"), tags.indexOf("function addTagFromField"))
+  const rows = (html) => [...html.matchAll(/data-tag-index="(\d+)"[\s\S]*?class="tag-registry-input" value="([^"]*)"/g)].map((m) => [Number(m[1]), m[2]])
+  const make = (names) => {
+    const list = { innerHTML: "" }
+    const pager = { hidden: false, innerHTML: "", _buttons: [], querySelectorAll: () => [] }
+    const chip = { textContent: "", style: { setProperty() {} } }
+    const sandbox = {
+      tagDraft: names,
+      tagRegistryPage: 0,
+      tagRegistryQuery: "",
+      esc: (s) => String(s ?? ""),
+      tagColor: () => "#000",
+      tagRegistryNames: () => names,
+      emptyInlineHtml: (message) => `<div class="empty-inline">${message}</div>`,
+      $: (id) => (id === "tags-list" ? list : id === "tags-pager" ? pager : {}),
+      document: { querySelectorAll: () => [] },
+    }
+    // Rows are built as markup, so the per-row handlers need element stubs.
+    list.querySelectorAll = () => rows(list.innerHTML).map(([index, value]) => ({
+      dataset: { tagIndex: String(index) },
+      querySelector: (selector) => (selector === ".tag-chip" ? chip : { oninput: null, onclick: null, value }),
+    }))
+    vm.createContext(sandbox)
+    vm.runInContext(source + "\nthis.render = renderTagRegistry", sandbox)
+    return { sandbox, list, pager }
+  }
+  const many = ["a1", "b2", "c3", "d4", "e5", "f6", "g7", "h8", "i9"]
+  const first = make(many)
+  first.sandbox.render()
+  assert.deepEqual(rows(first.list.innerHTML).map(([, value]) => value), ["a1", "b2", "c3", "d4", "e5", "f6", "g7", "h8"], "eight per page")
+  assert.equal(first.pager.hidden, false, "nine tags need a pager")
+  // The second page keeps the draft indexes, so a delete hits the right tag.
+  vm.runInContext("tagRegistryPage = 1", first.sandbox)
+  first.sandbox.render()
+  assert.deepEqual(rows(first.list.innerHTML), [[8, "i9"]])
+  // The search filters the whole draft and resets paging.
+  vm.runInContext('tagRegistryQuery = "f"; tagRegistryPage = 0', first.sandbox)
+  first.sandbox.render()
+  assert.deepEqual(rows(first.list.innerHTML), [[5, "f6"]])
+  // A query with no hit says so instead of drawing an empty list.
+  vm.runInContext('tagRegistryQuery = "zzz"', first.sandbox)
+  first.sandbox.render()
+  assert.match(first.list.innerHTML, /ничего не найдено/)
+})
+
+test("the skills dialog lists installed skills and keeps a placeholder browser", () => {
+  assert.match(indexHtml, /id="integrations-advanced"[^>]*>Скиллы</, "the button is named Скиллы")
+  assert.doesNotMatch(indexHtml, /Расширенные настройки/)
+  assert.match(indexHtml, /data-skills-tab="installed"[^>]*>Установленные</)
+  assert.match(indexHtml, /data-skills-tab="browse"[^>]*>Браузер</)
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const dialog = providers.slice(providers.indexOf("function renderSkillsDialog"), providers.indexOf('$("image-settings-cancel")'))
+  assert.match(dialog, /emptyInlineHtml\("в разработке"\)/, "the browser tab is a placeholder")
+  // The image skill lives in the Opencode card again; the dialog lists it too,
+  // so both copies must follow the same state.
+  assert.match(indexHtml, /id="oc-preview"[\s\S]*image-skill-install/, "the card carries the install button")
+  assert.match(providers, /querySelectorAll\("\.image-skill-status"\)/, "both copies update together")
+})
+
+test("the hint opens above the button instead of over its neighbour", () => {
+  const core = readFileSync(new URL("js/core.js", FRONTEND), "utf8")
+  const source = core.slice(core.indexOf("function showFieldHint"), core.indexOf("function hideFieldHint"))
+  const place = (buttonRect, viewport = { innerWidth: 700, innerHeight: 400 }) => {
+    const hint = {
+      hidden: true,
+      textContent: "",
+      innerHTML: "",
+      style: {},
+      parentElement: null,
+      // A 140x30 tooltip: the sizes the clamp uses.
+      getBoundingClientRect: () => ({ width: 140, height: 30 }),
+    }
+    const button = {
+      dataset: { tip: "Очистить" },
+      getBoundingClientRect: () => buttonRect,
+      closest: () => null,
+    }
+    const sandbox = { fieldHint: hint, window: viewport, document: { body: { append() {} } }, button }
+    vm.createContext(sandbox)
+    vm.runInContext(source + "\nthis.showFieldHint = showFieldHint", sandbox)
+    vm.runInContext("showFieldHint(button)", sandbox)
+    return { top: Number.parseFloat(hint.style.top), left: Number.parseFloat(hint.style.left), height: 30, width: 140 }
+  }
+  // A clear icon in a mid-page toolbar with "Добавить" right after it: the hint
+  // used to open beside the icon, on top of the neighbouring button.
+  const bar = { left: 587, right: 617, top: 200, bottom: 230, width: 30, height: 30 }
+  const hint = place(bar)
+  assert.ok(hint.top + hint.height <= bar.top, `the hint sits above the button (top ${hint.top})`)
+  assert.ok(hint.top >= 8, "and stays inside the window")
+
+  // At the very top there is no room above, so it drops below the button
+  // instead of covering it.
+  const topBar = place({ ...bar, top: 16, bottom: 46 })
+  assert.ok(topBar.top >= 46, `the hint drops below when the top is tight (top ${topBar.top})`)
+})
+
+test("the images panel renders its tiles from the day's image entries", () => {
+  // `imageEntries` was dropped while the history table was removed, and every
+  // statistics render threw a ReferenceError before painting the panel.
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const report = usage.slice(usage.indexOf("function renderUsageReport"), usage.indexOf("// The 3-second poll"))
+  const declared = report.indexOf("const imageEntries = Object.entries(u.images")
+  const used = report.indexOf("imageEntries.reduce")
+  assert.ok(declared > 0, "the image entries are computed")
+  assert.ok(declared < used, "and before the tiles that use them")
+})
+
+test("the skills dialog lists every skill folder, not only the bundled one", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(providers.indexOf("let skillsList = null"), providers.indexOf('$("image-settings-cancel")'))
+  const panels = { installed: {}, browse: {} }
+  const dialog = {
+    open: true,
+    querySelector: (selector) => panels[selector.includes("installed") ? "installed" : "browse"],
+  }
+  const sandbox = {
+    api: async () => ({ ok: true, json: async () => ({ skills: [] }) }),
+    apiErrorMessage: (payload, fallback) => fallback,
+    imageSkillErrorMessage: (message) => message,
+    imageSkillState: {},
+    emptyInlineHtml: (message) => `<div class="empty-inline">${message}</div>`,
+    esc: (s) => String(s ?? ""),
+    dlgSkills: dialog,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + "\nthis.render = renderSkillsDialog; this.set = (list) => { skillsList = list }", sandbox)
+  vm.runInContext(`set([
+    { name: "debugging", description: "Find the cause", path: "/s/debugging/SKILL.md", bundled: false },
+    { name: "image-generation", description: "", path: "/s/image-generation/SKILL.md", bundled: true },
+  ])`, sandbox)
+  vm.runInContext("render()", sandbox)
+  const html = panels.installed.innerHTML
+  assert.match(html, /<h4>debugging<\/h4>/, "a skill that is not image-generation is listed")
+  assert.match(html, /Find the cause/, "its frontmatter description is shown")
+  assert.match(html, /<h4>image-generation<\/h4>/, "the bundled skill is listed too")
+  assert.match(html, /\/s\/debugging\/SKILL.md/, "each row keeps its path")
+  assert.match(panels.browse.innerHTML, /в разработке/, "browser stays a placeholder")
+
+  // An empty or unreadable folder is a message, not a blank panel.
+  vm.runInContext("set([]); render()", sandbox)
+  assert.match(panels.installed.innerHTML, /ничего нет/)
+  vm.runInContext("skillsError = 'нет доступа'; render()", sandbox)
+  assert.match(panels.installed.innerHTML, /нет доступа/)
+})
+
+test("the provider dialog reveals the key and aligns the file row", () => {
+  assert.match(
+    indexHtml,
+    /<input id="dp-key" type="password"[^>]*>\s*<button type="button" id="dp-key-reveal"/,
+    "the eye sits inside the key field",
+  )
+  const dialogs = readFileSync(new URL("js/dialogs-provider.js", FRONTEND), "utf8")
+  assert.match(dialogs, /function setKeyRevealed/, "one place toggles the field type")
+  assert.match(dialogs, /setKeyRevealed\(false\)/, "the dialog reopens with the key hidden")
+  const reveal = dialogs.slice(dialogs.indexOf("function setKeyRevealed"), dialogs.indexOf('$("dp-key-reveal").onclick'))
+  assert.doesNotMatch(reveal, /\.value\s*=/, "revealing only flips the field type")
+
+  // The uptime caption is a plain block, not a `label`, so it needs the label
+  // typography by hand or it renders in the body's colour and size.
+  const components = readFileSync(new URL("css/components.css", FRONTEND), "utf8")
+  assert.match(components, /\.field-block \{[^}]*font-size: 12px[^}]*color: var\(--muted\)/, "the uptime caption matches the other labels")
+})
+
+test("the image skill dialog says the default model is used when the skill runs", () => {
+  const help = indexHtml.slice(indexHtml.indexOf('id="image-settings-help"'), indexHtml.indexOf("</p>", indexHtml.indexOf('id="image-settings-help"')))
+  assert.match(help, /по умолчанию/)
+  assert.match(help, /при запуске skill/, "the dialog explains the skill uses it too")
+})
+
+test("the eye button flips the key field between password and text", () => {
+  const dialogs = readFileSync(new URL("js/dialogs-provider.js", FRONTEND), "utf8")
+  const source = dialogs.slice(dialogs.indexOf("function setKeyRevealed"), dialogs.indexOf('$("dp-uptime-file").onchange'))
+  const input = { type: "password" }
+  const button = {
+    dataset: {},
+    setAttribute(key, value) { this[key] = value },
+  }
+  // Every id gets its own node: one shared stub let `dp-cancel` overwrite the
+  // eye's handler and the test proved nothing.
+  const nodes = { "dp-key": input, "dp-key-reveal": button }
+  const sandbox = {
+    $: (id) => nodes[id] ?? (nodes[id] = { dataset: {}, setAttribute() {} }),
+    openProviderDialog() {},
+    dlgProvider: { close() {} },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  vm.runInContext('$("dp-key-reveal").onclick()', sandbox)
+  assert.equal(input.type, "text", "a click reveals the typed key")
+  assert.equal(button["aria-pressed"], "true")
+  assert.equal(button["aria-label"], "Скрыть ключ")
+  assert.equal(button.dataset.tip, "Скрыть ключ", "the tip follows the state, not the old label")
+  vm.runInContext('$("dp-key-reveal").onclick()', sandbox)
+  assert.equal(input.type, "password", "and the next click hides it again")
+  // Reopening the dialog must not leave a revealed field behind.
+  vm.runInContext("setKeyRevealed(true); setKeyRevealed(false)", sandbox)
+  assert.equal(input.type, "password")
 })

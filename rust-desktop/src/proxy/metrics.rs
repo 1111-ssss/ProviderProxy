@@ -17,6 +17,13 @@ use super::{
 };
 
 pub(crate) const USAGE_RETENTION_DAYS: usize = 7;
+/// Log history: one day, capped by row count. The GUI pages through it from
+/// SQLite instead of holding the whole day in memory.
+pub(crate) const LOG_RETENTION_MS: u64 = 24 * 60 * 60 * 1000;
+pub(crate) const LOG_DB_LIMIT: usize = 5000;
+/// Trimming on every insert would cost a delete scan per log line; a minute of
+/// slack costs a few hundred extra rows.
+const LOG_TRIM_INTERVAL_MS: u64 = 60_000;
 
 pub(crate) fn now_ms() -> u128 {
     SystemTime::now()
@@ -275,11 +282,93 @@ pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
         message.into()
     );
     println!("{line}");
-    let mut logs = state.logs.lock().unwrap();
-    logs.push_back(line);
-    while logs.len() > state.log_max {
-        logs.pop_front();
+    append_log(state, &line);
+}
+
+/// Persist one line. The GUI reads pages from SQLite, so nothing is kept in
+/// memory: a day of logs would only be a cache of the database.
+fn append_log(state: &AppState, line: &str) {
+    let Some(created_ms) = now_ms().try_into().ok() else {
+        return;
+    };
+    let created_ms: u64 = created_ms;
+    let Ok(connection) = state.storage.connection.lock() else {
+        return;
+    };
+    if connection
+        .execute(
+            "INSERT INTO logs(created_ms, line) VALUES(?1, ?2)",
+            params![created_ms, line],
+        )
+        .is_err()
+    {
+        return;
     }
+    // Trim at most once a minute: the check itself is a cheap settings read,
+    // the deletes are not.
+    let now = created_ms;
+    let last = connection
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'logsTrimmedAt'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .unwrap_or(0);
+    if now.saturating_sub(last) < LOG_TRIM_INTERVAL_MS {
+        return;
+    }
+    let _ = connection.execute(
+        "INSERT INTO settings(key, value) VALUES('logsTrimmedAt', ?1) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![now.to_string()],
+    );
+    let cutoff = now.saturating_sub(LOG_RETENTION_MS);
+    let _ = connection.execute("DELETE FROM logs WHERE created_ms < ?1", params![cutoff]);
+    let _ = connection.execute(
+        "DELETE FROM logs WHERE id <= (SELECT id FROM logs ORDER BY id DESC LIMIT 1 OFFSET ?1)",
+        params![LOG_DB_LIMIT],
+    );
+}
+
+/// One page of stored logs, newest first. `before` is an exclusive id cursor so
+/// the "older" button can walk back without loading the day.
+pub(crate) fn log_page(
+    storage: &Storage,
+    before: Option<i64>,
+    limit: usize,
+) -> Vec<(i64, String)> {
+    let Ok(connection) = storage.connection.lock() else {
+        return Vec::new();
+    };
+    let limit = limit.clamp(1, 500) as i64;
+    let query = match before {
+        Some(_) => "SELECT id, line FROM logs WHERE id < ?1 ORDER BY id DESC LIMIT ?2",
+        None => "SELECT id, line FROM logs ORDER BY id DESC LIMIT ?1",
+    };
+    let Ok(mut statement) = connection.prepare(query) else {
+        return Vec::new();
+    };
+    let read = |row: &rusqlite::Row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?));
+    let rows = match before {
+        Some(id) => statement.query_map(params![id, limit], read),
+        None => statement.query_map(params![limit], read),
+    };
+    let Ok(rows) = rows else {
+        return Vec::new();
+    };
+    rows.flatten().collect()
+}
+
+/// Total rows kept, so the pager can show how far back it goes.
+pub(crate) fn log_count(storage: &Storage) -> usize {
+    let Ok(connection) = storage.connection.lock() else {
+        return 0;
+    };
+    connection
+        .query_row("SELECT COUNT(*) FROM logs", [], |row| row.get::<_, usize>(0))
+        .unwrap_or(0)
 }
 
 /// Log lines that belong to one harness conversation carry its id as a trailing

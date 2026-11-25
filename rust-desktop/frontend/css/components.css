@@ -30,6 +30,85 @@
   .dialog-header h3 { margin: 0; font-size: 18px; }
   .dialog-header p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
   .dialog-body { flex: 1 1 auto; min-height: 0; padding: 22px 24px 14px; overflow: auto; }
+  /* Tag chips: the colour comes from the tag name, so one chip style covers
+     every surface (cards, filter list, registry dialog). */
+  .tag-chip { display: inline-flex; align-items: center; max-width: 100%; min-height: 22px; padding: 1px 8px; border: 1px solid color-mix(in srgb, var(--tag-color, var(--accent)) 45%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--tag-color, var(--accent)) 14%, transparent); color: var(--text); font-size: 11px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag-registry { display: grid; gap: 6px; margin-bottom: 10px; }
+  /* Fixed chip column: with an auto track every input started at its own x and
+     the rename fields had a different width on every row. */
+  .tag-registry-row { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  .tag-registry-row .tag-chip { justify-self: start; max-width: 100%; }
+  .tag-registry-input { min-height: 32px; padding: 4px 8px; }
+  .tag-registry-add { gap: 6px; }
+  .tag-registry-add input { flex: 1 1 auto; min-width: 0; }
+  .tag-registry-search { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .tag-registry-search .search-field { flex: 1 1 auto; min-width: 0; }
+  .tag-registry-pager { display: flex; align-items: center; gap: 6px; }
+  .tag-registry-pager[hidden] { display: none; }
+  .tag-registry-pager button { min-width: 28px; padding: 2px 6px; }
+  .tag-registry-add .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; min-height: 34px; padding: 0; }
+  .tag-registry-add .icon-action svg, .tag-registry-row .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* Tag picker in the chain/model dialogs: one row of chips, a search icon that
+     widens into a field, and the registry button. Chips that do not fit are
+     hidden instead of wrapped, so the dialog keeps its height and the search
+     still reaches them. */
+  .dialog-tag-row { display: grid; gap: 6px; margin-bottom: 14px; }
+  .tag-picker { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-height: 30px; min-width: 0; }
+  .tag-picker-list { display: flex; flex: 1 1 auto; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .tag-picker-list .tag-toggle[hidden] { display: none; }
+  .tag-picker-empty { color: var(--muted); font-size: 12px; }
+  .tag-picker-empty[hidden] { display: none; }
+  .tag-picker-search { flex: 0 0 auto; width: 0; min-width: 0; overflow: hidden; transition: width .15s ease; }
+  .tag-picker-search.is-open { width: 128px; }
+  .tag-picker-search input { width: 100%; min-height: 30px; padding: 4px 8px; font-size: 12px; }
+  .tag-picker-icon { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; min-height: 26px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  .tag-picker-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tag-picker-icon:hover:not(:disabled), .tag-picker-icon[aria-pressed="true"] { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
+  .tag-toggle { flex: 0 0 auto; cursor: pointer; padding: 4px 10px; border-style: dashed; background: transparent; color: var(--muted); font-size: 12px; }
+  .tag-toggle:hover { border-style: solid; color: var(--text); }
+  .tag-toggle.is-on { border-style: solid; background: color-mix(in srgb, var(--tag-color, var(--accent)) 22%, transparent); color: var(--text); }
+  /* The optional category row above the chain/model lists: same chips as the
+     dialogs, wrapping freely because it has a whole page width. */
+  .tag-category-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -4px 0 14px; }
+  /* Provider dialog: optional fields fold away, and the uptime script is a file
+     picker rather than a code box. */
+  .dialog-more { margin-top: 2px; padding: 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-soft); }
+  .dialog-more > summary { display: flex; align-items: center; gap: 7px; padding: 10px 12px; color: var(--muted); font-size: 13px; cursor: pointer; list-style: none; }
+  .dialog-more > summary::-webkit-details-marker { display: none; }
+  .dialog-more-icon { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+  .dialog-more[open] > summary { border-bottom: 1px solid var(--border); color: var(--text); }
+  .dialog-more[open] .dialog-more-icon { transform: rotate(90deg); }
+  /* Keep the label's grid: overriding it to block made the inputs fall back to
+     their default width instead of filling the dialog. */
+  .dialog-more > label, .dialog-more > .field-block { margin: 12px 12px; }
+  .dialog-more > label:last-child, .dialog-more > .field-block:last-child { margin-bottom: 14px; }
+  /* A field without a wrapping `label` gets the label typography by hand:
+     otherwise its caption renders at the body's default text colour and size. */
+  .field-block { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+  .file-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  /* The native file input cannot be styled; a label wraps it and hides it. */
+  /* `dialog label` adds a 14px bottom margin; on this nested label it shifted
+     the button 7px above the name and the trash that share the row. */
+  .file-pick-button { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; min-height: 38px; margin: 0; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+  .file-pick-button:hover { border-color: var(--accent-strong); }
+  .file-pick-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file-pick-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .file-pick .icon-action { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; min-height: 38px; padding: 0; }
+  .file-pick .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* Last image models: one card per question, side by side on a wide window and
+     stacked when there is no room for both. */
+  .last-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+  .last-model-card { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .last-model-card strong { font-size: 13px; }
+  .last-model-name { color: var(--text); font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+  .last-model-empty { color: var(--muted); font-size: 12px; }
+  /* Uptime dialog: the script's bars, plus a note when it failed. Reuses the
+     statistics bar markup so a percentage looks the same on both pages. */
+  #dlg-uptime .dialog-body { display: grid; gap: 10px; align-content: start; }
+  #dlg-uptime .dialog-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  #uptime-meta { font-size: 12px; }
+  #uptime-body .empty-inline { padding: 10px 0; text-align: left; }
+  #uptime-body .empty-inline.is-error { color: var(--danger); overflow-wrap: anywhere; white-space: pre-wrap; }
   dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
   dialog label.sr-only { display: block; margin: 0; }
   dialog label input, dialog label select { font-size: 14px; }
@@ -37,9 +116,8 @@
   .dialog-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
   .dialog-section-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
   .dialog-count { color: var(--accent); font-size: 11px; white-space: nowrap; }
-  /* Filled downwards first (1 under 2, then the next column), so the order the
-     user drags is the order they read. */
-  .chain-editor { display: grid; grid-template-columns: repeat(var(--chain-cols, 1), minmax(0, 1fr)); grid-template-rows: repeat(var(--chain-rows, 1), auto); grid-auto-flow: column; gap: 8px; padding-right: 2px; }
+  /* Always one column: the order the user drags is the order they read. */
+  .chain-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-right: 2px; }
   .chain-editor:empty { display: block; }
   .chain-row { display: grid; grid-template-columns: 18px 22px minmax(0, 1fr) auto; gap: 6px; align-items: center; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-soft); }
   .chain-row[draggable="true"] .drag-handle { cursor: grab; }
@@ -236,6 +314,13 @@
   .tile-wide .v { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile-wide .k { white-space: nowrap; }
   .tile .k { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
+  /* "Любимые" is one wide card on its own row: two long names side by side used
+     to leave a hole exactly one small tile wide in front of the last tile. */
+  .tile-favourites { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 10px 18px; }
+  .tile-favourites .fav-title { grid-column: 1 / -1; font-size: 13px; }
+  .fav-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
+  .fav-row .v { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 640px) { .tile-favourites { grid-template-columns: minmax(0, 1fr); } }
   .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
   .chart-card { min-width: 0; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -308,11 +393,30 @@
   .usage-panel { display: none; margin-top: 14px; }
   .usage-panel.active { display: block; }
   .usage-panel[data-panel="lifetime"].active { margin-top: 14px; }
-  .pager-drawer { margin-top: 12px; }
-  .pager-drawer-toggle { display: inline-flex; align-items: center; gap: 8px; }
-  .pager-drawer-toggle::after { content: ""; width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); }
-  .pager-drawer-body { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .pager-drawer-body[hidden] { display: none; }
+  /* The provider/model tables fill the panel: the name is the only flexible
+     column, the rest get fixed widths. A long name is cut with an ellipsis and
+     the full value stays in the shared hint. */
+  #u-providers, #u-models { width: 100%; table-layout: fixed; }
+  #u-providers th, #u-providers td, #u-models th, #u-models td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #u-providers th:nth-child(2), #u-providers td:nth-child(2),
+  #u-models th:nth-child(2), #u-models td:nth-child(2) { width: 92px; }
+  #u-providers th:nth-child(3), #u-providers td:nth-child(3),
+  #u-models th:nth-child(3), #u-models td:nth-child(3) { width: 76px; }
+  /* Wide enough for the "ПРОБЛЕМНОСТЬ" caption: at 108px the word spilled over
+     the column edge, and a clipped caption is not an option (it is one word). */
+  #u-providers th:nth-child(4), #u-providers td:nth-child(4),
+  #u-models th:nth-child(4), #u-models td:nth-child(4) { width: 142px; }
+  #u-providers th:nth-child(5), #u-providers td:nth-child(5),
+  #u-models th:nth-child(5), #u-models td:nth-child(5) { width: 148px; }
+  #u-providers th:not(:first-child), #u-providers td:not(:first-child),
+  #u-models th:not(:first-child), #u-models td:not(:first-child) { white-space: nowrap; }
+  /* Uptime tab: same group tabs as statistics, its own panel switch. */
+  .uptime-panel { display: none; margin-top: 14px; }
+  .uptime-panel.active { display: block; }
+  /* Session dialog: the pager shares the action row with "Закрыть", so a short
+     table keeps no separate pager block. */
+  #dlg-all-sessions .dialog-actions { justify-content: space-between; align-items: center; gap: 12px; }
+  #all-sessions-pager { display: flex; align-items: center; gap: 8px; }
   .sort-arrow { display: inline-grid; place-items: center; width: 1em; margin-left: 4px; color: var(--muted); font-size: 11px; }
   /* 24 fixed columns so an idle hour still leaves a visible slot. */
   .hour-chart { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); align-items: end; gap: 3px; height: 150px; margin-top: 8px; }
@@ -395,6 +499,9 @@
   .search-clear { position: absolute; right: 4px; top: 4px; min-height: 30px; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); }
   .search-clear svg { display: block; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
   .search-clear:hover:not(:disabled) { background: transparent; border-color: transparent; color: var(--text); }
+  /* Keep the keyboard ring inside the 30px square: offset outward it painted a
+     second pill around the icon and read as a separate button. */
+  .search-clear:focus-visible, .search-filter:focus-visible { outline-offset: -1px; border-radius: 6px; }
   .search-filter { position: absolute; right: 34px; top: 4px; min-height: 30px; width: 30px; padding: 0; border: 0; background: transparent; color: var(--muted); }
   .search-filter svg { display: block; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .search-filter:hover:not(:disabled), .search-filter[aria-expanded="true"], .search-filter.is-active { background: transparent; border-color: transparent; color: var(--accent); }
@@ -404,7 +511,9 @@
   /* Logs filter: three tabs on top, a paged facet list below, controls at the
      bottom. The list scrolls; the tabs and footer stay put. */
   .log-filter-menu { width: min(300px, calc(100vw - 16px)); gap: 6px; }
-  .log-filter-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 2px; border-radius: 8px; background: var(--surface-inset); }
+  /* auto-fit so two tabs (chains/Models filter) fill the row as evenly as three
+     (logs); the fixed three-column track left a gap after "Теги". */
+  .log-filter-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; padding: 2px; border-radius: 8px; background: var(--surface-inset); }
   .log-filter-tabs button { min-height: 28px; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; }
   .log-filter-tabs button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
   .log-filter-tabs button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
@@ -414,6 +523,8 @@
   .log-facet-option:hover { background: var(--surface-hover); }
   .log-facet-option span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .log-facet-footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  /* Tags tab: paging either side of the search and registry buttons. */
+  .log-facet-footer.is-tags { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .log-facet-footer button { display: inline-grid; place-items: center; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
   .log-facet-footer button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .log-facet-footer button:hover:not(:disabled), .log-facet-footer button[aria-pressed="true"] { background: var(--surface-hover); color: var(--accent); }
@@ -429,6 +540,25 @@
   .search-menu-item.danger { color: var(--danger); }
   .filter-bar { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
   .providers-toolbar { align-items: center; }
+  /* Provider table: the URL column takes whatever the name and the edit icon
+     leave, and the inner span truncates only when it really overflows that
+     column. A fixed character cap ellipsised URLs that still had room. */
+  #providers th:nth-child(2), #providers td:nth-child(2) { width: 100%; }
+  /* A URL is one long word, so its min-content width is the whole string and the
+     cell refuses to shrink; `max-width: 0` takes the content out of the sizing
+     and lets the span ellipsise only when the column is actually too narrow. */
+  #providers td:nth-child(2) { max-width: 0; overflow: hidden; }
+  #providers th:not(:nth-child(2)), #providers td:not(:nth-child(2)) { white-space: nowrap; }
+  #providers .provider-links { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 6px; }
+  #providers .provider-links:empty { display: none; }
+  #providers .provider-url { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The actions cell stays a table cell: `display: flex` on a `td` takes it out
+     of the table layout, which stretched the row and pushed the button away. */
+  #providers td.provider-actions { text-align: right; }
+  #providers .provider-actions .icon-action { display: inline-flex; align-items: center; gap: 5px; width: auto; padding: 0 9px; }
+  #providers .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-height: 28px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); }
+  #providers .icon-action:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
+  #providers .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .filter-result { color: var(--muted); font-size: 12px; white-space: nowrap; }
   #dlg-confirm { width: min(440px, calc(100vw - 28px)); }
   .confirm-message { margin: 0; color: var(--text); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -526,7 +656,7 @@
      card, and a hover target on the whole label blocked the input under it. */
   .field-hint-layer {
     position: fixed;
-    z-index: 60;
+    z-index: 90; /* the filter menu is a top layer at 70: a hint must sit above it */
     max-width: min(280px, calc(100vw - 24px));
     padding: 7px 9px;
     border: 1px solid var(--border-strong);
@@ -582,10 +712,22 @@
   /* The name gets the room the short numeric columns leave, and wraps instead
      of being cut when the window is narrow. */
   .session-name { display: block; cursor: copy; overflow-wrap: anywhere; }
-  /* The name absorbs the width the short numeric columns leave free; the
-     numeric headers stay on one line instead of wrapping into a two-line block. */
-   #u-sessions table th:first-child, #u-sessions table td:first-child, #all-sessions-table table th:first-child, #all-sessions-table table td:first-child { width: 100%; }
-   #u-sessions table th:not(:first-child), #u-sessions table td:not(:first-child), #all-sessions-table table th:not(:first-child), #all-sessions-table table td:not(:first-child) { white-space: nowrap; }
+  /* Long session names used to spill over the numeric columns and print on top
+     of them. A fixed layout with explicit tracks gives the name its share and
+     keeps every number in its own cell; the name wraps, numbers never do. */
+  #u-sessions table, #all-sessions-table table { width: 100%; table-layout: fixed; }
+  #u-sessions table th:first-child, #u-sessions table td:first-child,
+  #all-sessions-table table th:first-child, #all-sessions-table table td:first-child { width: 34%; }
+  #u-sessions table th:nth-child(2), #u-sessions table td:nth-child(2),
+  #all-sessions-table table th:nth-child(2), #all-sessions-table table td:nth-child(2) { width: 12%; }
+  #u-sessions table th:nth-child(3), #u-sessions table td:nth-child(3),
+  #all-sessions-table table th:nth-child(3), #all-sessions-table table td:nth-child(3) { width: 20%; }
+  #u-sessions table th:nth-child(4), #u-sessions table td:nth-child(4),
+  #all-sessions-table table th:nth-child(4), #all-sessions-table table td:nth-child(4) { width: 15%; }
+  #u-sessions table th:last-child, #u-sessions table td:last-child,
+  #all-sessions-table table th:last-child, #all-sessions-table table td:last-child { width: 19%; }
+  #u-sessions table th:not(:first-child), #u-sessions table td:not(:first-child),
+  #all-sessions-table table th:not(:first-child), #all-sessions-table table td:not(:first-child) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
    .sessions-empty { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
    .sessions-empty-icon { width: clamp(100px, 16vw, 164px); height: auto; fill: none; stroke: currentColor; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; opacity: .42; }
    .sessions-empty strong { font-size: 15px; font-weight: 550; }
@@ -670,6 +812,9 @@
   .opencode-model { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
   .opencode-model strong { color: var(--text); font-size: 12px; }
   .opencode-model span { color: var(--muted); font-size: 11px; }
+  /* `display: inline-flex` above beats the hidden attribute, and the preview
+     hides chips past the second row. */
+  .opencode-model[hidden] { display: none; }
   .opencode-panel .integration-skill-card { margin-top: 16px; }
   .model-context { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .model-warning { color: var(--warning); font-size: 11px; white-space: nowrap; cursor: help; }

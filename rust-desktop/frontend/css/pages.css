@@ -13,6 +13,18 @@
   #dlg-all-sessions { width: min(900px, calc(100vw - 28px)); }
   #dlg-all-sessions .dialog-body { max-height: min(560px, calc(100vh - 180px)); overflow: auto; }
   #dlg-integrations-advanced { width: min(620px, calc(100vw - 28px)); }
+  /* Skill dialog: two tabs, so the shared three-column strip would leave a gap. */
+  #dlg-integrations-advanced .log-filter-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 14px; }
+  .skills-panel[hidden] { display: none; }
+  /* A skills folder holds a dozen entries; the list scrolls inside the dialog
+     instead of growing it past the window. */
+  .skills-panel { display: grid; gap: 8px; max-height: min(58vh, 440px); overflow: auto; padding-right: 2px; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  #dlg-integrations-advanced .skill-card { padding: 10px 12px; gap: 6px; }
+  #dlg-integrations-advanced .skill-card-head { align-items: baseline; }
+  /* A description is a paragraph of prose in the frontmatter; two lines say what
+     the skill is for, the whole thing would push every other skill out of view. */
+  #dlg-integrations-advanced .skill-card p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  #dlg-integrations-advanced .skill-card .row { align-items: center; }
   .skill-card { display: grid; gap: 10px; padding: 14px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 10px; background: var(--surface-soft); }
   .skill-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .skill-card h4 { margin: 0; }

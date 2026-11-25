@@ -2,9 +2,9 @@ use super::*;
 
 const IMAGE_SKILL: &str = include_str!("../../../../skills/image-generation/SKILL.md");
 
-fn image_skill_path(state: &AppState) -> PathBuf {
+fn skills_dir(state: &AppState) -> PathBuf {
     if let Some(path) = std::env::var_os("PP_OPENCODE_SKILLS_DIR") {
-        return PathBuf::from(path).join("image-generation/SKILL.md");
+        return PathBuf::from(path);
     }
     dirs::config_dir()
         .unwrap_or_else(|| {
@@ -14,7 +14,86 @@ fn image_skill_path(state: &AppState) -> PathBuf {
                 .unwrap_or_else(|| std::path::Path::new("."))
                 .to_path_buf()
         })
-        .join("opencode/skills/image-generation/SKILL.md")
+        .join("opencode/skills")
+}
+
+fn image_skill_path(state: &AppState) -> PathBuf {
+    skills_dir(state).join("image-generation/SKILL.md")
+}
+
+/// Minimal frontmatter reader: OpenCode only needs `name` and `description` as
+/// top-level keys, so a YAML dependency would be more than this list needs.
+pub(crate) fn skill_frontmatter(content: &str, folder: &str) -> (String, String) {
+    let mut name = String::new();
+    let mut description = String::new();
+    let mut lines = content.lines();
+    if lines.next().map(str::trim) != Some("---") {
+        return (folder.to_string(), String::new());
+    }
+    for line in lines {
+        let line = line.trim();
+        if line == "---" {
+            break;
+        }
+        // Keys a description may wrap onto its own line are ignored.
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = value.trim().trim_matches(|c| c == '"' || c == '\'');
+        match key.trim() {
+            "name" if !value.is_empty() => name = value.to_string(),
+            "description" if !value.is_empty() => description = value.to_string(),
+            _ => {}
+        }
+    }
+    (
+        if name.is_empty() {
+            folder.to_string()
+        } else {
+            name
+        },
+        description,
+    )
+}
+
+/// Every skill folder under `root` that has a readable `SKILL.md`, sorted by
+/// name. Kept path-in, path-out so a test can point it at a temp folder.
+pub(crate) fn list_skills(root: &std::path::Path) -> Vec<Value> {
+    let mut skills = Vec::new();
+    let Ok(entries) = fs::read_dir(root) else {
+        return skills;
+    };
+    for entry in entries.flatten() {
+        let folder = entry.file_name().to_string_lossy().to_string();
+        if folder.starts_with('.') || !entry.path().is_dir() {
+            continue;
+        }
+        let path = entry.path().join("SKILL.md");
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let (name, description) = skill_frontmatter(&content, &folder);
+        skills.push(json!({
+            "folder": folder,
+            "name": name,
+            "description": description,
+            "path": path,
+            "bundled": folder == "image-generation",
+        }));
+    }
+    skills.sort_by(|a, b| {
+        let key = |v: &Value| v["name"].as_str().unwrap_or("").to_lowercase();
+        key(a).cmp(&key(b))
+    });
+    skills
+}
+
+pub(crate) async fn skills_get(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !authorized(&state, &headers) {
+        return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
+    }
+    let root = skills_dir(&state);
+    Json(json!({ "root": root, "skills": list_skills(&root) })).into_response()
 }
 
 fn image_skill_status(state: &AppState) -> (PathBuf, bool, bool) {

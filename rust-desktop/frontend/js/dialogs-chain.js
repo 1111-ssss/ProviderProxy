@@ -7,7 +7,7 @@ let pickFilters = new Set()
 
 function openModelDialog(name = null) {
   const src = name ? cfg.models[name] : null
-  draft = { original: name, enabled: src?.enabled !== false, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [] }
+  draft = { original: name, enabled: src?.enabled !== false, upstreams: src ? JSON.parse(JSON.stringify(src.upstreams ?? [])) : [], tags: [...(src?.tags ?? [])] }
   dlgModel.returnValue = ""
     $("dm-title").textContent = name ? "Изменить цепочку" : "Добавить цепочку"
   $("dm-name").value = name ?? ""
@@ -16,6 +16,7 @@ function openModelDialog(name = null) {
   chainProviderFilter = ""
   filters.delete("dm-pick-list")
   pickFilters.clear()
+  tagPickerState.delete("dm-tags")
   renderModelDialog()
   dlgModel.showModal()
 }
@@ -23,6 +24,9 @@ function openModelDialog(name = null) {
 function renderModelDialog() {
   const ups = draft.upstreams
   const provNames = Object.keys(cfg.providers)
+
+  $("dm-tags").innerHTML = tagPickerHtml(draft.tags, "dm-tags")
+  wireTagPicker("dm-tags", () => draft.tags, (tags) => (draft.tags = tags), renderModelDialog)
 
   $("dm-chain").innerHTML = ups.length
     ? ups.map((u, i) => `
@@ -37,8 +41,6 @@ function renderModelDialog() {
           </div>
         </div>`).join("")
     : emptyInlineHtml("Цепочка пуста — выбери модель ниже")
-  // Columns follow the pane width and collapse if the rendered model label clips.
-  applyChainColumns($("dm-chain"))
 
   const on = (a, fn) => $("dm-chain").querySelectorAll(`[data-a="${a}"]`).forEach((b) => (b.onclick = () => fn(+b.dataset.i)))
   on("up", (i) => { const u = draft.upstreams; [u[i - 1], u[i]] = [u[i], u[i - 1]]; renderModelDialog() })
@@ -193,7 +195,9 @@ $("dm-form").addEventListener("submit", (e) => {
 dlgModel.addEventListener("close", () => {
   if (dlgModel.returnValue !== "save") return
   const name = $("dm-name").value.trim()
+  const tags = draft.tags?.length ? [...new Set(draft.tags)] : []
   cfg.models[name] = { ...(draft.enabled ? {} : { enabled: false }), upstreams: draft.upstreams }
+  if (tags.length) cfg.models[name].tags = tags
   if (draft.original && draft.original !== name) delete cfg.models[draft.original]
   save(); renderModels(); renderOpenCode()
 })

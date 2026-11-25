@@ -50,14 +50,25 @@ function showFieldHint(button, html) {
   const anchor = button.getBoundingClientRect()
   const box = fieldHint.getBoundingClientRect()
   const margin = 8
-  // Beside the button, not under it: the field it explains sits right below,
-  // and a hint on top of the input still hides what the user is typing.
-  let left = anchor.right + 8
-  if (left + box.width > window.innerWidth - margin) left = anchor.left - box.width - 8
-  if (left < margin) {
-    left = Math.max(margin, Math.min(anchor.left, window.innerWidth - box.width - margin))
+  // Above, then below, and only then beside. Placed beside, a hint on a button
+  // in a toolbar covered the neighbouring control ("Очистить" printed on top of
+  // "Добавить"); above or below the button it never sits on another control.
+  const centered = Math.max(margin, Math.min(anchor.left + anchor.width / 2 - box.width / 2, window.innerWidth - box.width - margin))
+  const above = anchor.top - box.height - 8
+  const below = anchor.bottom + 8
+  let top
+  let left = centered
+  if (above >= margin) {
+    top = above
+  } else if (below + box.height <= window.innerHeight - margin) {
+    top = below
+  } else {
+    // No vertical room (a short window): fall back to the side of the button.
+    left = anchor.right + 8
+    if (left + box.width > window.innerWidth - margin) left = anchor.left - box.width - 8
+    left = Math.max(margin, Math.min(left, window.innerWidth - box.width - margin))
+    top = Math.max(margin, Math.min(anchor.top + anchor.height / 2 - box.height / 2, window.innerHeight - box.height - margin))
   }
-  const top = Math.max(margin, Math.min(anchor.top + anchor.height / 2 - box.height / 2, window.innerHeight - box.height - margin))
   fieldHint.style.top = `${top}px`
   fieldHint.style.left = `${left}px`
 }
@@ -328,8 +339,10 @@ let pmProviderFilter = ""
 let modelSearch = ""
 // Checkbox filters: an empty set shows everything, any picked value narrows.
 let chainFilters = new Set() // active | disabled | empty
+let chainTags = new Set()
 let directModelSearch = ""
 let directFilters = new Set() // active | disabled
+let directTags = new Set()
 
 function syncFilterButton(id, filters) {
   const button = $(id)
@@ -339,6 +352,12 @@ function toggleFilter(buttonId, filters, value) {
   if (filters.has(value)) filters.delete(value)
   else filters.add(value)
   syncFilterButton(buttonId, filters)
+}
+/// Tag picks are live (no drag staging here), so the button state is the only
+/// extra bookkeeping.
+function toggleTagFilter(set, value) {
+  if (set.has(value)) set.delete(value)
+  else set.add(value)
 }
 
 const modelDetails = (provider, id) => cfg.providers[provider]?.modelInfo?.[id] ?? null
@@ -436,6 +455,7 @@ const appSettings = () => {
   settings.autoRestart ??= false
   settings.autostart ??= false
   settings.autostartTray ??= false
+  settings.tagCategories ??= false
   return settings
 }
 const tauriInvoke = (command, args) => {
@@ -526,6 +546,46 @@ function flash(ok, msg) {
   flash.t = setTimeout(() => (s.style.display = "none"), 2500)
 }
 
+/// A new authToken must be saved under the token the server still knows. Swapping
+/// the local copy before the PUT made the save itself a 401, and every request
+/// after it too: the GUI locked itself out of its own config.
+let pendingAuth = null
+function setAuthToken(next) {
+  pendingAuth = { next, configured: Boolean(cfg.authTokenConfigured) }
+  if (next) {
+    cfg.authToken = next
+    delete cfg.authTokenConfigured
+  } else {
+    delete cfg.authToken
+    delete cfg.authTokenConfigured
+  }
+  save()
+}
+function settlePendingAuth(saved) {
+  if (!pendingAuth) return
+  const { next, configured } = pendingAuth
+  pendingAuth = null
+  if (saved) {
+    token = next
+    localStorage.setItem("pp_token", token)
+    // The server hands the token back redacted; mirror that so the plain-text
+    // field never shows it and the next save keeps it without re-sending it.
+    cfg.authToken = ""
+    if (next) cfg.authTokenConfigured = true
+    else delete cfg.authTokenConfigured
+    return renderSettings()
+  }
+  // The server never took the change, so the form must not claim it did.
+  if (configured) {
+    cfg.authToken = ""
+    cfg.authTokenConfigured = true
+  } else {
+    delete cfg.authToken
+    delete cfg.authTokenConfigured
+  }
+  renderSettings()
+}
+
 let saveT
 function modelHasLocalReference(provider, id) {
   if (Object.values(cfg.models ?? {}).some((def) => (def?.upstreams ?? []).some((upstream) => upstream.provider === provider && upstream.model === id))) return true
@@ -545,6 +605,9 @@ function cleanupModelMetadata() {
 }
 let configDirty = false
 let saveSeq = 0
+// Saves are serialized: two PUTs in flight while a new authToken is being
+// installed would let the older one arrive after the switch and 401 itself.
+let saveChain = Promise.resolve()
 function save(silent = false) {
   configDirty = true
   // Only the newest save may clear the dirty flag: an older response must not
@@ -556,17 +619,21 @@ function save(silent = false) {
   cleanupModelMetadata()
   clearTimeout(saveT)
   debugLog("save-scheduled")
-  saveT = setTimeout(async () => {
-    debugLog("save-request")
-    const r = await api("/api/config", { method: "PUT", body: JSON.stringify(cfg) })
-    if (!r.ok) {
-      debugLog("save-failed", { status: r.status })
-      return flash(false, apiErrorMessage(await r.json().catch(() => ({})), `HTTP ${r.status}`))
-    }
-    if (seq === saveSeq) configDirty = false
-    const j = await r.json().catch(() => ({}))
-    debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
-    if (j.opencodeSynced === false) return flash(false, "сохранено, но Opencode не обновлен — проверь путь и вкладку «Логи»")
-    if (!silent) flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
+  saveT = setTimeout(() => {
+    saveChain = saveChain.then(async () => {
+      debugLog("save-request")
+      const r = await api("/api/config", { method: "PUT", body: JSON.stringify(cfg) })
+      if (!r.ok) {
+        debugLog("save-failed", { status: r.status })
+        settlePendingAuth(false)
+        return flash(false, apiErrorMessage(await r.json().catch(() => ({})), `HTTP ${r.status}`))
+      }
+      settlePendingAuth(true)
+      if (seq === saveSeq) configDirty = false
+      const j = await r.json().catch(() => ({}))
+      debugLog("save-result", { status: r.status, opencodeSynced: j.opencodeSynced, restartRequired: j.restartRequired })
+      if (j.opencodeSynced === false) return flash(false, "сохранено, но Opencode не обновлен — проверь путь и вкладку «Логи»")
+      if (!silent) flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
+    })
   }, 300)
 }

@@ -8,8 +8,6 @@ use std::{
 
 use super::crypto::{decrypt_secret, encrypt_secret};
 
-pub(crate) const LOG_MAX_DEFAULT: usize = 500;
-
 pub(crate) struct Storage {
     pub(crate) path: PathBuf,
     pub(crate) connection: Mutex<Connection>,
@@ -49,7 +47,13 @@ pub(crate) fn open_storage(
          CREATE TABLE IF NOT EXISTS usage_days (\
              day TEXT PRIMARY KEY,\
              payload TEXT NOT NULL\
-         );",
+         );\
+         CREATE TABLE IF NOT EXISTS logs (\
+             id INTEGER PRIMARY KEY AUTOINCREMENT,\
+             created_ms INTEGER NOT NULL,\
+             line TEXT NOT NULL\
+         );\
+         CREATE INDEX IF NOT EXISTS logs_created ON logs(created_ms);",
     )?;
     Ok(Storage {
         path,

@@ -6,8 +6,9 @@ function openOpenCodeModelDialog(provider = null) {
   const selectedProvider = provider ?? names[0] ?? ""
    const definition = cfg.opencodeModels?.[selectedProvider]
    const current = directModelIds(selectedProvider, definition)
-  directDraft = { provider: selectedProvider, models: [...current], all: definition?.all === true, filter: "", providerFilter: "", filters: new Set(), editMode: Boolean(provider) }
+  directDraft = { provider: selectedProvider, models: [...current], all: definition?.all === true, filter: "", providerFilter: "", filters: new Set(), editMode: Boolean(provider), tags: [...(definition?.tags ?? [])] }
   dlgOpenCodeModel.returnValue = ""
+  tagPickerState.delete("dom-tags")
   $("dom-delete").hidden = !directDraft.editMode || !cfg.opencodeModels?.[selectedProvider]
   renderOpenCodeModelDialog()
   dlgOpenCodeModel.showModal()
@@ -15,6 +16,8 @@ function openOpenCodeModelDialog(provider = null) {
 
 function renderOpenCodeModelDialog() {
   const names = Object.keys(cfg.providers)
+  $("dom-tags").innerHTML = tagPickerHtml(directDraft.tags, "dom-tags")
+  wireTagPicker("dom-tags", () => directDraft.tags, (tags) => (directDraft.tags = tags), renderOpenCodeModelDialog)
   const providerQuery = directDraft.providerFilter.trim().toLowerCase()
   const shownProviders = providerQuery ? names.filter((name) => name.toLowerCase().includes(providerQuery)) : names
   $("dom-provider-options").innerHTML = shownProviders.length
@@ -57,7 +60,7 @@ function renderOpenCodeModelDialog() {
     return true
   })
   syncFilterButton("dom-filter-tick", directDraft.filters)
-  $("dom-provider-current").innerHTML = `<strong>${esc(directDraft.provider || "—")}</strong>`
+  $("dom-provider-current").innerHTML = `<strong>${esc(directDraft.provider || "-")}</strong>`
   $("dom-model-list").innerHTML = ids.length
     ? modelCardsHtml(directDraft.provider, ids, { checked: (id) => directDraft.models.includes(id) })
     : emptyInlineHtml(all.length ? "ничего не найдено" : "у провайдера нет выбранных моделей — добавь их на вкладке «Подключения»")
@@ -128,6 +131,10 @@ dlgOpenCodeModel.addEventListener("close", () => {
    const next = { ...prev, models: [...new Set(directDraft.models.filter((id) => !isImageModel(directDraft.provider, id)))] }
    if (directDraft.all) next.all = true
    else delete next.all
+   // Tags stay with the provider entry; an empty pick removes the field.
+   const tags = directDraft.tags?.length ? [...new Set(directDraft.tags)] : []
+   if (tags.length) next.tags = tags
+   else delete next.tags
    cfg.opencodeModels[directDraft.provider] = next
   save(); renderOpencodeModels(); renderOpenCode(); renderProviderModels()
 })

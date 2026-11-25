@@ -22,8 +22,8 @@ use super::{
         export_config, merge_config_secrets, merge_imported_config, public_config, save_config,
     },
     metrics::{
-        cooldown_snapshot, now_ms, persist_usage, push_log, usage_history_view,
-        USAGE_RETENTION_DAYS,
+        cooldown_snapshot, log_count, log_page, now_ms, persist_usage, push_log,
+        usage_history_view, USAGE_RETENTION_DAYS,
     },
     opencode::{default_opencode_config_setting, sync_opencode},
     routing::{add_model_metadata, direct_model_ids, map_headers, string_field, subst},
@@ -33,10 +33,12 @@ use super::{
 mod config;
 mod images;
 mod observe;
+mod uptime;
 
 pub(crate) use config::*;
 pub(crate) use images::*;
 pub(crate) use observe::*;
+pub(crate) use uptime::*;
 
 pub(crate) async fn index() -> impl IntoResponse {
     assets::serve("/")

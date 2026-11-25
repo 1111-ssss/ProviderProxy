@@ -32,14 +32,19 @@ function New-ProviderProxyShortcut {
 }
 
 $RustLauncher = Join-Path $RustDir "launch-windows.ps1"
-$RustArguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$RustLauncher`""
-$RustIcon = Join-Path $RustDir "target\release\provider-proxy-desktop.exe"
+# Run the exe directly when it exists: a shortcut to powershell.exe flashes a
+# console window on every start. The launcher (which builds first) is the
+# fallback only until the binary is there.
+$RustExe = Join-Path $RustDir "target\release\provider-proxy-desktop.exe"
+$RustIcon = $RustExe
 if (-not (Test-Path -LiteralPath $RustIcon)) { $RustIcon = "$env:SystemRoot\System32\SHELL32.dll,3" }
+$RustTarget = if (Test-Path -LiteralPath $RustExe) { $RustExe } else { $PowerShell }
+$RustArguments = if (Test-Path -LiteralPath $RustExe) { "" } else { "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$RustLauncher`"" }
 
 $Shortcuts = @(
     @{
         Name = "Provider Proxy.lnk"
-        Target = $PowerShell
+        Target = $RustTarget
         Arguments = $RustArguments
         WorkingDirectory = $Root
         Icon = $RustIcon

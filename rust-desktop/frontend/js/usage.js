@@ -52,7 +52,7 @@ function statTile(kind, value, label, { wide = false, tip = "" } = {}) {
 // Output tokens per second of real answer time; a dash when nothing streamed.
 const fmtSpeed = (tokens, ms) => {
   const seconds = (Number(ms) || 0) / 1000
-  if (!(seconds > 0)) return "—"
+  if (!(seconds > 0)) return "-"
   return fmtTok((Number(tokens) || 0) / seconds)
 }
 
@@ -262,14 +262,18 @@ function usageCompactTable(obj) {
     const errors = Number(stat.errors) || 0
     const problemRate = requests ? Math.round(((limits + errors) / requests) * 100) : 0
     const tip = `успех ${fmtNum(stat.ok)}, рейт-лимит ${fmtNum(limits)}, ошибки ${fmtNum(errors)}`
+    // Output tokens per second of actual streaming, the same unit as the day
+    // tile. A row that never streamed shows a dash, not 0.0.
+    const speed = fmtSpeed(stat.tokensOut, stat.streamMs)
     return `<tr>
-      <td>${esc(name)}</td>
+      <td data-tip="${esc(name)}">${esc(name)}</td>
       <td class="muted">${fmtNum(requests)}</td>
+      <td class="muted">${speed}${speed === "-" ? "" : "/с"}</td>
       <td class="muted"><span class="problem-rate" style="color:${problemColor(problemRate)}" data-tip="${esc(tip)}">${problemRate}%</span></td>
       <td class="muted">${fmtTok(stat.tokensIn)}<span class="sep">/</span>${fmtTok(stat.tokensOut)}</td>
     </tr>`
   }
-  return `<tr><th>Имя</th><th>Запросы</th><th>Проблемность</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
+  return `<tr><th>Имя</th><th>Запросы</th><th>Ток/с</th><th>Проблемность</th><th>Ток. вход<span class="sep">/</span>выход</th></tr>${rows.map(([name, stat]) => cell(name, stat)).join("")}`
 }
 
 function usageTable(obj, cols) {
@@ -343,7 +347,7 @@ function usageSessionTable(rows, titles) {
 
 function sessionTableHtml(list) {
   if (!list.length) return emptyStateHtml("ничего не найдено")
-  const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—")
+  const when = (ms) => (ms ? new Date(Number(ms)).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "-")
   const cell = ({ id, stat, title }) => `<tr>
       <td><span class="session-name" data-tip="${esc(title || id)}" data-session-copy="${esc(id)}">${esc(title || id)}</span></td>
       <td class="muted">${fmtNum(stat.requests)}</td>
@@ -395,16 +399,30 @@ const renderUsageGroups = () => {
 function renderLifetimePanel(report) {
   const lifetime = report?.lifetimeTokens ?? {}
   // Favourites are by delivered answers, the same unit as the request total.
+  // `rest` is the average of every other entry: "на N% больше, чем в среднем
+  // на остальные" compares the leader to its competitors, not to the whole.
   const favourite = (counts) => {
-    const best = Object.entries(counts ?? {}).sort(([, a], [, b]) => b - a)[0]
-    return best ? best[0] : "—"
+    const entries = Object.entries(counts ?? {}).sort(([, a], [, b]) => b - a)
+    if (!entries.length) return { name: "", requests: 0, above: null }
+    const [name, requests] = entries[0]
+    const others = entries.slice(1)
+    const rest = others.length ? others.reduce((sum, [, value]) => sum + value, 0) / others.length : 0
+    return { name, requests, above: rest > 0 ? Math.round(((requests - rest) / rest) * 100) : null }
+  }
+  const favouriteCard = (icon, value, title) => {
+    const count = value.name ? `${fmtNum(value.requests)} запросов` : "нет данных"
+    const diff = value.above === null ? "" : `<span class="fav-diff">${value.above > 0 ? "+" : ""}${value.above}% к среднему</span>`
+    return `<div class="fav-row"><span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24">${TILE_ICONS[icon] ?? ""}</svg></span><div class="tile-body"><span class="v"${value.name ? ` data-tip="${esc(value.name)}"` : ""}>${esc(value.name || "-")}</span><span class="k">${title} · ${count}${diff ? ` · ${diff}` : ""}</span></div></div>`
   }
   $("u-lifetime-tiles").innerHTML =
+    `<article class="tile tile-favourites">
+      <strong class="fav-title">Любимые за всё время</strong>
+      ${favouriteCard("providers", favourite(lifetime.providers), "провайдер")}
+      ${favouriteCard("models", favourite(lifetime.models), "модель")}
+    </article>` +
     statTile("requests", fmtNum(lifetime.requests), "запросов") +
     statTile("input", fmtTok(lifetime.tokensIn), "токенов вход") +
     statTile("output", fmtTok(lifetime.tokensOut), "токенов выход") +
-    statTile("models", esc(favourite(lifetime.models)), "любимая модель", { wide: true, tip: favourite(lifetime.models) }) +
-    statTile("providers", esc(favourite(lifetime.providers)), "любимый провайдер") +
     statTile("images", fmtNum(lifetime.imagesGenerated), "изображений сгенерировано")
 }
 const usageDayLabel = (date, today) => {
@@ -467,12 +485,15 @@ function renderUsageReport(report) {
   $("u-sessions").innerHTML = usageSessionTable(u.sessions, report.sessionTitles)
   const imageEntries = Object.entries(u.images ?? {}).sort(([, a], [, b]) => (b.requests ?? 0) - (a.requests ?? 0))
   $("u-image-tiles").innerHTML = statTile("images", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.requests ?? 0), 0)), "запросов") + statTile("output", fmtNum(u.imagesGenerated ?? 0), "сгенерировано") + statTile("ok", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.ok ?? 0), 0)), "успешных") + statTile("errors", fmtNum(imageEntries.reduce((n, [, s]) => n + (s.errors ?? 0), 0)), "ошибок")
-  const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : "—"
-  const recent = (u.recentImages ?? []).slice().reverse()
-  $("u-image-recent").innerHTML = `<strong>Последние модели</strong><div class="muted" style="margin-top:6px">Последняя: ${esc(last(u.lastImageModel))} · последняя edit: ${esc(last(u.lastEditImageModel))}</div>${recent.length ? `<div class="provider-model-list" style="margin-top:10px">${recent.slice(0, 10).map((item) => `<span class="opencode-model"><strong>${esc(item.provider)}/${esc(item.model)}</strong><span>${esc(item.mode ?? "generate")} · ${esc(item.status ?? "pending")} · ${esc(item.at ?? "")}</span></span>`).join("")}</div>` : `<div class="muted" style="margin-top:6px">Изображений ещё не запускали.</div>`}`
-  $("u-images").innerHTML = imageEntries.length
-    ? `<tr><th>провайдер</th><th>модель</th><th>запросов</th><th>успешных</th><th>ошибок</th><th>последний HTTP</th></tr>${imageEntries.map(([, s]) => `<tr><td>${esc(s.provider)}</td><td>${esc(s.model)}</td><td class="muted">${s.requests ?? 0}</td><td class="muted">${s.ok ?? 0}</td><td class="muted">${s.errors ?? 0}</td><td class="muted">${s.lastStatus || "—"}</td></tr>`).join("")}`
-    : `<tr><td class="muted">генераций пока не было</td></tr>`
+  // Two answers to two different questions: what generated the last image, and
+  // what edited it. The old block mixed both into one line and listed a history
+  // nobody asked for.
+  const last = (value) => value?.provider && value?.model ? `${value.provider}/${value.model}` : ""
+  const lastCard = (model, label) => model
+    ? `<strong>${label}</strong><span class="last-model-name" data-tip="${esc(model)}">${esc(model)}</span>`
+    : `<strong>${label}</strong><span class="last-model-empty">пока не было</span>`
+  $("u-image-last-generate").innerHTML = lastCard(last(u.lastImageModel), "Последняя модель для генерации")
+  $("u-image-last-edit").innerHTML = lastCard(last(u.lastEditImageModel), "Последняя модель для редактирования")
 }
 
 // The 3-second poll rebuilds every block in place. Between two writes the page

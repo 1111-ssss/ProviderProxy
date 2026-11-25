@@ -13,7 +13,7 @@ use std::process::Command;
 #[cfg(target_os = "windows")]
 pub(crate) fn confirm(title: &str, message: &str) -> bool {
     let script = "$ErrorActionPreference='Stop'; Add-Type -AssemblyName PresentationFramework; $r=[System.Windows.MessageBox]::Show($env:PP_MSG, $env:PP_TITLE, 'YesNo', 'Question'); if ($r -eq 'Yes') { exit 0 } else { exit 1 }";
-    Command::new("powershell.exe")
+    quiet(Command::new("powershell.exe"))
         .args([
             "-NoLogo",
             "-NoProfile",
@@ -35,6 +35,23 @@ pub(crate) fn confirm(title: &str, message: &str) -> bool {
 /// Set when the app is started by the autostart entry. The window stays hidden
 /// and only the tray icon appears, so logging in does not open a GUI window.
 const TRAY_FLAG: &str = "--tray";
+
+/// Console programs (`reg`, `powershell.exe`) open a console window every time a
+/// GUI build calls them: Windows shows it because the parent has no console.
+/// CREATE_NO_WINDOW keeps the call silent, so the app no longer flashes a black
+/// box on start-up and on every autostart lookup.
+#[cfg(target_os = "windows")]
+pub(crate) fn quiet(command: &mut Command) -> &mut Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW)
+}
+
+#[cfg(not(target_os = "windows"))]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))] // Windows-only call sites
+pub(crate) fn quiet(command: &mut Command) -> &mut Command {
+    command
+}
 
 pub(crate) fn started_in_tray() -> bool {
     std::env::args().skip(1).any(|arg| arg == TRAY_FLAG)
@@ -201,7 +218,7 @@ fn read_autostart_preference() -> bool {
 pub(crate) fn autostart_tray_enabled() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("reg")
+        let output = quiet(Command::new("reg"))
             .args([
                 "QUERY",
                 r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -239,7 +256,7 @@ pub(crate) fn autostart_tray_enabled() -> Result<bool, String> {
 pub(crate) fn autostart_enabled() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        let output = Command::new("reg")
+        let output = quiet(Command::new("reg"))
             .args([
                 "QUERY",
                 r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -268,7 +285,7 @@ pub(crate) fn set_autostart(enabled: bool, tray: bool) -> Result<bool, String> {
             let executable = std::env::current_exe().map_err(|error| error.to_string())?;
             let config = autostart_config_path()?;
             let command = autostart_command(&executable, &config, tray);
-            Command::new("reg")
+            quiet(Command::new("reg"))
                 .args([
                     "ADD",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -282,7 +299,7 @@ pub(crate) fn set_autostart(enabled: bool, tray: bool) -> Result<bool, String> {
                 .args(["/f"])
                 .status()
         } else {
-            Command::new("reg")
+            quiet(Command::new("reg"))
                 .args([
                     "DELETE",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -369,7 +386,7 @@ $shortcut.Description = 'Provider Proxy'
 $shortcut.IconLocation = "$env:PP_SHORTCUT_TARGET,0"
 $shortcut.Save()
 "#;
-    let output = Command::new("powershell.exe")
+    let output = quiet(Command::new("powershell.exe"))
         .args([
             "-NoLogo",
             "-NoProfile",

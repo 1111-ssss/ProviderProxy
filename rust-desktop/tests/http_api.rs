@@ -760,6 +760,100 @@ async fn retry_mode_never_hammers_with_a_zero_cooldown() {
     );
 }
 
+/// A client that hangs up must not leave the proxy retrying in the background,
+/// including the non-stream path: a plain request in retry mode used to keep
+/// hitting the provider minutes after the chat was cancelled.
+#[tokio::test]
+async fn retry_mode_stops_a_non_stream_request_when_the_client_hangs_up() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": {"message": "boom"}})))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 1,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    let request = tokio::spawn({
+        let url = proxy.url("/v1/chat/completions");
+        let client = proxy.client.clone();
+        async move {
+            let _ = client.post(url).json(&json!({"model": "chain", "messages": []})).send().await;
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(2500)).await;
+    request.abort();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let after_abort = hits.load(Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    let later = hits.load(Ordering::SeqCst);
+    assert_eq!(
+        after_abort, later,
+        "a plain retry-mode request must stop when the client leaves: {after_abort} then {later}"
+    );
+}
+
+/// A client that hangs up must not leave the proxy retrying in the background,
+/// including the streaming retry path, where the work runs in its own task and
+/// dropping the response body does not cancel it by itself.
+#[tokio::test]
+async fn retry_mode_stops_a_stream_request_when_the_client_hangs_up() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": {"message": "boom"}})))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 1,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    let request = tokio::spawn({
+        let url = proxy.url("/v1/chat/completions");
+        let client = proxy.client.clone();
+        async move {
+            let _ = client
+                .post(url)
+                .json(&json!({"model": "chain", "stream": true, "messages": []}))
+                .send()
+                .await;
+        }
+    });
+    tokio::time::sleep(Duration::from_millis(2500)).await;
+    request.abort();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let after_abort = hits.load(Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    let later = hits.load(Ordering::SeqCst);
+    assert_eq!(
+        after_abort, later,
+        "the streaming retry task must stop once the client is gone: {after_abort} then {later}"
+    );
+}
+
 /// A client that hangs up must not leave the proxy retrying in the background.
 #[tokio::test]
 async fn retry_mode_stops_when_the_client_hangs_up() {
@@ -858,8 +952,11 @@ async fn normal_failover_diagnostics_stay_out_of_the_answer_stream() {
         .await
         .unwrap();
     assert!(
-        logs["lines"].as_array().unwrap().iter().any(|line| {
-            line.as_str().unwrap_or_default().contains("chain (m) — HTTP 502, заблокирован")
+        logs["lines"].as_array().unwrap().iter().any(|row| {
+            row["line"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("chain (m) — HTTP 502, заблокирован")
         }),
         "details stay in the proxy logs, not the assistant response: {logs}"
     );
@@ -979,4 +1076,262 @@ async fn session_active_ms(proxy: &TestProxy, id: &str) -> u64 {
         tokio::time::sleep(Duration::from_millis(25)).await;
     }
     0
+}
+
+#[tokio::test]
+async fn uptime_script_sees_the_model_list_and_its_bars_reach_the_gui() {
+    // The script stands in for a real Python one: same stdout contract, and it
+    // asks for the model list through the API instead of being handed it.
+    let proxy = TestProxy::start(json!({
+        "authToken": "test-token",
+        "providers": {
+            "local": {
+                "baseURL": "http://127.0.0.1:1/v1",
+                "apiKey": "fixture",
+                "models": ["m1", "m2"],
+                "uptimeScript": "import json, os, urllib.request\nurl = os.environ['PP_MODELS_API']\nreq = urllib.request.Request(url, headers={'authorization': 'Bearer ' + os.environ['PP_PROXY_TOKEN']})\nmodels = json.load(urllib.request.urlopen(req))['models']\nprint(json.dumps({'bars': [{'label': m, 'percent': 100} for m in models]}))\n"
+            }
+        },
+        "models": {}
+    }))
+    .await;
+    let auth = HeaderMap::from_iter([(
+        "authorization".parse().unwrap(),
+        "Bearer test-token".parse().unwrap(),
+    )]);
+
+    // Without the token both endpoints stay closed.
+    let open = proxy
+        .client
+        .get(proxy.url("/api/provider-models-list?provider=local"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(open.status(), StatusCode::UNAUTHORIZED);
+
+    let listed: Value = proxy
+        .client
+        .get(proxy.url("/api/provider-models-list?provider=local"))
+        .headers(auth.clone())
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(listed["models"], json!(["m1", "m2"]), "only the selected models");
+    assert_eq!(listed.as_object().unwrap().len(), 2, "names only, nothing else about the provider");
+
+    let missing = proxy
+        .client
+        .get(proxy.url("/api/provider-models-list?provider=nope"))
+        .headers(auth.clone())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+
+    let run: Value = proxy
+        .client
+        .post(proxy.url("/api/uptime/run"))
+        .headers(auth.clone())
+        .json(&json!({ "provider": "local" }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    // No Python on the runner is allowed to fail as "interpreter missing", but a
+    // script that ran and produced nothing usable must not pass silently.
+    match run.get("bars") {
+        Some(bars) => {
+            assert_eq!(bars[0]["label"], "m1");
+            assert_eq!(bars.as_array().unwrap().len(), 2);
+        }
+        None => {
+            let message = run["error"]["message"].as_str().unwrap_or_default();
+            assert!(
+                message.contains("не найден интерпретатор"),
+                "the script ran but did not answer: {message}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn stored_logs_page_back_through_the_day() {
+    let proxy = TestProxy::start(json!({
+        "authToken": "test-token",
+        "providers": { "local": { "baseURL": "http://127.0.0.1:1/v1", "apiKey": "k" } },
+        "models": {}
+    }))
+    .await;
+    let auth = HeaderMap::from_iter([(
+        "authorization".parse().unwrap(),
+        "Bearer test-token".parse().unwrap(),
+    )]);
+    // The boot line is already there; three requests add three more.
+    for _ in 0..3 {
+        let _ = proxy
+            .client
+            .get(proxy.url("/v1/models"))
+            .headers(auth.clone())
+            .send()
+            .await
+            .unwrap();
+    }
+    let first: Value = proxy
+        .client
+        .get(proxy.url("/api/logs?limit=2"))
+        .headers(auth.clone())
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let lines = first["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 2, "one page is capped by limit");
+    assert!(lines[0]["id"].as_i64() > lines[1]["id"].as_i64(), "newest first");
+    let cursor = first["next"].as_i64().expect("more lines are waiting");
+    assert_eq!(cursor, lines[1]["id"].as_i64().unwrap());
+
+    let older: Value = proxy
+        .client
+        .get(proxy.url(&format!("/api/logs?before={cursor}&limit=10")))
+        .headers(auth.clone())
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let older_lines = older["lines"].as_array().unwrap();
+    assert!(!older_lines.is_empty(), "the day continues behind the cursor");
+    assert!(
+        older_lines.iter().all(|row| row["id"].as_i64().unwrap() < cursor),
+        "the cursor is exclusive"
+    );
+    assert!(
+        first["total"].as_u64().unwrap() >= 4,
+        "the pager can count the stored day: {first}"
+    );
+    assert!(first["total"].as_u64().unwrap() <= 5000, "the day is capped");
+}
+
+/// The GUI never sees the key: it gets back an empty `apiKey` plus
+/// `apiKeyConfigured`. Saving the dialog with that field untouched must keep the
+/// stored key, not wipe it.
+#[tokio::test]
+async fn editing_a_provider_with_an_empty_key_field_keeps_the_saved_key() {
+    let upstream = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|headers: HeaderMap, Json(body): Json<Value>| async move {
+            assert_eq!(headers["authorization"], "Bearer kept-key");
+            Json(json!({
+                "model": body["model"],
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1}
+            }))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {"local": {"baseURL": upstream.base_url, "apiKey": "kept-key"}},
+        "models": {"alias": {"upstreams": [{"provider": "local", "model": "m"}]}}
+    }))
+    .await;
+    // What the dialog does: take the public config, change one field, save it
+    // back with the key field still empty.
+    let mut config: Value = proxy
+        .client
+        .get(proxy.url("/api/config"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(config["providers"]["local"]["apiKey"], "");
+    assert_eq!(config["providers"]["local"]["apiKeyConfigured"], true);
+    config["providers"]["local"]["baseURL"] = json!(upstream.base_url);
+    config["providers"]["local"]["homepage"] = json!("https://example.test");
+    let saved = proxy
+        .client
+        .put(proxy.url("/api/config"))
+        .json(&config)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), StatusCode::OK);
+
+    let after: Value = proxy
+        .client
+        .get(proxy.url("/api/config"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(after["providers"]["local"]["apiKeyConfigured"], true);
+    assert_eq!(after["providers"]["local"]["homepage"], "https://example.test");
+
+    // The proof is the live request: the upstream must still get the old key.
+    let answer = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "alias", "messages": [{"role": "user", "content": "hi"}]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(answer.status(), StatusCode::OK);
+}
+
+/// The skills dialog is only useful if it sees what is on disk. The route and
+/// the folder scan are checked through the real HTTP surface.
+#[tokio::test]
+async fn lists_skill_folders_from_the_skills_directory() {
+    let skills = std::env::temp_dir().join(format!(
+        "provider-proxy-http-skills-{}-{}",
+        std::process::id(),
+        rand::random::<u64>()
+    ));
+    for (folder, frontmatter) in [
+        ("image-generation", "name: image-generation\ndescription: bundled\n"),
+        ("debugging", "name: debugging\ndescription: \"Find the cause\"\n"),
+    ] {
+        fs::create_dir_all(skills.join(folder)).unwrap();
+        fs::write(
+            skills.join(folder).join("SKILL.md"),
+            format!("---\n{frontmatter}---\n# body\n"),
+        )
+        .unwrap();
+    }
+    // Only this test reads the variable, so no other test sees a changed root.
+    std::env::set_var("PP_OPENCODE_SKILLS_DIR", &skills);
+    let proxy = TestProxy::start(json!({ "providers": {}, "models": {} })).await;
+    let body: Value = proxy
+        .client
+        .get(proxy.url("/api/skills"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    std::env::remove_var("PP_OPENCODE_SKILLS_DIR");
+    let _ = fs::remove_dir_all(&skills);
+
+    assert_eq!(body["root"], json!(skills));
+    let names: Vec<&str> = body["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|skill| skill["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["debugging", "image-generation"]);
+    assert_eq!(body["skills"][0]["description"], "Find the cause");
+    assert_eq!(body["skills"][1]["bundled"], true);
 }

@@ -85,36 +85,3 @@ function applyPmColumns(box) {
     observer.observe(grid)
   }
 }
-
-/// The chain editor uses a separate row layout, but shares the same sizing
-/// module: try two columns, then collapse to one if a model id gets clipped.
-function applyChainColumns(box) {
-  const fit = () => {
-    const available = box.clientWidth
-    if (!available) return
-    const rows = [...box.querySelectorAll(".chain-row")]
-    const cols = Math.max(1, Math.min(2, Math.floor((available + 8) / 338)))
-    const rowsPerColumn = Math.max(1, Math.ceil(rows.length / cols))
-    box.style.setProperty("--chain-cols", cols)
-    box.style.setProperty("--chain-rows", rowsPerColumn)
-    // Wait for the chosen grid width to apply, then detect actual text clipping.
-    requestAnimationFrame(() => {
-      const clipped = [...box.querySelectorAll(".chain-row")].some((row) => {
-        const name = row.querySelector(".chain-model-label code")
-        return name && name.scrollWidth > name.clientWidth + 1
-      })
-      const finalCols = clipped ? 1 : cols
-      const finalRows = Math.max(1, Math.ceil(rows.length / finalCols))
-      if (box.style.getPropertyValue("--chain-cols") !== String(finalCols)) box.style.setProperty("--chain-cols", finalCols)
-      if (box.style.getPropertyValue("--chain-rows") !== String(finalRows)) box.style.setProperty("--chain-rows", finalRows)
-    })
-  }
-  fit()
-  let observer = pmColumnsObservers.get(box)
-  if (!observer) {
-    observer = new ResizeObserver(() => requestAnimationFrame(fit))
-    pmColumnsObservers.set(box, observer)
-    observer.observe(box)
-  }
-}
-

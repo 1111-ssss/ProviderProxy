@@ -11,28 +11,36 @@ async function deleteProvider(name) {
 }
 
 function renderProviders() {
-  const t = $("providers")
+  const box = $("providers")
   const allEntries = Object.entries(cfg.providers)
   const query = providersFilter.trim().toLowerCase()
+  // baseURL stays searchable even though the row only shows the name.
   const shown = query
     ? allEntries.filter(([name, p]) => `${name} ${p.baseURL ?? ""}`.toLowerCase().includes(query))
     : allEntries
-  t.innerHTML = shown.length ? "<tr><th>имя</th><th>baseURL</th><th>модели</th><th></th></tr>" : ""
-  for (const [name, p] of shown) {
-    const models = p.models ?? []
-    const tr = t.insertRow()
-    tr.innerHTML = `
-      <td><b>${esc(name)}</b>${p.homepage || p.checkin ? `<span class="provider-links">${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" data-tip="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" data-tip="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}</span>` : ""}</td>
-      <td class="muted">${esc(p.baseURL ?? "")}</td>
-      <td class="muted">${models.length}</td>
-      <td class="provider-actions">
-        <button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button>
-      </td>`
-    if (p.homepage) tr.querySelector('[data-a="homepage"]').onclick = () => openUrl(p.homepage)
-    if (p.checkin) tr.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
-    tr.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(name)
+  // A row carries the name, its actions and the URL it points at; the model
+  // count lives in the dialog, so a long list stays one line per provider.
+  box.innerHTML = shown.length
+    ? `<tr><th>имя</th><th>baseURL</th><th></th></tr>${shown
+        .map(([name, p]) => `<tr data-provider="${esc(name)}">
+        <td><b>${esc(name)}</b><span class="provider-links">
+          ${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" data-tip="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}
+          ${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" data-tip="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}
+          ${p.uptimeScript ? `<button type="button" class="icon-action" data-a="uptime" data-tip="Аптайм моделей" aria-label="Аптайм моделей"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"></path></svg></button>` : ""}
+        </span></td>
+        <td class="muted"><span class="provider-url" data-tip="${esc(p.baseURL ?? "")}">${esc(p.baseURL ?? "")}</span></td>
+        <td class="provider-actions"><button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button></td>
+      </tr>`)
+        .join("")}`
+    : ""
+  for (const row of box.querySelectorAll("tr[data-provider]")) {
+    const p = cfg.providers[row.dataset.provider]
+    if (p?.homepage) row.querySelector('[data-a="homepage"]').onclick = () => openUrl(p.homepage)
+    if (p?.checkin) row.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
+    if (p?.uptimeScript) row.querySelector('[data-a="uptime"]').onclick = () => openUptimeDialog(row.dataset.provider)
+    row.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(row.dataset.provider)
   }
-  // Clicking the checkin button must also cover providers the table filter hides:
+  // Clicking the checkin button must also cover providers the filter hides:
   // the button is about every configured checkin, not what is on screen.
   $("p-checkins").style.display = allEntries.some(([, p]) => p.checkin) ? "" : "none"
   if (!shown.length) {
@@ -46,15 +54,36 @@ $("p-checkins").onclick = () => {
   for (const p of Object.values(cfg.providers)) if (p.checkin) openUrl(p.checkin)
 }
 
+/// One chip per tag when the setting is on: a tag list doubles as a category
+/// row, so a narrow screen gets the same filter as the flyout without a dialog.
+function renderTagCategoryBar(id, selected, onPick) {
+  const box = $(id)
+  box.hidden = !appSettings().tagCategories
+  if (box.hidden) {
+    box.innerHTML = ""
+    return
+  }
+  const names = tagRegistryNames()
+  box.innerHTML = names.length
+    ? names.map((tag) => `<button type="button" class="tag-chip tag-toggle${selected.has(tag) ? " is-on" : ""}" data-tag="${esc(tag)}" aria-pressed="${selected.has(tag)}" style="--tag-color:${tagColor(tag)}">${esc(tag)}</button>`).join("")
+    : `<span class="muted">тегов пока нет — добавь их в цепочке или модели</span>`
+  box.querySelectorAll("[data-tag]").forEach((chip) => (chip.onclick = () => onPick(chip.dataset.tag)))
+}
+
 function renderModels() {
   const box = $("models")
   box.innerHTML = ""
   syncFilterButton("m-search-filter", chainFilters)
+  renderTagCategoryBar("m-tag-bar", chainTags, (tag) => {
+    toggleTagFilter(chainTags, tag)
+    renderModels()
+  })
   const query = modelSearch.trim().toLowerCase()
   const allEntries = Object.entries(cfg.models)
   const entries = allEntries
     .filter(([name]) => !query || name.toLowerCase().includes(query))
     .filter(([, def]) => {
+      if (!tagFilterMatches(def?.tags, chainTags)) return false
       if (!chainFilters.size) return true
       return [...chainFilters].some((kind) =>
         kind === "active" ? def?.enabled !== false
@@ -72,7 +101,7 @@ function renderModels() {
     <div class="model-card-head">
         <b class="model-title">${esc(name)}</b>
         <div class="model-badges">
-          ${ups.length ? "" : `<span class="pill empty">пусто</span>`}${chainContextBadge(ups)}
+          ${ups.length ? "" : `<span class="pill empty">пусто</span>`}${chainContextBadge(ups)}${tagChipsHtml(def.tags)}
         </div>
         <div class="head-controls">
           <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" data-tip="${enabled ? "Убрать цепочку из публикации" : "Вернуть цепочку в публикацию"}" aria-label="${enabled ? "Активна" : "Скрыта"}">
@@ -191,27 +220,67 @@ const DEFAULT_OPENCODE_PROVIDER = "provider-proxy"
 let opencodeConfigDefault = DEFAULT_OPENCODE_CONFIG
 
  const previewExpanded = new Set()
+// Two rows fit without turning the card into a list; everything past them needs
+// the toggle. A fixed chip count could not do that: chips wrap differently at
+// every window width.
+const previewEntries = new Map()
+let previewFitObserver = null
  function renderOpenCodePreview(id, entries) {
    const box = $(id)
+   previewEntries.set(id, entries)
    if (!entries.length) {
      box.innerHTML = `<span class="muted">Включи хотя бы одну модель или цепочку — она появится здесь после синхронизации.</span>`
      return
    }
    const expanded = previewExpanded.has(id)
-   const visible = expanded ? entries : entries.slice(0, 10)
-   box.innerHTML = visible.map(([name, suffix]) => `<div class="opencode-model"><strong>${esc(name)}</strong>${suffix ? `<span>(${esc(suffix)})</span>` : ""}</div>`).join("")
-   if (entries.length > 15) {
-     const toggle = document.createElement("button")
-     toggle.type = "button"
-     toggle.className = "opencode-preview-toggle"
-     toggle.innerHTML = expanded ? "↑ Свернуть список" : `↓ Показать ещё ${entries.length - 10}`
-     toggle.onclick = () => {
-       if (expanded) previewExpanded.delete(id)
-       else previewExpanded.add(id)
-       renderOpenCode()
+   box.innerHTML = entries.map(([name, suffix]) => `<div class="opencode-model"><strong>${esc(name)}</strong>${suffix ? `<span>(${esc(suffix)})</span>` : ""}</div>`).join("")
+   fitPreviewRows(id, expanded)
+   // Hiding rows changes the height but not the width, so re-fitting on a width
+   // change cannot loop.
+   previewFitObserver?.disconnect()
+   let width = box.clientWidth
+   previewFitObserver = new ResizeObserver(() => {
+     if (box.clientWidth === width) return
+     width = box.clientWidth
+     requestAnimationFrame(() => fitPreviewRows(id, previewExpanded.has(id)))
+   })
+   previewFitObserver.observe(box)
+ }
+
+ /// Hide the chips that fall below the second row and show the toggle only when
+ /// something is actually hidden behind it.
+ function fitPreviewRows(id, expanded) {
+   const box = $(id)
+   const entries = previewEntries.get(id) ?? []
+   const chips = [...box.querySelectorAll(".opencode-model")]
+   box.querySelector(".opencode-preview-toggle")?.remove()
+   // Measure with every chip visible: a hidden one reports no offset.
+   for (const chip of chips) chip.hidden = false
+   let cutoff = chips.length
+   if (!expanded) {
+     const rows = []
+     for (let index = 0; index < chips.length; index += 1) {
+       const top = chips[index].offsetTop
+       if (!rows.includes(top)) rows.push(top)
+       if (rows.length > 2) {
+         cutoff = index
+         break
+       }
      }
-     box.append(toggle)
    }
+   for (let index = cutoff; index < chips.length; index += 1) chips[index].hidden = true
+   const hidden = entries.length - cutoff
+   if (!expanded && hidden <= 0) return
+   const toggle = document.createElement("button")
+   toggle.type = "button"
+   toggle.className = "opencode-preview-toggle"
+   toggle.innerHTML = expanded ? "↑ Свернуть список" : `↓ Показать ещё ${hidden}`
+   toggle.onclick = () => {
+     if (expanded) previewExpanded.delete(id)
+     else previewExpanded.add(id)
+     renderOpenCode()
+   }
+   box.append(toggle)
  }
 
  function renderOpenCode() {
@@ -276,6 +345,10 @@ function applyModelColumns(box) {
 function renderOpencodeModels() {
   const box = $("opencode-models")
   syncFilterButton("om-search-filter", directFilters)
+  renderTagCategoryBar("om-tag-bar", directTags, (tag) => {
+    toggleTagFilter(directTags, tag)
+    renderOpencodeModels()
+  })
   const allEntries = Object.entries(cfg.opencodeModels ?? {})
     .filter(([provider]) => cfg.providers[provider])
     .sort(([, a], [, b]) => Number(a?.enabled === false) - Number(b?.enabled === false))
@@ -283,6 +356,7 @@ function renderOpencodeModels() {
   const entries = allEntries
     .filter(([provider, def]) => !query || provider.toLowerCase().includes(query) || directModelIds(provider, def).some((id) => id.toLowerCase().includes(query)))
     .filter(([, def]) => {
+      if (!tagFilterMatches(def?.tags, directTags)) return false
       if (!directFilters.size) return true
       return [...directFilters].some((kind) =>
         kind === "active" ? def?.enabled !== false : def?.enabled === false)
@@ -295,7 +369,7 @@ function renderOpencodeModels() {
            return `<div class="card direct-model-card${enabled ? "" : " chain-disabled"}" data-provider="${esc(provider)}">
             <div class="model-card-head">
               <b class="model-title">${esc(provider)}</b>
-              <div class="model-badges"></div>
+              <div class="model-badges">${tagChipsHtml(def?.tags)}</div>
               <div class="head-controls">
                 <label class="chain-toggle ${enabled ? "is-on" : "is-off"}" data-tip="${enabled ? "Убрать модели провайдера из публикации" : "Вернуть модели провайдера в публикацию"}" aria-label="${enabled ? "Активен" : "Скрыт"}">
                   <input type="checkbox" data-a="toggle" ${enabled ? "checked" : ""}>
@@ -345,8 +419,9 @@ function renderSettings() {
   $("s-pending-buffer").value = String(cfg.pendingBufferBytes ?? 8388608)
   $("s-retry-forever").checked = cfg.retryForever === true
   syncResetVisibility()
-  $("s-version").textContent = cfg.appVersion ?? "—"
+  $("s-version").textContent = cfg.appVersion ?? "-"
   $("s-theme-current").textContent = themeLabel(settings.theme)
+  $("s-tag-categories").checked = settings.tagCategories
   $("s-auto-update").checked = settings.autoUpdate
   $("s-auto-restart").checked = settings.autoRestart
   $("s-auto-restart").disabled = !settings.autoUpdate
@@ -726,45 +801,118 @@ dlgModelSettings.addEventListener("close", () => {
 })
 
 const dlgImageSettings = $("dlg-image-settings")
-const imageSkillStatusNode = $("image-skill-status")
-const imageSkillPathNode = $("image-skill-path")
-const imageSkillInstallButton = $("image-skill-install")
+const dlgSkills = $("dlg-integrations-advanced")
+// The skill has two homes: the Opencode card is the primary one, the "Скиллы"
+// dialog only lists what is installed. Both read the same state, so every node
+// carrying the shared class is updated in one place.
+const skillStatusNodes = [...document.querySelectorAll(".image-skill-status")]
+const skillPathNodes = [...document.querySelectorAll(".image-skill-path")]
+const skillInstallButtons = [...document.querySelectorAll(".image-skill-install")]
+let imageSkillState = {}
+
 $("integrations-advanced").onclick = () => {
-  $("dlg-integrations-advanced").showModal()
+  dlgSkills.showModal()
+  skillsList = null
+  renderSkillsDialog()
   loadImageSkillStatus()
+  loadSkillsList()
 }
-$("image-skill-settings").onclick = () => {
-  dlgImageSettings.showModal()
-  renderImageSettings()
+for (const button of document.querySelectorAll("[data-skills-tab]")) {
+  button.onclick = () => {
+    for (const other of document.querySelectorAll("[data-skills-tab]")) {
+      const active = other === button
+      other.classList.toggle("active", active)
+      other.setAttribute("aria-selected", String(active))
+    }
+    for (const panel of dlgSkills.querySelectorAll("[data-skills-panel]")) {
+      panel.hidden = panel.dataset.skillsPanel !== button.dataset.skillsTab
+    }
+  }
+}
+// Everything under the skills root, not just the bundled one: the list comes
+// from the backend so a skill added by hand shows up without a restart.
+let skillsList = null
+let skillsError = ""
+
+async function loadSkillsList() {
+  try {
+    const response = await api("/api/skills")
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
+    skillsList = payload.skills ?? []
+    skillsError = ""
+  } catch (error) {
+    skillsList = []
+    skillsError = imageSkillErrorMessage(error.message)
+  }
+  if (dlgSkills.open) renderSkillsDialog()
+}
+
+function renderSkillsDialog() {
+  const box = dlgSkills.querySelector('[data-skills-panel="installed"]')
+  if (!skillsList) {
+    box.innerHTML = `<div class="empty-inline">проверяю…</div>`
+  } else if (!skillsList.length) {
+    box.innerHTML = emptyInlineHtml(skillsError || "в папке skills ничего нет")
+  } else {
+    box.innerHTML = skillsList
+      .map((skill) => {
+        // The bundled skill also answers whether its file matches the built-in copy.
+        // The image skill's own card reports whether its file still matches the
+        // bundled copy; until that request answers, no badge beats a wrong one.
+        const status = skill.bundled && imageSkillState.path
+          ? `<span class="skill-status ${imageSkillState.same ? "is-ok" : "is-warn"}">${imageSkillState.same ? "установлен" : "есть другая версия"}</span>`
+          : ""
+        // The card clamps the description to two lines; a long one stays
+        // readable through the shared hint on hover.
+        const tip = skill.description.length > 140 ? ` data-tip="${esc(skill.description)}"` : ""
+        return `<div class="skill-card"><div class="skill-card-head"><div><h4>${esc(skill.name)}</h4>${skill.description ? `<p${tip}>${esc(skill.description)}</p>` : ""}</div>${status}</div><div class="skill-path">${esc(skill.path)}</div></div>`
+      })
+      .join("")
+  }
+  dlgSkills.querySelector('[data-skills-panel="browse"]').innerHTML = emptyInlineHtml("в разработке")
 }
 $("image-settings-cancel").onclick = () => dlgImageSettings.close()
 
 function renderImageSkillStatus(state = {}) {
-  imageSkillPathNode.textContent = state.path ?? "путь пока неизвестен"
-  imageSkillStatusNode.className = "skill-status" + (state.same ? " is-ok" : state.installed ? " is-warn" : "")
-  imageSkillStatusNode.textContent = state.same ? "установлен" : state.installed ? "есть другая версия" : "не установлен"
-  imageSkillInstallButton.textContent = state.installed && !state.same ? "Обновить скилл" : "Добавить скилл"
+  imageSkillState = state
+  for (const node of skillPathNodes) node.textContent = state.path ?? "путь пока неизвестен"
+  for (const node of skillStatusNodes) {
+    node.className = "skill-status image-skill-status" + (state.same ? " is-ok" : state.installed ? " is-warn" : "")
+    node.textContent = state.same ? "установлен" : state.installed ? "есть другая версия" : "не установлен"
+  }
+  for (const button of skillInstallButtons) {
+    button.textContent = state.installed && !state.same ? "Обновить скилл" : "Добавить скилл"
+  }
+  if (dlgSkills.open) renderSkillsDialog()
 }
 
 async function loadImageSkillStatus() {
-  imageSkillStatusNode.className = "skill-status"
-  imageSkillStatusNode.textContent = "проверяю…"
+  for (const node of skillStatusNodes) {
+    node.className = "skill-status image-skill-status"
+    node.textContent = "проверяю…"
+  }
   try {
     const response = await api("/api/skills/image-generation")
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(apiErrorMessage(payload, `HTTP ${response.status}`))
     renderImageSkillStatus(payload)
   } catch (error) {
-    imageSkillPathNode.textContent = "—"
-    imageSkillStatusNode.className = "skill-status is-warn"
-    imageSkillStatusNode.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
+    for (const node of skillPathNodes) node.textContent = "-"
+    for (const node of skillStatusNodes) {
+      node.className = "skill-status image-skill-status is-warn"
+      node.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
+    }
+    if (dlgSkills.open) renderSkillsDialog()
   }
 }
 
 async function installImageSkill(overwrite = false) {
-  imageSkillInstallButton.disabled = true
-  imageSkillStatusNode.className = "skill-status"
-  imageSkillStatusNode.textContent = "устанавливаю…"
+  for (const button of skillInstallButtons) button.disabled = true
+  for (const node of skillStatusNodes) {
+    node.className = "skill-status image-skill-status"
+    node.textContent = "устанавливаю…"
+  }
   try {
     const response = await api("/api/skills/image-generation", { method: "POST", body: JSON.stringify({ overwrite }) })
     const payload = await response.json().catch(() => ({}))
@@ -778,15 +926,21 @@ async function installImageSkill(overwrite = false) {
     renderImageSkillStatus(payload)
     flash(true, "skill для генерации изображений добавлен ✓")
   } catch (error) {
-    renderImageSkillStatus({ path: imageSkillPathNode.textContent, installed: false, same: false })
-    imageSkillStatusNode.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
+    renderImageSkillStatus({ path: imageSkillState.path, installed: false, same: false })
+    for (const node of skillStatusNodes) node.textContent = `ошибка: ${imageSkillErrorMessage(error.message)}`
     flash(false, `не удалось добавить skill: ${imageSkillErrorMessage(error.message)}`)
   } finally {
-    imageSkillInstallButton.disabled = false
+    for (const button of skillInstallButtons) button.disabled = false
   }
 }
 
-imageSkillInstallButton.onclick = () => installImageSkill()
+for (const button of skillInstallButtons) button.onclick = () => installImageSkill()
+for (const button of document.querySelectorAll(".image-skill-settings")) {
+  button.onclick = () => {
+    dlgImageSettings.showModal()
+    renderImageSettings()
+  }
+}
 
 $("oc-path").onchange = (e) => {
   const value = e.target.value.trim()
@@ -895,6 +1049,12 @@ $("theme-search-clear").onclick = () => {
   $("theme-search").value = ""
   renderThemeDialog()
   $("theme-search").focus()
+}
+$("s-tag-categories").onchange = (e) => {
+  appSettings().tagCategories = e.target.checked
+  renderModels()
+  renderOpencodeModels()
+  save()
 }
 $("s-auto-update").onchange = (e) => {
   appSettings().autoUpdate = e.target.checked
@@ -1026,17 +1186,7 @@ $("s-autostart-tray").onchange = async (e) => {
   await applyAutostart(true, tray, () => (e.target.checked = !tray))
 }
 $("s-auth").onchange = (e) => {
-  const v = e.target.value.trim()
-  if (v) {
-    cfg.authToken = v
-    delete cfg.authTokenConfigured
-  } else {
-    delete cfg.authToken
-    delete cfg.authTokenConfigured
-  }
-  token = v
-  localStorage.setItem("pp_token", v)
-  save()
+  setAuthToken(e.target.value.trim())
 }
 
 $("u-session-search").oninput = (e) => {
@@ -1085,8 +1235,6 @@ function renderAllSessions() {
   const slice = rows.slice(allSessionPage * SESSION_PAGE_SIZE, (allSessionPage + 1) * SESSION_PAGE_SIZE)
   $("all-sessions-count").textContent = ""
   $("all-sessions-table").innerHTML = sessionTableHtml(slice)
-  // One page needs no controls: the drawer only exists while there is a choice.
-  $("all-sessions-drawer").hidden = pages <= 1
   $("all-sessions-pager").innerHTML = pages > 1
     ? `<button type="button" data-page="${allSessionPage - 1}"${allSessionPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${allSessionPage + 1} / ${pages}</span><button type="button" data-page="${allSessionPage + 1}"${allSessionPage === pages - 1 ? " disabled" : ""}>Вперёд</button>`
     : ""
@@ -1103,12 +1251,6 @@ $("u-session-all").onclick = () => {
   $("all-sessions-search").value = ""
   renderAllSessions()
   $("dlg-all-sessions").showModal()
-}
-$("all-sessions-drawer-toggle").onclick = () => {
-  const body = $("all-sessions-pager")
-  const open = body.hidden
-  body.hidden = !open
-  $("all-sessions-drawer-toggle").setAttribute("aria-expanded", String(open))
 }
 $("all-sessions-search").oninput = (e) => {
   allSessionQuery = e.target.value
@@ -1150,20 +1292,26 @@ $("om-search-clear").onclick = () => {
   renderOpencodeModels()
   $("om-search").focus()
 }
-$("m-search-filter").onclick = () => {
-  const options = [["active", "Активные"], ["disabled", "Скрытые"], ["empty", "Пустые"]]
-  openSearchMenu($("m-search-filter"), options.map(([value, label]) => ({
-    label, toggle: true, stayOpen: true, checked: chainFilters.has(value),
-    action: () => { toggleFilter("m-search-filter", chainFilters, value); renderModels() },
-  })))
-}
-$("om-search-filter").onclick = () => {
-  const options = [["active", "Активные"], ["disabled", "Скрытые"]]
-  openSearchMenu($("om-search-filter"), options.map(([value, label]) => ({
-    label, toggle: true, stayOpen: true, checked: directFilters.has(value),
-    action: () => { toggleFilter("om-search-filter", directFilters, value); renderOpencodeModels() },
-  })))
-}
+const chainFilterChecks = () => [["active", "Активные"], ["disabled", "Скрытые"], ["empty", "Пустые"]]
+  .map(([value, label]) => ({ value, label }))
+const directFilterChecks = () => [["active", "Активные"], ["disabled", "Скрытые"]]
+  .map(([value, label]) => ({ value, label }))
+$("m-search-filter").onclick = () => openTagFilterMenu($("m-search-filter"), {
+  checks: chainFilterChecks(),
+  checked: (value) => chainFilters.has(value),
+  tagSet: chainTags,
+  onChecksChange: (value) => { toggleFilter("m-search-filter", chainFilters, value); renderModels() },
+  onTagsChange: (tag) => { toggleTagFilter(chainTags, tag); renderModels() },
+  rerender: () => renderModels(),
+})
+$("om-search-filter").onclick = () => openTagFilterMenu($("om-search-filter"), {
+  checks: directFilterChecks(),
+  checked: (value) => directFilters.has(value),
+  tagSet: directTags,
+  onChecksChange: (value) => { toggleFilter("om-search-filter", directFilters, value); renderOpencodeModels() },
+  onTagsChange: (tag) => { toggleTagFilter(directTags, tag); renderOpencodeModels() },
+  rerender: () => renderOpencodeModels(),
+})
 $("theme-search-filter").onclick = () => {
   openSearchMenu($("theme-search-filter"), [
     { label: "Все темы", checked: !themeOnlyCurrent, action: () => { themeOnlyCurrent = false; renderThemeDialog() } },

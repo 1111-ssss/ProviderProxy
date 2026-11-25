@@ -129,7 +129,8 @@ fn webview2_installed() -> bool {
     ]
     .iter()
     .any(|key| {
-        std::process::Command::new("reg")
+        // Quiet: a GUI build has no console, so `reg` would flash one.
+        platform::quiet(std::process::Command::new("reg"))
             .args(["query", key, "/v", "pv"])
             .output()
             .map(|output| output.status.success() && !output.stdout.is_empty())

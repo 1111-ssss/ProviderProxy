@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     path::PathBuf,
     sync::{Arc, Mutex, RwLock},
     time::Instant,
@@ -29,6 +29,10 @@ pub(crate) struct ProviderUsage {
     pub(crate) tokens_in: u64,
     #[serde(rename = "tokensOut")]
     pub(crate) tokens_out: u64,
+    /// Wall time this provider spent streaming answers. Token speed is derived
+    /// from it, so the provider row shows the same "ток/с" as the day total.
+    #[serde(rename = "streamMs")]
+    pub(crate) stream_ms: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -45,6 +49,9 @@ pub(crate) struct ModelUsage {
     pub(crate) tokens_in: u64,
     #[serde(rename = "tokensOut")]
     pub(crate) tokens_out: u64,
+    /// Same meaning as `ProviderUsage::stream_ms`, per upstream model.
+    #[serde(rename = "streamMs")]
+    pub(crate) stream_ms: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -215,7 +222,6 @@ pub(crate) struct AppState {
     pub(crate) config: Arc<RwLock<Value>>,
     pub(crate) chains: Arc<RwLock<HashMap<String, Vec<Upstream>>>>,
     pub(crate) cooldowns: Arc<Mutex<HashMap<String, Instant>>>,
-    pub(crate) logs: Arc<Mutex<VecDeque<String>>>,
     pub(crate) usage: Arc<Mutex<Usage>>,
     pub(crate) usage_history: Arc<Mutex<HashMap<String, Usage>>>,
     /// Serialized snapshots of the last successful write, so the one-second
@@ -234,7 +240,6 @@ pub(crate) struct AppState {
     pub(crate) image_tasks: Arc<Mutex<HashMap<String, (String, Instant)>>>,
     pub(crate) client: reqwest::Client,
     pub(crate) port: u16,
-    pub(crate) log_max: usize,
 }
 
 pub struct ServerHandle {

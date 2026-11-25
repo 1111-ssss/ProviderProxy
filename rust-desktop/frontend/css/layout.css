@@ -62,16 +62,6 @@
   td, th { padding: 6px 8px 6px 0; text-align: left; vertical-align: middle; }
   /* Column separators: without them a wide table reads as one blob of numbers. */
   table td + td, table th + th { border-left: 1px solid var(--border); padding-left: 12px; }
-  /* The provider table's only long field is baseURL: let it take the free
-     width and keep the count and actions at their content size, so no row has
-     a wide empty cell between a number and the next separator. */
-  #providers th:first-child, #providers td:first-child { width: 1%; white-space: nowrap; }
-  #providers th:nth-child(2), #providers td:nth-child(2) { width: 100%; overflow-wrap: anywhere; }
-  #providers th:nth-child(3), #providers td:nth-child(3) { width: 1%; white-space: nowrap; }
-  /* No width on the actions column: `1%` collapsed it to the flex items'
-     min-content (about 20px) and squeezed the buttons. Auto sizing gives it
-     exactly the icons' width while baseURL keeps the free space. */
-  #providers th:last-child, #providers td:last-child { white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
   .muted { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

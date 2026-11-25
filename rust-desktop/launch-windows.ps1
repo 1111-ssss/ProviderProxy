@@ -35,4 +35,4 @@ if ($NeedsBuild) {
 }
 
 $Argument = "`"$Config`""
-Start-Process -FilePath $Binary -WorkingDirectory $Root -ArgumentList $Argument
+Start-Process -FilePath $Binary -WorkingDirectory $Root -ArgumentList $Argument -WindowStyle Hidden
