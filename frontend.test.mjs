@@ -34,6 +34,21 @@ test("every element id the scripts look up exists in the markup", () => {
   assert.deepEqual(missing, [], "these ids are used by JS but absent from index.html")
 })
 
+test("the update entry sits pinned above Settings, outside the scrolling tab list", () => {
+  // A tab list that scrolls must not carry the update entry: it used to sit
+  // inside .tabs-scroll and showed up right under the last tab group, floating
+  // in the middle of the navigation.
+  const nav = indexHtml.slice(indexHtml.indexOf("<nav"), indexHtml.indexOf("</nav>"))
+  const scroll = nav.slice(nav.indexOf('class="tabs-scroll"'), nav.indexOf('class="tabs-splitter"'))
+  assert.ok(scroll.length > 100, "the scrolling tab list must exist")
+  assert.ok(!scroll.includes("update-nav-button"), "the update entry must not live in the scrolling list")
+  const afterSplitter = nav.slice(nav.indexOf('class="tabs-splitter"'))
+  const update = afterSplitter.indexOf('id="update-nav-button"')
+  const settings = afterSplitter.indexOf('class="settings-nav-button"')
+  assert.ok(update > -1, "the update entry must follow the splitter")
+  assert.ok(update < settings, "the update entry goes above Settings")
+})
+
 test("the desktop app flags its own frame so the window buttons are drawn", () => {
   // The window is undecorated: without this flag the caption bar has no
   // minimize/maximize/close at all, which is what Windows showed. On Windows a
