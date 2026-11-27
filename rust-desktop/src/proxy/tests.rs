@@ -4,9 +4,10 @@ use super::config::{
 };
 use super::metrics::{hour_stat, load_usage, model_stat, now_ms, tally_usage, USAGE_RETENTION_DAYS};
 use super::handlers::{list_skills, skill_frontmatter};
-use super::routing::{build_chains, model_label, with_model};
+use super::opencode::sync_agent_models;
+use super::routing::{build_chains, model_label, rank_chain, with_model};
 use super::server::{shutdown_running_instance, start_server};
-use super::types::{AppState, ProviderUsage, Usage};
+use super::types::{AppState, ProviderUsage, Upstream, Usage};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::{
@@ -55,6 +56,62 @@ fn loads_only_the_last_seven_calendar_days_of_usage() {
     let _ = fs::remove_dir_all(directory);
 }
 
+fn upstream(name: &str, model: &str) -> Upstream {
+    Upstream {
+        name: name.into(),
+        base_url: String::new(),
+        model: model.into(),
+        api_key: String::new(),
+        headers: Default::default(),
+    }
+}
+
+/// The chain is no longer a fixed queue: the position keeps a strong vote, but a
+/// dead first link must give way to a live second one instead of burning every
+/// request on the model the status page already calls broken.
+#[test]
+fn chain_ranking_prefers_priority_then_health_then_last_outcome() {
+    use std::collections::HashMap;
+    let chain = vec![
+        upstream("a", "dead"),
+        upstream("a", "alive"),
+        upstream("b", "unknown"),
+    ];
+    // A healthy chain keeps the user's own order.
+    let healthy: HashMap<String, HashMap<String, f64>> = HashMap::from([(
+        "a".to_string(),
+        HashMap::from([("dead".to_string(), 100.0), ("alive".to_string(), 100.0)]),
+    )]);
+    let order: Vec<String> = rank_chain(&chain, &healthy, &HashMap::new())
+        .into_iter()
+        .map(|upstream| upstream.model)
+        .collect();
+    assert_eq!(order, ["dead", "alive", "unknown"]);
+
+    // 0 % from the status page and a failed last attempt: the live second link
+    // wins, because the first would only answer the same error again.
+    let broken: HashMap<String, HashMap<String, f64>> = HashMap::from([(
+        "a".to_string(),
+        HashMap::from([("dead".to_string(), 0.0), ("alive".to_string(), 100.0)]),
+    )]);
+    let last = HashMap::from([
+        ("a|dead".to_string(), false),
+        ("a|alive".to_string(), true),
+    ]);
+    let order: Vec<String> = rank_chain(&chain, &broken, &last)
+        .into_iter()
+        .map(|upstream| upstream.model)
+        .collect();
+    assert_eq!(order[0], "alive", "a dead first link must sink: {order:?}");
+
+    // No data at all is the middle: the configured order survives.
+    let order: Vec<String> = rank_chain(&chain, &HashMap::new(), &HashMap::new())
+        .into_iter()
+        .map(|upstream| upstream.model)
+        .collect();
+    assert_eq!(order, ["dead", "alive", "unknown"]);
+}
+
 #[test]
 fn builds_chain_and_direct_models_from_config() {
     let config = json!({
@@ -64,12 +121,88 @@ fn builds_chain_and_direct_models_from_config() {
         "models": {
             "proxy-model": { "upstreams": [{ "provider": "a", "model": "a-model" }] }
         },
-        "opencodeModels": { "a": { "all": true, "models": ["direct"] } }
+        "opencodeModels": { "a": { "all": true, "models": ["direct"] } },
+        "opencodeAgentModels": { "explore": "tag:cheap" }
     });
     let chains = build_chains(&config);
     assert_eq!(chains["proxy-model"][0].model, "a-model");
     assert_eq!(chains["a/direct"][0].base_url, "https://a.example/v1");
     assert_eq!(chains["a/new"][0].model, "new");
+    assert!(!chains.contains_key("agent-tag:cheap"));
+}
+
+#[test]
+fn opencode_agent_selections_change_only_helper_models_and_preserve_other_settings() {
+    let mut document = json!({
+        "model": "provider-proxy/main-session-model",
+        "providers": {
+            "provider-proxy": {
+                "models": {
+                    "fast-chain": {},
+                    "vendor/model-v2": {},
+                    "agent-tag:cheap": {}
+                }
+            }
+        },
+        "agents": {
+            "compaction": { "prompt": "keep this", "model": "old/model" },
+            "title": { "temperature": 0.2, "model": "old/title" },
+            "custom": { "model": "keep/custom" }
+        }
+    });
+    sync_agent_models(
+        &mut document,
+        &json!({
+            "opencodeAgentModels": {
+                "compaction": "chain:fast-chain",
+                "explore": "model:vendor/model-v2",
+                "summary": "tag:cheap"
+            }
+        }),
+        "provider-proxy",
+    );
+    assert_eq!(document["model"], "provider-proxy/main-session-model");
+    assert_eq!(document["agents"]["compaction"]["model"], "provider-proxy/fast-chain");
+    assert_eq!(document["agents"]["compaction"]["prompt"], "keep this");
+    assert_eq!(document["agents"]["explore"]["model"], "provider-proxy/vendor/model-v2");
+    assert_eq!(document["agents"]["summary"]["model"], "provider-proxy/agent-tag:cheap");
+    assert_eq!(document["agents"]["title"]["model"], "old/title", "a foreign model is not ours to drop");
+    assert_eq!(document["agents"]["custom"]["model"], "keep/custom");
+
+    sync_agent_models(
+        &mut document,
+        &json!({"opencodeAgentModels": {"compaction": "default"}}),
+        "provider-proxy",
+    );
+    assert_eq!(document["agents"]["compaction"], json!({"prompt": "keep this"}));
+    assert!(document["agents"].get("explore").is_none());
+    assert!(document["agents"].get("summary").is_none());
+    assert_eq!(document["agents"]["title"]["model"], "old/title");
+    assert_eq!(document["agents"]["custom"]["model"], "keep/custom");
+}
+
+#[test]
+fn builds_agent_tag_chain_from_enabled_tagged_models_only() {
+    let config = json!({
+        "providers": {
+            "a": { "baseURL": "https://a.example/v1", "models": ["direct", "hidden"] },
+            "b": { "baseURL": "https://b.example/v1", "models": ["other"] }
+        },
+        "models": {
+            "tagged-chain": { "tags": ["cheap"], "upstreams": [{ "provider": "a", "model": "chain-model" }] },
+            "disabled-chain": { "enabled": false, "tags": ["cheap"], "upstreams": [{ "provider": "a", "model": "disabled" }] },
+            "other-chain": { "tags": ["other"], "upstreams": [{ "provider": "b", "model": "other" }] }
+        },
+        "opencodeModels": {
+            "a": { "models": ["direct", "hidden"], "tags": ["cheap"] },
+            "b": { "models": ["other"], "tags": ["cheap"], "enabled": false }
+        },
+        "opencodeAgentModels": { "explore": "tag:cheap" }
+    });
+    let chains = build_chains(&config);
+    let tagged = &chains["agent-tag:cheap"];
+    assert_eq!(tagged.iter().map(|upstream| upstream.model.as_str()).collect::<Vec<_>>(), ["chain-model", "direct", "hidden"]);
+    assert!(!chains.contains_key("agent-tag:other"));
 }
 
 #[test]
@@ -177,6 +310,38 @@ fn models_are_keyed_by_provider_and_upstream_model() {
     assert_eq!(usage.models["aquadevs/deepseek-v4.1"].errors, 1);
 }
 
+/// A minimal AppState for cooldown checks: no real storage, just a config.
+pub(crate) fn test_state_with_config(config: Value) -> AppState {
+    static NEXT_DB: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    // now_ms() collided when two tests started in the same millisecond and the
+    // second one reset a database the first still had open ("readonly database").
+    let path = std::env::temp_dir().join(format!(
+        "provider-proxy-state-test-{}-{}.db",
+        std::process::id(),
+        NEXT_DB.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_file(&path);
+    AppState {
+        config_path: std::sync::Arc::new(path.clone()),
+        storage: std::sync::Arc::new(super::config::open_storage(&path).unwrap()),
+        config: std::sync::Arc::new(std::sync::RwLock::new(config)),
+        chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
+        cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        uptime_bars: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        last_outcome: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
+        usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
+        lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        lifetime_persisted: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        uptime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        client: reqwest::Client::new(),
+        port: 0,
+    }
+}
+
 /// Yesterday's hourly chart must survive the day rollover: the snapshot is
 /// written to SQLite every second, so the buckets a past day accumulated are
 /// read back instead of being rebuilt from live traffic (which is gone).
@@ -193,12 +358,15 @@ fn hourly_buckets_survive_the_day_rollover() {
         config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
         chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
         cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        uptime_bars: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        last_outcome: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
         lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         lifetime_persisted: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        uptime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
@@ -266,12 +434,15 @@ fn lifetime_totals_outlive_the_seven_day_window() {
         config: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
         chains: std::sync::Arc::new(std::sync::RwLock::new(Default::default())),
         cooldowns: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        uptime_bars: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
+        last_outcome: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage: std::sync::Arc::new(std::sync::Mutex::new(Usage::default())),
         usage_history: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_persisted: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         usage_day: std::sync::Arc::new(std::sync::Mutex::new(String::new())),
         lifetime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         lifetime_persisted: std::sync::Arc::new(std::sync::Mutex::new(None)),
+        uptime: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         image_tasks: std::sync::Arc::new(std::sync::Mutex::new(Default::default())),
         client: reqwest::Client::new(),
         port: 0,
@@ -566,7 +737,11 @@ async fn fails_over_when_upstream_returns_an_empty_success_stream() {
         .await
         .unwrap();
     let models = &usage["days"][0]["models"];
-    assert_eq!(models["p/empty"]["errors"], 1, "empty response is counted as an error: {usage}");
+    // An empty answer is retried on the same model before the chain moves on.
+    assert_eq!(
+        models["p/empty"]["errors"], 3,
+        "three empty answers are three errors, then the model rests: {usage}"
+    );
     assert_eq!(models["p/answer"]["ok"], 1, "fallback answered: {usage}");
 
     let database = database_path(&path);
@@ -682,7 +857,11 @@ async fn retries_the_chain_until_an_upstream_answers_in_retry_mode() {
             "errorCooldownSec": 1,
             "opencodeConfig": opencode.display().to_string(),
             "providers": { "p": { "baseURL": format!("http://127.0.0.1:{upstream_port}/v1"), "apiKey": "k" } },
-            "models": { "chain": { "upstreams": [{ "provider": "p", "model": "m" }] } }
+            // Two links: a one-link chain is not retried, it fails fast.
+            "models": { "chain": { "upstreams": [
+                { "provider": "p", "model": "m" },
+                { "provider": "p", "model": "m" }
+            ] } }
         })
         .to_string(),
     )

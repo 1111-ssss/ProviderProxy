@@ -456,6 +456,9 @@ const appSettings = () => {
   settings.autostart ??= false
   settings.autostartTray ??= false
   settings.tagCategories ??= false
+  settings.logsReversed ??= false
+  settings.uptimeRefreshMinutes ??= 10
+  settings.uptimeChainAverage ??= false
   return settings
 }
 const tauriInvoke = (command, args) => {
@@ -636,4 +639,14 @@ function save(silent = false) {
       if (!silent) flash(true, j.restartRequired ? "сохранено; перезапусти прокси (port)" : "сохранено")
     })
   }, 300)
+}
+
+/// Resolves once the queued write has landed on the server. The uptime script
+/// asks the proxy for the model list, so a refresh that changed the catalog has
+/// to wait for the save instead of racing it.
+/// shortcut: waits out save()'s 300ms debounce; upgrade to a real flush promise
+/// if that number ever moves.
+function saveNow(silent = false) {
+  save(silent)
+  return new Promise((resolve) => setTimeout(() => saveChain.then(resolve, resolve), 320))
 }

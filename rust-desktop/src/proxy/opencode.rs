@@ -75,6 +75,71 @@ fn apply_model_context(item: &mut Value, context: Option<u64>) {
     }
 }
 
+pub(crate) fn sync_agent_models(document: &mut Value, config: &Value, provider_id: &str) {
+    let Some(root) = document.as_object_mut() else {
+        return;
+    };
+    let settings = config.get("opencodeAgentModels").and_then(Value::as_object);
+    // Nothing to write and nothing of ours to clean up.
+    if settings.is_none() && !root.contains_key("agents") {
+        return;
+    }
+    // An agent may only point at a model this provider publishes; a disabled
+    // chain or a tag with no members would leave a dangling reference.
+    let published: Vec<String> = root
+        .get("providers")
+        .and_then(|providers| providers.get(provider_id))
+        .and_then(|provider| provider.get("models"))
+        .and_then(Value::as_object)
+        .map(|models| models.keys().cloned().collect())
+        .unwrap_or_default();
+    let agents = root
+        .entry("agents")
+        .or_insert_with(|| Value::Object(Map::new()));
+    let Some(agents) = agents.as_object_mut() else {
+        return;
+    };
+    for name in ["compaction", "explore", "title", "summary"] {
+        let desired = settings
+            .and_then(|settings| settings.get(name))
+            .and_then(Value::as_str)
+            .and_then(|selection| match selection.split_once(':') {
+                Some(("chain", id)) | Some(("model", id)) => Some(id.to_string()),
+                Some(("tag", tag)) => Some(format!("agent-tag:{tag}")),
+                _ => None,
+            })
+            .filter(|id| published.contains(id))
+            .map(|id| format!("{provider_id}/{id}"));
+        let agent = agents.get_mut(name).and_then(Value::as_object_mut);
+        match (agent, desired) {
+            (Some(agent), Some(model)) => {
+                agent.insert("model".into(), Value::String(model));
+            }
+            // Only our own reference is removed: a model the user wrote by hand
+            // belongs to the user, even when the GUI says "default".
+            (Some(agent), None) => {
+                if agent
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .is_some_and(|model| model.starts_with(&format!("{provider_id}/")))
+                {
+                    agent.remove("model");
+                    if agent.is_empty() {
+                        agents.remove(name);
+                    }
+                }
+            }
+            (None, Some(model)) => {
+                agents.insert(name.to_string(), json!({ "model": model }));
+            }
+            (None, None) => {}
+        }
+    }
+    if agents.is_empty() {
+        root.remove("agents");
+    }
+}
+
 pub(crate) async fn sync_opencode(state: &AppState) -> bool {
     let config = state.config.read().unwrap().clone();
     let path = default_opencode_config_path(&config);
@@ -201,7 +266,18 @@ pub(crate) async fn sync_opencode(state: &AppState) -> bool {
             }
         }
     }
+    for (name, chain) in chains.iter().filter(|(name, _)| name.starts_with("agent-tag:")) {
+        let mut item = previous.get(name).cloned().unwrap_or_else(|| json!({}));
+        if let Value::Object(object) = &mut item {
+            object.insert(
+                "name".into(),
+                Value::String(format!("{name} (proxy, x{})", chain.len())),
+            );
+        }
+        models.insert(name.clone(), item);
+    }
     provider.insert("models".into(), Value::Object(models));
+    sync_agent_models(&mut document, &config, provider_id);
     let serialized = format!(
         "{}\n",
         serde_json::to_string_pretty(&document).unwrap_or_else(|_| raw.clone())

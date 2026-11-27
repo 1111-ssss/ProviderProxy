@@ -11,11 +11,14 @@ pub(crate) async fn v1_models(State(state): State<AppState>, headers: HeaderMap)
         return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
     }
     let chains = state.chains.read().unwrap();
-    push_log(&state, format!("GET /v1/models → {} моделей", chains.len()));
     let data: Vec<Value> = chains
         .keys()
+        // Tag chains exist only for an OpenCode helper agent; they are not part
+        // of the public model list.
+        .filter(|id| !id.starts_with("agent-tag:"))
         .map(|id| json!({ "id": id, "object": "model", "owned_by": "provider_proxy" }))
         .collect();
+    push_log(&state, format!("GET /v1/models → {} моделей", data.len()));
     Json(json!({ "object": "list", "data": data })).into_response()
 }
 
@@ -73,6 +76,16 @@ fn session_titles(state: &AppState) -> std::collections::HashMap<String, String>
     keys.sort_unstable();
     keys.dedup();
     super::super::session_titles::titles_for(&keys)
+}
+
+pub(crate) async fn get_uptime_answers(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    if !authorized(&state, &headers) {
+        return json_error(StatusCode::UNAUTHORIZED, "bad proxy token");
+    }
+    Json(uptime_snapshot(&state)).into_response()
 }
 
 pub(crate) async fn get_usage(State(state): State<AppState>, headers: HeaderMap) -> Response {

@@ -67,6 +67,8 @@ function showTab(name) {
   if (name === "integrations") loadImageSkillStatus()
   if (name === "logs") loadLogs()
   if (name === "usage") loadUsage()
+  // The boot call runs before uptime.js is loaded, so the tab draws itself.
+  if (name === "uptime" && typeof refreshUptimeTab === "function") refreshUptimeTab()
 }
 document.querySelectorAll(".tabs button[data-tab]").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)))
 

@@ -85,7 +85,10 @@
   /* A field without a wrapping `label` gets the label typography by hand:
      otherwise its caption renders at the body's default text colour and size. */
   .field-block { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
-  .file-pick { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .file-pick { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  /* The browser fallback for picking a script: kept rendered but invisible, so
+     the picker button can open it and no browser refuses the click. */
+  .file-pick-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   /* The native file input cannot be styled; a label wraps it and hides it. */
   /* `dialog label` adds a 14px bottom margin; on this nested label it shifted
      the button 7px above the name and the trash that share the row. */
@@ -95,6 +98,8 @@
   .file-pick-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
   .file-pick .icon-action { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; min-height: 38px; padding: 0; }
   .file-pick .icon-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* The row's buttons own a display value, which would beat [hidden] otherwise. */
+  .file-pick .icon-action[hidden], .file-pick-button[hidden] { display: none; }
   /* Last image models: one card per question, side by side on a wide window and
      stacked when there is no room for both. */
   .last-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
@@ -107,6 +112,17 @@
   #dlg-uptime .dialog-body { display: grid; gap: 10px; align-content: start; }
   #dlg-uptime .dialog-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   #uptime-meta { font-size: 12px; }
+  /* Window switch inside the uptime dialog: 24 h or 1 h, when a script reports
+     both. Two small pills, same active colour as the statistics group tabs. */
+  .uptime-window { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-inset); justify-self: start; }
+  .uptime-window button { min-height: 26px; padding: 3px 12px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .uptime-window button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--text); }
+  .uptime-window[hidden] { display: none; }
+  /* In the tab's filter bar the switch sits next to the search field and takes
+     its height, so the row reads as one line. */
+  .uptime-filter-bar .uptime-window { flex: 0 0 auto; align-self: stretch; }
+  .uptime-filter-bar .uptime-window[hidden] { display: none; }
+  .uptime-filter-bar .uptime-window button { min-height: 30px; }
   #uptime-body .empty-inline { padding: 10px 0; text-align: left; }
   #uptime-body .empty-inline.is-error { color: var(--danger); overflow-wrap: anywhere; white-space: pre-wrap; }
   dialog label { display: grid; gap: 6px; margin-bottom: 14px; font-size: 12px; color: var(--muted); }
@@ -273,6 +289,15 @@
   @media (prefers-reduced-motion: reduce) { .update-nav-button .update-progress.is-indeterminate .update-progress-fill { animation: none; width: 100%; opacity: .45; } }
   .update-nav-button[hidden] { display: none; }
   section[data-tab="logs"] { min-height: 0; display: flex; flex-direction: column; }
+  /* The pager and the search row trade places when the logs are mirrored; both
+     live in the DOM once and only their order changes. */
+  section[data-tab="logs"] .section-head { order: 0; }
+  section[data-tab="logs"] .log-controls { order: 1; }
+  section[data-tab="logs"] .logbox { order: 2; }
+  section[data-tab="logs"] .log-pager { order: 3; }
+  section[data-tab="logs"].logs-reversed .log-pager { order: 1; padding: 0 0 8px; }
+  section[data-tab="logs"].logs-reversed .logbox { order: 2; }
+  section[data-tab="logs"].logs-reversed .log-controls { order: 3; margin: 10px 0 0; }
    /* The filter lives in the search field's icon menu now; the row is just the
       search taking the full width. */
   .log-controls { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 8px; margin: 0 0 10px; }
@@ -314,13 +339,19 @@
   .tile-wide .v { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tile-wide .k { white-space: nowrap; }
   .tile .k { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
-  /* "Любимые" is one wide card on its own row: two long names side by side used
-     to leave a hole exactly one small tile wide in front of the last tile. */
-  .tile-favourites { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 10px 18px; }
+  /* The "за всё время" tiles fill the panel and wrap as the window narrows:
+     as many 148px tracks as fit. The favourites card takes four of those
+     tracks, so it stays four blocks wide instead of stretching into a banner,
+     and the small tiles flow beside it into the space that used to stay empty. */
+  .usage-panel[data-panel="lifetime"] .tiles { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+  .usage-panel[data-panel="lifetime"] .tile-favourites { grid-column: span 4; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 10px 18px; }
   .tile-favourites .fav-title { grid-column: 1 / -1; font-size: 13px; }
   .fav-row { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; }
   .fav-row .v { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  @media (max-width: 640px) { .tile-favourites { grid-template-columns: minmax(0, 1fr); } }
+  /* Fewer than four tracks to span: the card takes the whole row it landed in. */
+  @media (max-width: 659px) {
+    .usage-panel[data-panel="lifetime"] .tile-favourites { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); }
+  }
   .usage-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 14px; margin-top: 18px; }
   .chart-card { min-width: 0; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
@@ -413,6 +444,99 @@
   /* Uptime tab: same group tabs as statistics, its own panel switch. */
   .uptime-panel { display: none; margin-top: 14px; }
   .uptime-panel.active { display: block; }
+  .uptime-filter-bar { margin: 0; flex-wrap: wrap; }
+  .uptime-filter-bar .search-field { flex: 1 1 200px; min-width: 140px; }
+  /* One card per provider, then the models and chains view. Cards keep the
+     window's width instead of a fixed column count: a strip of cells needs the
+     room, and two narrow columns would squeeze it. */
+  .uptime-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 14px; }
+  .uptime-card { margin: 0; display: grid; gap: 6px; align-content: start; min-width: 0; }
+  /* Model rows start under the provider name, not under the chevron: one left
+     edge for the name and its models reads as a group. The models view has no
+     chevron, so it takes the same inset and its strips line up with the
+     provider view cell for cell. */
+  .uptime-card > .token-bars { padding-left: 21px; gap: 0; }
+  .uptime-card .token-bars[hidden] { display: none; }
+  .uptime-card-head,
+  .uptime-card-head:hover:not(:disabled),
+  .uptime-card-head:active:not(:disabled) {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 2px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    text-align: left;
+    transform: none;
+  }
+  .uptime-card-head:focus-visible { outline-offset: 0; }
+  .uptime-card .uptime-card-head:hover:not(:disabled) { background: transparent; border-color: transparent; }
+  .uptime-card-head:hover strong { color: var(--accent); }
+  .uptime-card-title { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+  .uptime-card-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .uptime-chevron { flex: 0 0 auto; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); transition: transform .12s ease; }
+  .uptime-card-head[aria-expanded="true"] .uptime-chevron { transform: rotate(90deg); }
+  .uptime-card-meta { flex: 0 0 auto; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .uptime-card-meta .problem-rate { color: var(--danger); }
+  /* A row is name + percentage over the time strip, metrics under it. */
+  .uptime-card .token-bars > .uptime-row { padding: 9px 0; }
+  .uptime-card .token-bars > .uptime-row:first-child { padding-top: 2px; }
+  .uptime-card .token-bars > .uptime-row + .uptime-row { border-top: 1px solid var(--border); }
+  .uptime-row-empty { color: var(--muted); }
+  .uptime-row-empty .uptime-row-head { align-items: center; }
+  .uptime-row-empty .uptime-row-head > .muted { flex: 0 0 auto; font-size: 11px; }
+  .uptime-row { display: grid; gap: 5px; min-width: 0; }
+  .uptime-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+  .uptime-row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 12.5px; }
+  .uptime-row-percent { flex: 0 0 auto; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .uptime-row-percent.success { color: var(--success); }
+  .uptime-row-percent.limit { color: var(--warning); }
+  .uptime-row-percent.error { color: var(--danger); }
+  .uptime-model-row { display: grid; gap: 6px; padding: 10px 0; min-width: 0; }
+  .uptime-model-row:first-child { padding-top: 2px; }
+  .uptime-model-row + .uptime-model-row { border-top: 1px solid var(--border); }
+  .uptime-model-note { color: var(--muted); font-size: 10.5px; }
+  /* The strip of boxes under a row: one box per interval, no wrap, no
+     horizontal scroll — the boxes share the width the row already has. */
+  .uptime-strip { display: grid; gap: 4px; }
+  /* Two strips under one model need names: a short tag sits left of each, so
+     "скрипт" and "ответы" cannot be mistaken for one another. */
+  .uptime-strip-line { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 6px; }
+  .uptime-strip-tag { color: var(--faint); font-size: 10px; text-align: right; }
+  /* The proxy's own strip: same cells, half the height, so the script's
+     picture stays the first thing read and the answers read as a second line. */
+  .uptime-strip-answers { gap: 2px; }
+  .uptime-strip-answers .uptime-cell { height: 6px; }
+  .uptime-row-numbers { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 8px; }
+  .uptime-row-answers { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .uptime-cells { display: flex; gap: 2px; }
+  /* A capped box width keeps two heartbeats two boxes instead of a second
+     full-width progress bar; many boxes still shrink to fit. */
+  .uptime-cell { flex: 1 1 0; min-width: 0; height: 14px; border-radius: 2px; background: var(--surface); }
+  /* The colour is the cell's own gradient, set inline: 0 % red, 50 % yellow,
+     100 % green. Three fixed buckets made 96 % look the same as 100 %. */
+  /* A slot without a number, from either source: a grey box, not a red one and
+     not a gap — the outline alone read as an empty cell at 14px. */
+  .uptime-cell.empty { background: color-mix(in srgb, var(--muted) 26%, var(--surface)); }
+  .pm-icon-button.is-spinning svg { animation: uptime-spin .9s linear infinite; }
+  @keyframes uptime-spin { to { transform: rotate(360deg); } }
+  .uptime-row-foot { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .uptime-threshold { display: grid; gap: 8px; min-width: 220px; }
+  .uptime-threshold-head { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+  .uptime-threshold-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .uptime-threshold-slider { width: 100%; height: 18px; min-height: 18px; margin: 0; padding: 0; border: 0; background: transparent; accent-color: var(--accent); cursor: pointer; }
+  .uptime-threshold-direction { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .uptime-threshold-direction button { min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 12px; font-weight: 600; }
+  .uptime-threshold-direction button:hover:not(.active) { border-color: var(--border-strong); color: var(--text); }
+  .uptime-threshold-direction button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--text); }
   /* Session dialog: the pager shares the action row with "Закрыть", so a short
      table keeps no separate pager block. */
   #dlg-all-sessions .dialog-actions { justify-content: space-between; align-items: center; gap: 12px; }
@@ -435,6 +559,12 @@
      them to the card. */
   .hour-hint { position: absolute; left: 50%; top: var(--hint-y, 70px); z-index: 5; display: none; width: max-content; max-width: 200px; padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--tooltip-bg); color: var(--text); font-size: 11px; line-height: 1.45; text-align: left; box-shadow: 0 8px 20px rgba(0, 0, 0, .45); transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; }
   .hour-hint span { display: block; }
+  /* Numbers in one left-aligned column, names after them: a list of "12 успех"
+     lines reads down the digits instead of hunting each label's edge. The
+     selector carries .hour-hint because `.hour-hint span` sets display:block
+     and would otherwise outrank a bare `.hour-hint-line`. */
+  .hour-hint .hour-hint-line { display: flex; align-items: baseline; gap: 6px; }
+  .hour-hint-line b { min-width: 5ch; font-weight: 600; font-variant-numeric: tabular-nums; }
   .hour-hint-time { display: block; margin-bottom: 2px; text-align: center; font-variant-numeric: tabular-nums; }
   /* Near either edge the centred hint would hang outside the window, so it
      anchors to the column side instead. */
@@ -622,6 +752,20 @@
      cards and left a dead column of background. */
   .settings-page-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
   @media (min-width: 920px) { .settings-page-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  /* The folded advanced area is a block in the same grid; open, its own grid
+     keeps the moved groups two columns like the rest of the page. */
+  /* The folded area is a card like the others: its own padding would push the
+     summary title 16px right of every other heading, so it is dropped here. */
+  details.settings-advanced { padding: 0; }
+  .settings-advanced > summary { display: flex; align-items: center; gap: 8px; padding: 16px; cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 700; user-select: none; list-style: none; }
+  .settings-advanced > summary::-webkit-details-marker { display: none; }
+  /* An icon box, not a nudged glyph: the chevron keeps the same left edge as
+     every other block on the page. */
+  .settings-advanced > summary::before { content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .12s ease; }
+  .settings-advanced[open] > summary::before { transform: rotate(45deg); }
+  .settings-advanced > summary:hover { color: var(--text); }
+  /* The folded blocks start under the summary title, not under its chevron. */
+  .settings-advanced .settings-page-grid { padding: 0 16px 16px; }
   .settings-block { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
   .settings-block.wide { grid-column: 1 / -1; }
   .settings-block h3 { margin: 0; font-size: 14px; }

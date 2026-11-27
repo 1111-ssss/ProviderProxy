@@ -11,6 +11,7 @@ fn main() {
                 "create_app_shortcut",
                 "list_versions",
                 "rollback_to",
+                "read_uptime_file",
             ]),
         );
         tauri_build::try_build(attributes).expect("failed to run tauri-build");

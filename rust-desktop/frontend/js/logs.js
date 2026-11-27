@@ -14,6 +14,9 @@ let logFacetPage = { chats: 0, models: 0 }
 // list from jumping under the pointer while a tab is switched or a query typed.
 let logFacetOrder = null
 let logPage = 0
+// Newest first by default; the setting flips the card order and swaps which
+// end of the page the pager sits on.
+let logReversed = appSettings().logsReversed === true
 // One window of stored lines at a time. The day lives in SQLite; the GUI keeps
 // what it has displayed, plus whatever it had to load to page further back, so
 // searching and filtering still see every line the user has walked through.
@@ -21,7 +24,6 @@ const LOG_WINDOW = 500
 let logLines = []
 let logIds = []
 let logHasMore = false
-let logTotal = 0
 let logSessionTitles = {}
 let logHasRenderedRecords = false
 
@@ -239,16 +241,20 @@ function renderLogs() {
   const anchorText = visible?.dataset.logLine
   const anchorOffset = visible ? visible.getBoundingClientRect().top - hostTop : 0
   const atTop = !logHasRenderedRecords || host.scrollTop <= 60
-  box.replaceChildren(...(slice.length ? slice.map(logCard) : [logEmpty()]))
+  // Mirrored logs: the pager sits above the list and search with filters moves
+  // under it, so the reading order stays top-down in both directions.
+  const section = box.closest("section")
+  section.classList.toggle("logs-reversed", logReversed)
+  const cards = slice.length ? slice.map(logCard) : [logEmpty()]
+  box.replaceChildren(...(logReversed ? cards.reverse() : cards))
   if (atTop) host.scrollTop = 0
   else if (anchorText) {
     const anchor = [...box.querySelectorAll(".log-card")].find((card) => card.dataset.logLine === anchorText)
     if (anchor) host.scrollTop += anchor.getBoundingClientRect().top - host.getBoundingClientRect().top - anchorOffset
   }
   if (slice.length) logHasRenderedRecords = true
-  const totalLabel = logTotal ? ` · ${logTotal.toLocaleString("ru-RU")} за сутки` : ""
   $("log-pager").innerHTML = pages > 1 || logHasMore
-    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Новее</button><span class="muted">${logPage + 1} / ${pages}${totalLabel}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 && !logHasMore ? " disabled" : ""}>Старее</button>`
+    ? `<button type="button" data-page="${logPage - 1}"${logPage === 0 ? " disabled" : ""}>Назад</button><span class="muted">${logPage + 1} / ${pages}</span><button type="button" data-page="${logPage + 1}"${logPage === pages - 1 && !logHasMore ? " disabled" : ""}>Вперёд</button>`
     : ""
   $("log-pager").querySelectorAll("[data-page]").forEach((button) => button.onclick = async () => {
     const target = Number(button.dataset.page) || 0
@@ -281,7 +287,6 @@ async function loadLogs() {
   try {
     const j = await (await api(`/api/logs?limit=${LOG_WINDOW}`)).json()
     const rows = Array.isArray(j.lines) ? j.lines : []
-    logTotal = Number(j.total) || 0
     logSessionTitles = j.sessionTitles ?? {}
     if (!logIds.length) {
       logLines = rows.map((row) => row.line)

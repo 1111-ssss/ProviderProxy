@@ -26,7 +26,7 @@ function renderProviders() {
         <td><b>${esc(name)}</b><span class="provider-links">
           ${p.homepage ? `<button type="button" class="icon-action" data-a="homepage" data-tip="Открыть страницу провайдера" aria-label="Открыть страницу провайдера"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>` : ""}
           ${p.checkin ? `<button type="button" class="icon-action" data-a="checkin" data-tip="Открыть чекин" aria-label="Открыть чекин"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v9H4v-9"></path><path d="M2 7h20v5H2z"></path><path d="M12 22V7"></path><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg></button>` : ""}
-          ${p.uptimeScript ? `<button type="button" class="icon-action" data-a="uptime" data-tip="Аптайм моделей" aria-label="Аптайм моделей"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"></path></svg></button>` : ""}
+          ${p.uptimeScript || p.uptimeScriptPath ? `<button type="button" class="icon-action" data-a="uptime" data-tip="Аптайм моделей" aria-label="Аптайм моделей"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"></path></svg></button>` : ""}
         </span></td>
         <td class="muted"><span class="provider-url" data-tip="${esc(p.baseURL ?? "")}">${esc(p.baseURL ?? "")}</span></td>
         <td class="provider-actions"><button type="button" class="icon-action" data-a="edit" data-tip="Изменить" aria-label="Изменить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></button></td>
@@ -37,7 +37,7 @@ function renderProviders() {
     const p = cfg.providers[row.dataset.provider]
     if (p?.homepage) row.querySelector('[data-a="homepage"]').onclick = () => openUrl(p.homepage)
     if (p?.checkin) row.querySelector('[data-a="checkin"]').onclick = () => openUrl(p.checkin)
-    if (p?.uptimeScript) row.querySelector('[data-a="uptime"]').onclick = () => openUptimeDialog(row.dataset.provider)
+    if (p?.uptimeScript || p?.uptimeScriptPath) row.querySelector('[data-a="uptime"]').onclick = () => openUptimeDialog(row.dataset.provider)
     row.querySelector('[data-a="edit"]').onclick = () => openProviderDialog(row.dataset.provider)
   }
   // Clicking the checkin button must also cover providers the filter hides:
@@ -413,6 +413,7 @@ function renderSettings() {
   $("s-auth").placeholder = cfg.authTokenConfigured ? "оставить текущий токен" : "не задан"
   $("s-limit").value = cfg.limitCooldownSec ?? 300
   $("s-error").value = cfg.errorCooldownSec ?? 30
+  $("s-single").value = cfg.singleCooldownSec ?? 30
   $("s-header").value = cfg.headerTimeoutSec ?? 120
   $("s-stream-idle").value = cfg.streamIdleTimeoutSec ?? 90
   $("s-session-gap").value = cfg.sessionIdleGapSec ?? 300
@@ -422,6 +423,9 @@ function renderSettings() {
   $("s-version").textContent = cfg.appVersion ?? "-"
   $("s-theme-current").textContent = themeLabel(settings.theme)
   $("s-tag-categories").checked = settings.tagCategories
+  $("s-logs-reversed").checked = settings.logsReversed
+  $("s-uptime-refresh").value = settings.uptimeRefreshMinutes
+  $("s-uptime-chain-average").checked = settings.uptimeChainAverage
   $("s-auto-update").checked = settings.autoUpdate
   $("s-auto-restart").checked = settings.autoRestart
   $("s-auto-restart").disabled = !settings.autoUpdate
@@ -802,7 +806,65 @@ dlgModelSettings.addEventListener("close", () => {
 
 const dlgImageSettings = $("dlg-image-settings")
 const dlgSkills = $("dlg-integrations-advanced")
-// The skill has two homes: the Opencode card is the primary one, the "Скиллы"
+const dlgIntegrationAgents = $("dlg-integration-agents")
+const agentSettingIds = {
+  "agent-compaction": "compaction",
+  "agent-explore": "explore",
+  "agent-title": "title",
+  "agent-summary": "summary",
+}
+
+function agentModelOptions(selected) {
+  const groups = [["Режим", [["default", "По умолчанию OpenCode"]]]]
+  const models = []
+  for (const [name, def] of Object.entries(cfg.models ?? {})) {
+    if (def?.enabled !== false && (def?.upstreams ?? []).length) models.push([`chain:${name}`, `Цепочка · ${name}`])
+  }
+  for (const [provider, def] of Object.entries(cfg.opencodeModels ?? {})) {
+    if (def?.enabled === false) continue
+    for (const id of directModelIds(provider, def)) models.push([`model:${provider}/${id}`, `Модель · ${provider}/${id}`])
+  }
+  models.sort((a, b) => a[1].localeCompare(b[1], "ru"))
+  if (models.length) groups.push(["Модель или цепочка", models])
+  const tags = tagRegistryNames().map((tag) => [`tag:${tag}`, `Тег · ${tag}`])
+  if (tags.length) groups.push(["Цепочка из всех моделей с тегом", tags])
+  // Keep removed selections visible so the config can be reset instead of
+  // silently appearing to switch to OpenCode's default.
+  const known = groups.some(([, entries]) => entries.some(([value]) => value === selected))
+  const missing = known ? "" : `<option value="${esc(selected)}" selected>Недоступно · ${esc(selected)}</option>`
+  return missing + groups.map(([label, entries]) =>
+    `<optgroup label="${esc(label)}">${entries.map(([value, text]) => `<option value="${esc(value)}"${value === selected ? " selected" : ""}>${esc(text)}</option>`).join("")}</optgroup>`
+  ).join("")
+}
+
+function renderAgentSettings() {
+  const agentConfig = cfg.opencodeAgentModels ?? {}
+  for (const [id, key] of Object.entries(agentSettingIds)) {
+    const value = agentConfig[key] ?? "default"
+    $(id).innerHTML = agentModelOptions(value)
+    $(id).value = value
+  }
+  $("agent-settings-status").textContent = tagRegistryNames().length
+    ? "Тег собирает цепочку из всех включённых моделей и цепочек с выбранным тегом."
+    : "Добавь теги цепочкам или прямым моделям, чтобы настроить цепочку по тегу."
+}
+
+$("integrations-agents").onclick = () => {
+  renderAgentSettings()
+  dlgIntegrationAgents.showModal()
+}
+$("integration-agents-cancel").onclick = () => dlgIntegrationAgents.close()
+for (const [id, key] of Object.entries(agentSettingIds)) {
+  $(id).onchange = (event) => {
+    const value = event.target.value
+    cfg.opencodeAgentModels ??= {}
+    if (value === "default") delete cfg.opencodeAgentModels[key]
+    else cfg.opencodeAgentModels[key] = value
+    if (!Object.keys(cfg.opencodeAgentModels).length) delete cfg.opencodeAgentModels
+    save()
+  }
+}
+// The skill has two homes: the Opencode card is the primary one, the "Управление скиллами"
 // dialog only lists what is installed. Both read the same state, so every node
 // carrying the shared class is updated in one place.
 const skillStatusNodes = [...document.querySelectorAll(".image-skill-status")]
@@ -958,10 +1020,12 @@ const SETTINGS_RESET_DEFAULTS = {
   "s-port": "8787",
   "s-limit": "300",
   "s-error": "30",
+  "s-single": "30",
   "s-header": "120",
   "s-stream-idle": "90",
   "s-session-gap": "300",
   "s-pending-buffer": "8388608",
+  "s-uptime-refresh": "10",
 }
 function syncResetVisibility() {
   document.querySelectorAll("[data-reset]").forEach((button) => {
@@ -987,11 +1051,13 @@ document.querySelectorAll("[data-reset]").forEach((button) => {
     else if (id === "s-port") delete cfg.port
     else if (id === "s-limit") delete cfg.limitCooldownSec
     else if (id === "s-error") delete cfg.errorCooldownSec
+    else if (id === "s-single") delete cfg.singleCooldownSec
     else if (id === "s-header") delete cfg.headerTimeoutSec
     else if (id === "s-stream-idle") delete cfg.streamIdleTimeoutSec
     else if (id === "s-session-gap") delete cfg.sessionIdleGapSec
     else if (id === "s-retry-forever") delete cfg.retryForever
     else if (id === "s-pending-buffer") delete cfg.pendingBufferBytes
+    else if (id === "s-uptime-refresh") delete appSettings().uptimeRefreshMinutes
     if (id === "s-retry-forever") $(id).checked = false
     else if (id === "s-pending-buffer") $(id).value = "8388608"
     renderSettings()
@@ -1014,6 +1080,7 @@ const num = (id, key) => ($(id).onchange = (e) => { cfg[key] = Number(e.target.v
 num("s-port", "port")
 num("s-limit", "limitCooldownSec")
 num("s-error", "errorCooldownSec")
+num("s-single", "singleCooldownSec")
 num("s-header", "headerTimeoutSec")
 num("s-stream-idle", "streamIdleTimeoutSec")
 // A session gap under 30s would make short pauses look like activity spikes.
@@ -1024,6 +1091,13 @@ $("s-session-gap").onchange = (e) => {
 }
 $("s-pending-buffer").onchange = (e) => {
   cfg.pendingBufferBytes = Number(e.target.value)
+  save()
+}
+// 0 is "off", so the usual "|| undefined" would silently drop it.
+$("s-uptime-refresh").onchange = (e) => {
+  const minutes = Math.min(1440, Math.max(0, Math.round(Number(e.target.value) || 0)))
+  appSettings().uptimeRefreshMinutes = minutes
+  e.target.value = minutes
   save()
 }
 $("s-retry-forever").onchange = (e) => {
@@ -1054,6 +1128,17 @@ $("s-tag-categories").onchange = (e) => {
   appSettings().tagCategories = e.target.checked
   renderModels()
   renderOpencodeModels()
+  save()
+}
+$("s-logs-reversed").onchange = (e) => {
+  appSettings().logsReversed = e.target.checked
+  logReversed = e.target.checked
+  renderLogs()
+  save()
+}
+$("s-uptime-chain-average").onchange = (e) => {
+  appSettings().uptimeChainAverage = e.target.checked
+  renderUptimeTab()
   save()
 }
 $("s-auto-update").onchange = (e) => {

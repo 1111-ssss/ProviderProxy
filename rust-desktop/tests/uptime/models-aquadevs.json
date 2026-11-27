@@ -1,0 +1,10 @@
+{
+ "provider": "aquadevs",
+ "models": [
+  "glm-5.3",
+  "GLM 5.3 Flash",
+  "deepseek-v4.1-flash",
+  "kimi-k3.1-pro",
+  "no-such-model"
+ ]
+}

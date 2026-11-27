@@ -1,0 +1,10 @@
+{
+ "provider": "logfare",
+ "models": [
+  "8ball",
+  "deepseek-v4.1-flash",
+  "glm-5.3-flash",
+  "kimi-k3.1-pro",
+  "no-such-model"
+ ]
+}

@@ -4,6 +4,7 @@ use axum::{
     body::to_bytes,
     extract::Request,
     http::{HeaderMap, StatusCode},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
@@ -106,6 +107,85 @@ impl Drop for MockProvider {
     fn drop(&mut self) {
         self.task.abort();
     }
+}
+
+#[tokio::test]
+async fn uptime_answers_count_model_attempts_and_chain_answers() {
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async { (StatusCode::TOO_MANY_REQUESTS, [("retry-after", "60")]) }),
+    ))
+    .await;
+    let working = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            Json(json!({
+                "model": body["model"],
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1}
+            }))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {
+            "limited": {"baseURL": failing.base_url},
+            "fine": {"baseURL": working.base_url}
+        },
+        "models": {
+            "alias": {"upstreams": [
+                {"provider": "limited", "model": "m"},
+                {"provider": "fine", "model": "m"}
+            ]}
+        }
+    }))
+    .await;
+
+    let response = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "alias", "messages": [{"role": "user", "content": "hi"}]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let answers: Value = proxy
+        .client
+        .get(proxy.url("/api/uptime/answers"))
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    // The model that hit the limit still counts as an attempt, so the strip is
+    // the real answer rate rather than only the successes.
+    assert_eq!(answers["models"]["limited/m"]["percent"], 0.0);
+    assert_eq!(answers["models"]["limited/m"]["total"], 1);
+    assert_eq!(answers["models"]["fine/m"]["percent"], 100.0);
+    // The chain answered, so its own rate is 100% even though one member failed.
+    assert_eq!(answers["chains"]["alias"]["percent"], 100.0);
+    assert_eq!(answers["chains"]["alias"]["total"], 1);
+    // Both windows are always reported: the tab's switch drives the second
+    // strip, so its shape cannot depend on whatever the script said.
+    assert_eq!(answers["models"]["fine/m"]["percent1h"], 100.0);
+    assert_eq!(answers["models"]["fine/m"]["percent24h"], 100.0);
+    let hour_cells = answers["models"]["fine/m"]["cells1h"].as_array().unwrap();
+    assert_eq!(hour_cells.len(), 12, "an hour is twelve five-minute cells");
+    assert!(
+        hour_cells.iter().any(|cell| cell["percent"] == 100.0 && cell["total"] == 1),
+        "the traffic lands in exactly one five-minute cell"
+    );
+    assert!(
+        hour_cells.iter().filter(|cell| cell["percent"].is_null()).count() >= 11,
+        "slots without traffic carry no percentage, so the GUI draws them grey"
+    );
+    let day_cells = answers["models"]["fine/m"]["cells24h"].as_array().unwrap();
+    assert!(!day_cells.is_empty() && day_cells.len() <= 24, "the day strip is one cell per elapsed hour");
+    assert_eq!(answers["day"].as_str().unwrap().len(), 10, "the day key is dated");
 }
 
 #[tokio::test]
@@ -473,6 +553,80 @@ async fn updates_config_models_and_an_isolated_opencode_file() {
 }
 
 #[tokio::test]
+async fn agent_tag_chain_answers_without_joining_the_public_model_list() {
+    let working = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            Json(json!({
+                "model": body["model"],
+                "choices": [{"message": {"content": "ok"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1}
+            }))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {"fine": {"baseURL": working.base_url, "models": ["cheap-model"]}},
+        "models": {},
+        "opencodeModels": {"fine": {"models": ["cheap-model"], "tags": ["cheap"]}},
+        "opencodeAgentModels": {"compaction": "tag:cheap"}
+    }))
+    .await;
+    fs::write(proxy.directory.join("opencode.json"), "{}").unwrap();
+    let sync: Value = proxy
+        .client
+        .post(proxy.url("/api/opencode-sync"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(sync["ok"], true);
+
+    let answer = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "agent-tag:cheap", "messages": [{"role": "user", "content": "hi"}]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(answer.status(), StatusCode::OK);
+    let body: Value = answer.json().await.unwrap();
+    assert_eq!(body["model"], "cheap-model");
+
+    let models: Value = proxy
+        .client
+        .get(proxy.url("/v1/models"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let ids: Vec<&str> = models["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|model| model["id"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&"fine/cheap-model"));
+    assert!(!ids.iter().any(|id| id.starts_with("agent-tag:")));
+
+    let synced: Value =
+        serde_json::from_str(&fs::read_to_string(proxy.directory.join("opencode.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        synced["agents"]["compaction"]["model"],
+        "provider-proxy/agent-tag:cheap"
+    );
+    assert_eq!(
+        synced["providers"]["provider-proxy"]["models"]["agent-tag:cheap"]["name"],
+        "agent-tag:cheap (proxy, x1)"
+    );
+}
+
+#[tokio::test]
 async fn image_suggestions_use_connections_not_the_cached_catalog_or_legacy_allowlist() {
     let upstream = MockProvider::start(Router::new().route(
         "/v1/images/tasks",
@@ -627,9 +781,11 @@ async fn fails_over_when_a_stream_stalls_after_headers() {
         "the backup upstream must answer after the stall: {response}"
     );
     let usage = proxy.usage().await;
+    // A stall is not retried on the same model: it already waited the whole
+    // idle window, so the chain moves on and the backup answers.
     assert_eq!(
         usage["days"][0]["models"]["stalled/stalled-model"]["errors"], 1,
-        "the stalled attempt is an error: {usage}"
+        "the stalled attempt is one error: {usage}"
     );
     assert_eq!(
         usage["days"][0]["models"]["backup/backup-model"]["ok"], 1,
@@ -713,6 +869,57 @@ async fn retry_mode_gives_up_on_an_empty_chain() {
     );
 }
 
+/// A chain of one has nothing to fail over to, but "retry until answered" is
+/// still the user's choice: the request keeps retrying, it just parks its only
+/// model for the short `singleCooldownSec` instead of hours.
+#[tokio::test]
+async fn retry_mode_keeps_retrying_a_single_model_chain() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let failing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": {"message": "boom"}})))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "retryForever": true,
+        "errorCooldownSec": 120,
+        "singleCooldownSec": 1,
+        "providers": {"p": {"baseURL": failing.base_url}},
+        "models": {"solo": {"upstreams": [{"provider": "p", "model": "m"}]}},
+        "opencodeConfig": "/dev/null"
+    }))
+    .await;
+    let request = tokio::spawn({
+        let url = proxy.url("/v1/chat/completions");
+        let client = proxy.client.clone();
+        async move {
+            let _ = client
+                .post(url)
+                .json(&json!({"model": "solo", "messages": []}))
+                .send()
+                .await;
+        }
+    });
+    tokio::time::sleep(Duration::from_secs(4)).await;
+    request.abort();
+    let attempts = hits.load(Ordering::SeqCst);
+    assert!(
+        attempts >= 2,
+        "retry mode must keep going for a single model: {attempts} attempts in 4s"
+    );
+    assert!(
+        attempts <= 12,
+        "the short block still spaces the retries: {attempts} attempts in 4s"
+    );
+}
+
 /// A cooldown of zero (only possible through a hand-edited config) used to make
 /// the retry loop hammer the same upstream with no pause.
 #[tokio::test]
@@ -754,8 +961,11 @@ async fn retry_mode_never_hammers_with_a_zero_cooldown() {
     tokio::time::sleep(Duration::from_secs(3)).await;
     request.abort();
     let attempts = hits.load(Ordering::SeqCst);
+    // A 500 gets three tries inside one round now, and a clamped one-second
+    // cooldown allows about three rounds in three seconds. Anything far above
+    // that means the clamp is gone and the loop is spinning.
     assert!(
-        attempts <= 6,
+        attempts <= 12,
         "a zero cooldown must be clamped, not turned into a hot loop: {attempts} attempts in 3s"
     );
 }
@@ -1089,6 +1299,15 @@ async fn uptime_script_sees_the_model_list_and_its_bars_reach_the_gui() {
                 "baseURL": "http://127.0.0.1:1/v1",
                 "apiKey": "fixture",
                 "models": ["m1", "m2"],
+                // The script must see the catalog, not just the selection:
+                // `cat1`/`cat2` are served but never picked, `gone` was dropped
+                // by the provider, `hand` was typed in by the user.
+                "manualModels": ["hand"],
+                "modelAvailability": {
+                    "cat1": { "available": true },
+                    "cat2": { "available": true },
+                    "gone": { "available": false }
+                },
                 "uptimeScript": "import json, os, urllib.request\nurl = os.environ['PP_MODELS_API']\nreq = urllib.request.Request(url, headers={'authorization': 'Bearer ' + os.environ['PP_PROXY_TOKEN']})\nmodels = json.load(urllib.request.urlopen(req))['models']\nprint(json.dumps({'bars': [{'label': m, 'percent': 100} for m in models]}))\n"
             }
         },
@@ -1119,7 +1338,11 @@ async fn uptime_script_sees_the_model_list_and_its_bars_reach_the_gui() {
         .json()
         .await
         .unwrap();
-    assert_eq!(listed["models"], json!(["m1", "m2"]), "only the selected models");
+    assert_eq!(
+        listed["models"],
+        json!(["cat1", "cat2", "hand", "m1", "m2"]),
+        "the whole catalog, not just the selection"
+    );
     assert_eq!(listed.as_object().unwrap().len(), 2, "names only, nothing else about the provider");
 
     let missing = proxy
@@ -1146,8 +1369,9 @@ async fn uptime_script_sees_the_model_list_and_its_bars_reach_the_gui() {
     // script that ran and produced nothing usable must not pass silently.
     match run.get("bars") {
         Some(bars) => {
-            assert_eq!(bars[0]["label"], "m1");
-            assert_eq!(bars.as_array().unwrap().len(), 2);
+            let bars = bars.as_array().unwrap();
+            assert_eq!(bars.len(), 5, "every catalog model gets a bar, not just the picked ones");
+            assert_eq!(bars[0]["label"], "cat1", "a served but unpicked model is parsed too");
         }
         None => {
             let message = run["error"]["message"].as_str().unwrap_or_default();
@@ -1157,6 +1381,71 @@ async fn uptime_script_sees_the_model_list_and_its_bars_reach_the_gui() {
             );
         }
     }
+}
+
+/// The picked file wins over the saved text, so editing the script on disk is
+/// picked up without choosing it again. A file that disappeared falls back to
+/// the text saved when it was chosen.
+#[tokio::test]
+async fn an_edited_uptime_script_file_is_read_on_every_run() {
+    let dir = std::env::temp_dir().join(format!(
+        "provider-proxy-uptime-api-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("uptime.py");
+    std::fs::write(&path, "print('{\"bars\":[{\"label\":\"from-file\",\"percent\":100}]}')\n").unwrap();
+
+    let proxy = TestProxy::start(json!({
+        "authToken": "test-token",
+        "providers": {
+            "local": {
+                "baseURL": "http://127.0.0.1:1/v1",
+                "apiKey": "fixture",
+                "models": ["m1"],
+                "uptimeScript": "print('{\"bars\":[{\"label\":\"from-text\",\"percent\":100}]}')\n",
+                "uptimeScriptFile": "uptime.py",
+                "uptimeScriptPath": path.to_string_lossy()
+            }
+        },
+        "models": {}
+    }))
+    .await;
+    let auth = HeaderMap::from_iter([(
+        "authorization".parse().unwrap(),
+        "Bearer test-token".parse().unwrap(),
+    )]);
+    let run = || {
+        proxy
+            .client
+            .post(proxy.url("/api/uptime/run"))
+            .headers(auth.clone())
+            .json(&json!({ "provider": "local" }))
+    };
+
+    let answer: Value = run().send().await.unwrap().json().await.unwrap();
+    if let Some(message) = answer["error"]["message"].as_str() {
+        // No Python on this machine: nothing to prove about the file.
+        assert!(message.contains("не найден интерпретатор"), "{message}");
+        let _ = std::fs::remove_dir_all(&dir);
+        return;
+    }
+    assert_eq!(answer["bars"][0]["label"], "from-file", "the file beats the saved text");
+
+    // The user edits the file: the next run is the new script, no re-picking.
+    std::fs::write(&path, "print('{\"bars\":[{\"label\":\"edited\",\"percent\":50}]}')\n").unwrap();
+    let edited: Value = run().send().await.unwrap().json().await.unwrap();
+    assert_eq!(edited["bars"][0]["label"], "edited");
+
+    // The file goes away: the saved text keeps the provider working.
+    std::fs::remove_file(&path).unwrap();
+    let fallback: Value = run().send().await.unwrap().json().await.unwrap();
+    assert_eq!(fallback["bars"][0]["label"], "from-text");
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[tokio::test]
@@ -1334,4 +1623,281 @@ async fn lists_skill_folders_from_the_skills_directory() {
     assert_eq!(names, ["debugging", "image-generation"]);
     assert_eq!(body["skills"][0]["description"], "Find the cause");
     assert_eq!(body["skills"][1]["bundled"], true);
+}
+
+/// Three quiet retries, then a block: a model that keeps answering 502 is not
+/// worth a failover per request, and a single hiccup must not block it either.
+#[tokio::test]
+async fn an_unusable_model_gets_three_tries_inside_one_request() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let broken = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::BAD_GATEWAY, "boom")
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {"p": {"baseURL": broken.base_url}},
+        "models": {"chain": {"upstreams": [{"provider": "p", "model": "m"}]}}
+    }))
+    .await;
+
+    let response = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_ne!(response.status(), StatusCode::OK, "nothing answered");
+    assert_eq!(
+        hits.load(Ordering::SeqCst),
+        3,
+        "502 gets three attempts, not one and not a hot loop"
+    );
+    let usage = proxy.usage().await;
+    assert_eq!(usage["providers"]["p"]["errors"], 3, "every attempt is counted: {usage}");
+    assert_eq!(
+        usage["cooldowns"][0]["upstreamModel"], "m",
+        "after the third miss the model is blocked: {usage}"
+    );
+
+    // The block is real: the next request does not touch the dead upstream.
+    let _ = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), 3, "a blocked model is not retried");
+}
+
+/// Two rate limits from one provider in one request are the account, not the
+/// model: the whole provider is blocked, so another model of it is skipped too.
+#[tokio::test]
+async fn two_rate_limits_block_the_whole_provider() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let limited = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(json!({"error": {"message": "rate limit exceeded"}})),
+                )
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {"p": {"baseURL": limited.base_url}},
+        "models": {"chain": {"upstreams": [
+            {"provider": "p", "model": "one"},
+            {"provider": "p", "model": "two"},
+            {"provider": "p", "model": "three"}
+        ]}}
+    }))
+    .await;
+    let _ = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(hits.load(Ordering::SeqCst), 2, "the third model is skipped: the account is out");
+    let usage = proxy.usage().await;
+    let blocked: Vec<&str> = usage["cooldowns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|row| row["upstreamModel"].as_str())
+        .collect();
+    assert!(blocked.contains(&"*"), "the provider itself is blocked: {usage}");
+}
+
+/// A 400 that names a rate limit is a limit, not a bad request: it must switch
+/// and block like a 429 instead of being handed to the client.
+#[tokio::test]
+async fn a_400_that_names_a_rate_limit_switches_and_blocks() {
+    let limited = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|| async {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": {"message": "RateLimit: slow down"}})),
+            )
+        }),
+    ))
+    .await;
+    let healthy = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            Json(json!({"model": body["model"], "choices": [{"message": {"content": "ok"}}]}))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {
+            "limited": {"baseURL": limited.base_url},
+            "healthy": {"baseURL": healthy.base_url}
+        },
+        "models": {"chain": {"upstreams": [
+            {"provider": "limited", "model": "m"},
+            {"provider": "healthy", "model": "m"}
+        ]}}
+    }))
+    .await;
+    let response = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "messages": []}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK, "the healthy link answered");
+    let usage = proxy.usage().await;
+    assert_eq!(usage["providers"]["limited"]["limits"], 1, "counted as a limit: {usage}");
+    assert_ne!(
+        usage["cooldowns"][0]["until"], 0,
+        "the limited model rests: {usage}"
+    );
+}
+
+/// A 404 is a provider-side truth: the model is not there, so the request
+/// switches at once and the next request does not try it again.
+#[tokio::test]
+async fn a_404_switches_once_and_blocks_the_model() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let missing = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                (StatusCode::NOT_FOUND, "no such model")
+            }
+        }),
+    ))
+    .await;
+    let healthy = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(|Json(body): Json<Value>| async move {
+            Json(json!({"model": body["model"], "choices": [{"message": {"content": "ok"}}]}))
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {
+            "missing": {"baseURL": missing.base_url},
+            "healthy": {"baseURL": healthy.base_url}
+        },
+        "models": {"chain": {"upstreams": [
+            {"provider": "missing", "model": "gone"},
+            {"provider": "healthy", "model": "m"}
+        ]}}
+    }))
+    .await;
+    for _ in 0..2 {
+        let response = proxy
+            .client
+            .post(proxy.url("/v1/chat/completions"))
+            .json(&json!({"model": "chain", "messages": []}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    assert_eq!(hits.load(Ordering::SeqCst), 1, "a missing model is asked once, not every request");
+}
+
+/// The GUI pushes the external uptime it already fetched, so the chain can rank
+/// by it. An unknown provider is simply recorded, not an error.
+#[tokio::test]
+async fn the_gui_can_push_external_uptime_for_ranking() {
+    let proxy = TestProxy::start(json!({"providers": {}, "models": {}})).await;
+    let response = proxy
+        .client
+        .post(proxy.url("/api/uptime/bars"))
+        .json(&json!({"bars": [
+            {"provider": "p", "models": [{"model": "good", "percent": 98.5}, {"model": "bad", "percent": 12.0}]}
+        ]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body: Value = response.json().await.unwrap();
+    assert_eq!(body["ok"], true);
+}
+
+/// A 502 inside the attempt is retried on the same model before the chain moves
+/// on: the model `one` answers 502 twice and then works, so the healthy backup
+/// must never be asked.
+#[tokio::test]
+async fn a_gateway_error_is_retried_on_the_same_model_first() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let counter = hits.clone();
+    let flaky = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move |Json(body): Json<Value>| {
+            let counter = counter.clone();
+            async move {
+                let attempt = counter.fetch_add(1, Ordering::SeqCst);
+                if attempt < 2 {
+                    return (StatusCode::BAD_GATEWAY, "boom").into_response();
+                }
+                Json(json!({"model": body["model"], "choices": [{"message": {"content": "ok"}}]}))
+                    .into_response()
+            }
+        }),
+    ))
+    .await;
+    let backup_hits = Arc::new(AtomicUsize::new(0));
+    let backup_counter = backup_hits.clone();
+    let backup = MockProvider::start(Router::new().route(
+        "/v1/chat/completions",
+        post(move || {
+            let counter = backup_counter.clone();
+            async move {
+                counter.fetch_add(1, Ordering::SeqCst);
+                Json(json!({"choices": [{"message": {"content": "backup"}}]}))
+            }
+        }),
+    ))
+    .await;
+    let proxy = TestProxy::start(json!({
+        "providers": {
+            "flaky": {"baseURL": flaky.base_url},
+            "backup": {"baseURL": backup.base_url}
+        },
+        "models": {"chain": {"upstreams": [
+            {"provider": "flaky", "model": "m"},
+            {"provider": "backup", "model": "m"}
+        ]}}
+    }))
+    .await;
+    let body: Value = proxy
+        .client
+        .post(proxy.url("/v1/chat/completions"))
+        .json(&json!({"model": "chain", "messages": []}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(body["choices"][0]["message"]["content"], "ok", "the retried model answered");
+    assert_eq!(hits.load(Ordering::SeqCst), 3, "two 502s, then the answer, all on one model");
+    assert_eq!(backup_hits.load(Ordering::SeqCst), 0, "a hiccup must not cost the backup a request");
 }

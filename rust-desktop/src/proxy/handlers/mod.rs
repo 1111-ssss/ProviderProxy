@@ -23,7 +23,7 @@ use super::{
     },
     metrics::{
         cooldown_snapshot, log_count, log_page, now_ms, persist_usage, push_log,
-        usage_history_view, USAGE_RETENTION_DAYS,
+        uptime_snapshot, usage_history_view, USAGE_RETENTION_DAYS,
     },
     opencode::{default_opencode_config_setting, sync_opencode},
     routing::{add_model_metadata, direct_model_ids, map_headers, string_field, subst},

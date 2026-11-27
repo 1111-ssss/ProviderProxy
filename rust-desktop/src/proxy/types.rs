@@ -234,6 +234,16 @@ pub(crate) struct AppState {
     /// Last lifetime blob written, so an idle process does not commit the same
     /// row to SQLite every second.
     pub(crate) lifetime_persisted: Arc<Mutex<Option<String>>>,
+    /// Answers the proxy delivered, per model and per chain. Kept in memory for
+    /// the current day only: it is the second, "real" uptime strip.
+    pub(crate) uptime: Arc<Mutex<super::metrics::UptimeCounters>>,
+    /// External uptime the provider scripts reported, pushed by the GUI:
+    /// `provider -> model -> percent`. The chain ranking reads it to prefer a
+    /// model the provider's own status page calls healthy.
+    pub(crate) uptime_bars: Arc<Mutex<HashMap<String, HashMap<String, f64>>>>,
+    /// Outcome of the last attempt per `provider|model`. A model that answered
+    /// last time starts ahead of one that did not.
+    pub(crate) last_outcome: Arc<Mutex<HashMap<String, bool>>>,
     /// `provider/task_id` -> image key and creation time. Entries leave when a
     /// terminal poll arrives; the timestamp lets new tasks prune the ones whose
     /// tab was closed before that.

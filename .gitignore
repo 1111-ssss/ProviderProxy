@@ -14,3 +14,5 @@ server-error.log
 !.env.example
 .playwright-mcp/
 .opencode/
+__pycache__/
+*.pyc

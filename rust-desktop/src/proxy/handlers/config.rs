@@ -75,12 +75,13 @@ fn validate_imported_config(value: &Value) -> Result<(), &'static str> {
     if !value.is_object() {
         return Err("config must be an object");
     }
-    for key in ["providers", "models", "opencodeModels"] {
+    for key in ["providers", "models", "opencodeModels", "opencodeAgentModels"] {
         if value.get(key).is_some_and(|item| !item.is_object()) {
             return Err(match key {
                 "providers" => "providers must be an object",
                 "models" => "models must be an object",
-                _ => "opencodeModels must be an object",
+                "opencodeModels" => "opencodeModels must be an object",
+                _ => "opencodeAgentModels must be an object",
             });
         }
     }

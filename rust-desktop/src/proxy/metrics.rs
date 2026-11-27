@@ -275,6 +275,199 @@ pub(crate) fn persist_lifetime(state: &AppState) {
     }
 }
 
+/// One bucket's outcomes: answers delivered and attempts made.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct UptimeBucket {
+    pub ok: u64,
+    pub total: u64,
+}
+
+/// Outcome per five-minute slot of the current day. Five minutes is the
+/// resolution the hour window needs; the day view adds slots up into hours.
+/// Only today is kept: the second uptime strip is "what happened today".
+#[derive(Debug, Default)]
+pub(crate) struct UptimeDay {
+    /// Minutes since local midnight / 5, i.e. 0..288.
+    pub slots: HashMap<u16, UptimeBucket>,
+}
+
+const SLOTS_PER_HOUR: u16 = 12;
+const SLOTS_PER_DAY: u16 = 24 * SLOTS_PER_HOUR;
+
+#[derive(Debug, Default)]
+pub(crate) struct UptimeCounters {
+    day: String,
+    /// `provider/model` -> slots.
+    pub models: HashMap<String, UptimeDay>,
+    /// Exposed chain name -> slots. `provider/model` requests are chains too
+    /// (a one-link chain), but the GUI reads them from `models`.
+    pub chains: HashMap<String, UptimeDay>,
+}
+
+fn uptime_now() -> (String, u16) {
+    let now = Local::now();
+    let minutes = u16::from(now.format("%H").to_string().parse::<u8>().unwrap_or(0)) * 60
+        + u16::from(now.format("%M").to_string().parse::<u8>().unwrap_or(0));
+    (local_day_key(), minutes / 5)
+}
+
+impl UptimeCounters {
+    /// A new day starts empty; the previous day is dropped rather than summed.
+    fn roll(&mut self, day: &str) {
+        if self.day != day {
+            self.day = day.to_string();
+            self.models.clear();
+            self.chains.clear();
+        }
+    }
+
+    fn counts(&mut self, day: &str, slot: u16, chain: bool, name: &str) -> &mut UptimeBucket {
+        self.roll(day);
+        let rows = if chain { &mut self.chains } else { &mut self.models };
+        rows.entry(name.to_string())
+            .or_default()
+            .slots
+            .entry(slot)
+            .or_default()
+    }
+}
+
+/// One attempt against one upstream model: `ok` means the upstream answered.
+pub(crate) fn record_model_uptime(state: &AppState, provider: &str, model: &str, ok: bool) {
+    let (day, slot) = uptime_now();
+    let mut counters = state.uptime.lock().unwrap();
+    let bucket = counters.counts(&day, slot, false, &format!("{provider}/{model}"));
+    bucket.total += 1;
+    if ok {
+        bucket.ok += 1;
+    }
+}
+
+/// Undoes the provisional ok counted when the upstream sent headers: the body
+/// turned out empty, so the attempt is re-counted as a failure right after.
+pub(crate) fn revert_model_uptime(state: &AppState, provider: &str, model: &str) {
+    let (day, slot) = uptime_now();
+    let mut counters = state.uptime.lock().unwrap();
+    let bucket = counters.counts(&day, slot, false, &format!("{provider}/{model}"));
+    bucket.total = bucket.total.saturating_sub(1);
+    bucket.ok = bucket.ok.saturating_sub(1);
+}
+
+/// One client request against a chain: `ok` means the chain produced an answer.
+pub(crate) fn record_chain_uptime(state: &AppState, chain: &str, ok: bool) {
+    let (day, slot) = uptime_now();
+    let mut counters = state.uptime.lock().unwrap();
+    let bucket = counters.counts(&day, slot, true, chain);
+    bucket.total += 1;
+    if ok {
+        bucket.ok += 1;
+    }
+}
+
+fn uptime_percent(bucket: UptimeBucket) -> Option<f64> {
+    (bucket.total > 0).then(|| (bucket.ok as f64 / bucket.total as f64 * 1000.0).round() / 10.0)
+}
+
+fn sum_slots(day: &UptimeDay, range: std::ops::RangeInclusive<i64>) -> UptimeBucket {
+    let mut total = UptimeBucket::default();
+    for slot in range {
+        if slot < 0 || slot >= i64::from(SLOTS_PER_DAY) {
+            continue;
+        }
+        if let Some(bucket) = day.slots.get(&(slot as u16)) {
+            total.ok += bucket.ok;
+            total.total += bucket.total;
+        }
+    }
+    total
+}
+
+/// One cell. `percent` is absent when the slot saw no traffic, so the GUI draws
+/// it as an empty (grey) box instead of a misleading 0 %.
+fn slot_cell(today: &str, slot: i64, bucket: UptimeBucket) -> Value {
+    let minutes = (slot * 5).max(0) as u16;
+    let mut cell = json!({
+        "t": format!("{today}T{:02}:{:02}:00", minutes / 60, minutes % 60),
+        "percent": uptime_percent(bucket),
+        "ok": bucket.ok,
+        "total": bucket.total,
+    });
+    if slot < 0 {
+        // A slot before midnight has no date to name: it is a placeholder box,
+        // and a wrong timestamp would be worse than none.
+        cell.as_object_mut().map(|object| object.remove("t"));
+    }
+    cell
+}
+
+/// `{"percent", "percent1h", "percent24h", "ok", "total", "cells1h", "cells24h"}`
+/// for one key. Both windows are always present, so the tab's hour/day switch
+/// moves the second strip too — the script's window has nothing to do with it.
+/// Each strip is full width and ends at the current slot: a day that has just
+/// started shows grey placeholder boxes on the left, not a short line.
+fn uptime_entry_json(day: &UptimeDay, slot_now: u16, today: &str) -> Value {
+    let slot_now = i64::from(slot_now);
+    let day_total = sum_slots(day, 0..=i64::from(SLOTS_PER_DAY) - 1);
+    // Trailing hour: the last twelve five-minute slots, ending now.
+    let hour_start = slot_now - i64::from(SLOTS_PER_HOUR) + 1;
+    let hour_total = sum_slots(day, hour_start..=slot_now);
+    let cells1h: Vec<Value> = (hour_start..=slot_now)
+        .map(|slot| {
+            let bucket = if slot < 0 { UptimeBucket::default() } else {
+                day.slots.get(&(slot as u16)).copied().unwrap_or_default()
+            };
+            slot_cell(today, slot, bucket)
+        })
+        .collect();
+    let cells24h: Vec<Value> = (0..24)
+        .map(|index| {
+            let hour = slot_now / i64::from(SLOTS_PER_HOUR) - 23 + index;
+            let bucket = sum_slots(
+                day,
+                hour * i64::from(SLOTS_PER_HOUR)..=(hour + 1) * i64::from(SLOTS_PER_HOUR) - 1,
+            );
+            let mut cell = slot_cell(today, hour * i64::from(SLOTS_PER_HOUR), bucket);
+            if let Some(object) = cell.as_object_mut() {
+                match object.get("t").and_then(Value::as_str) {
+                    Some(_) if hour >= 0 => {
+                        object.insert("t".into(), json!(format!("{today}T{:02}:00:00", hour)));
+                    }
+                    _ => {
+                        object.remove("t");
+                    }
+                }
+            }
+            cell
+        })
+        .collect();
+    let percent = uptime_percent(day_total);
+    json!({
+        "percent": percent,
+        "percent24h": percent,
+        "percent1h": uptime_percent(hour_total),
+        "ok": day_total.ok,
+        "total": day_total.total,
+        "cells24h": cells24h,
+        "cells1h": cells1h,
+    })
+}
+
+pub(crate) fn uptime_snapshot(state: &AppState) -> Value {
+    let (today, slot_now) = uptime_now();
+    let mut counters = state.uptime.lock().unwrap();
+    counters.roll(&today);
+    let rows = |map: &HashMap<String, UptimeDay>| {
+        map.iter()
+            .map(|(name, day)| (name.clone(), uptime_entry_json(day, slot_now, &today)))
+            .collect::<serde_json::Map<_, _>>()
+    };
+    json!({
+        "day": today,
+        "models": rows(&counters.models),
+        "chains": rows(&counters.chains),
+    })
+}
+
 pub(crate) fn push_log(state: &AppState, message: impl Into<String>) {
     let line = format!(
         "[{}] {}",

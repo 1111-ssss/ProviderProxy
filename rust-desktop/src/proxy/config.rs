@@ -347,6 +347,7 @@ pub(crate) fn export_config(value: &Value, keys: bool, chains: bool, models: boo
         }
         if !models {
             object.remove("opencodeModels");
+            object.remove("opencodeAgentModels");
         }
     }
     exported

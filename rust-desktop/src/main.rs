@@ -53,6 +53,13 @@ async fn rollback_to(app: tauri::AppHandle, version: String) -> Result<bool, Str
     Ok(installed)
 }
 
+/// Reads the uptime script the user pointed at, so the dialog shows what is on
+/// disk right now instead of the copy saved when the file was picked.
+#[tauri::command]
+fn read_uptime_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|error| format!("не удалось прочитать файл: {error}"))
+}
+
 #[tauri::command]
 fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
     if updater::restart_pending()? {
@@ -200,6 +207,9 @@ fn main() {
                 .open_js_links_on_click(false)
                 .build(),
         )
+        // The uptime script is a file the user keeps editing, so the dialog asks
+        // for a path instead of reading the text once through <input type=file>.
+        .plugin(tauri_plugin_dialog::init())
         .manage(server.clone())
         .invoke_handler(tauri::generate_handler![
             check_for_update,
@@ -210,7 +220,8 @@ fn main() {
             platform::autostart_enabled,
             platform::set_autostart,
             platform::autostart_tray_enabled,
-            platform::create_app_shortcut
+            platform::create_app_shortcut,
+            read_uptime_file
         ])
         .setup(move |app| {
             let url = Url::parse(&format!("http://127.0.0.1:{port}/")).expect("local proxy URL");

@@ -78,6 +78,29 @@ function renderProviderModels() {
 // every model the provider has.
 const providerAutoAll = () => (cfg.providerAutoAll ??= {})
 const isAutoAllProvider = (name) => providerAutoAll()[name] === true
+
+/// Records what the provider serves right now. The map is replaced, not merged:
+/// a model the provider dropped used to keep its old `available: true` forever,
+/// so the uptime catalog showed models that had been gone for days. Entries
+/// kept are only the ones still referenced locally (selected, typed in by hand,
+/// or used by a chain) and they are marked unavailable, which is what the ⚠
+/// badge and the uptime catalog read.
+function applyProviderCatalog(provider, ids, details) {
+  const returned = new Set(ids)
+  const at = new Date().toISOString()
+  const availability = {}
+  for (const id of returned) availability[id] = { available: true, checkedAt: at }
+  const keep = new Set([
+    ...(provider.models ?? []),
+    ...(provider.manualModels ?? []),
+  ])
+  for (const id of keep) {
+    if (!returned.has(id)) availability[id] = { available: false, checkedAt: at }
+  }
+  provider.modelAvailability = availability
+  mergeProviderModelDetails(provider, details)
+}
+
 async function syncAutoAllProvider(name, { refreshOnly = false } = {}) {
   const provider = cfg.providers[name]
   if (!provider) return
@@ -89,20 +112,14 @@ async function syncAutoAllProvider(name, { refreshOnly = false } = {}) {
   // first paint the user has chosen nothing yet: refreshOnly just records what
   // the provider serves and leaves `models` alone.
   if (refreshOnly) {
-    provider.modelAvailability ??= {}
-    const at = new Date().toISOString()
-    for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
-    mergeProviderModelDetails(provider, res.details)
+    applyProviderCatalog(provider, res.ids, res.details)
     pmState.ids = [...new Set([...(provider.models ?? []), ...res.ids])]
     cleanupModelMetadata()
     return
   }
   provider.models = [...new Set([...res.ids, ...manual])]
-  provider.modelAvailability ??= {}
-  const at = new Date().toISOString()
-  for (const id of res.ids) provider.modelAvailability[id] = { available: true, checkedAt: at }
-  for (const id of manual) provider.modelAvailability[id] ??= { available: returned.has(id), checkedAt: at }
-  mergeProviderModelDetails(provider, res.details)
+  applyProviderCatalog(provider, res.ids, res.details)
+  for (const id of manual) provider.modelAvailability[id] ??= { available: returned.has(id), checkedAt: new Date().toISOString() }
   // The Models tab reads `all`, so keep that entry pointing at the fresh list.
   const direct = (cfg.opencodeModels ??= {})[name] ??= {}
   direct.all = true
@@ -125,6 +142,21 @@ async function syncAutoAllProviders({ refreshOnly = false } = {}) {
   }
 }
 
+/// Re-reads one provider's catalog without touching the Connections pane: the
+/// uptime tab needs fresh availability, not a redraw of another tab's state.
+/// `true` when the catalog changed.
+async function refreshProviderCatalog(name) {
+  if (!cfg.providers[name]) return false
+  const res = await fetchProviderModels(name)
+  if (res.error) return false
+  applyProviderCatalog(cfg.providers[name], res.ids, res.details)
+  cleanupModelMetadata()
+  // The uptime script reads this catalog from the proxy, so the write must land
+  // before the script runs or it parses yesterday's list.
+  await saveNow()
+  return true
+}
+
 async function loadPmModels(name) {
   if (!cfg.providers[name]) return
   pmState.loading = true
@@ -137,10 +169,11 @@ async function loadPmModels(name) {
   if (!res.error) {
     const provider = cfg.providers[name]
     const ids = [...new Set([...(provider.models ?? []), ...res.ids])]
-    const returned = new Set(res.ids)
-    const availability = (provider.modelAvailability ??= {})
-    for (const id of ids) availability[id] = { available: returned.has(id), checkedAt: new Date().toISOString() }
-    mergeProviderModelDetails(provider, res.details)
+    applyProviderCatalog(
+      provider,
+      res.ids,
+      res.details,
+    )
     pmState.ids = ids
     cleanupModelMetadata()
     const chainsChanged = removeImageModelsFromChains()

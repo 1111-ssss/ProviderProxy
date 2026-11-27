@@ -195,19 +195,21 @@ function renderUsageHourChart(u, report, today) {
     .map((v, i) => {
       const empty = !v.tin && !v.tout && !v.requests
       const time = `${String(v.at.getHours()).padStart(2, "0")}:00`
+      // Value first, name second: the eye compares numbers down the column, so
+      // the digits must line up on the left instead of trailing the label.
       const lines = [
-        `вход ${fmtTok(v.tin)}`,
-        `выход ${fmtTok(v.tout)}`,
-        `запросов ${fmtNum(v.requests)}`,
-        `Ok ${fmtNum(v.ok)}`,
-        `Err ${fmtNum(v.failed)}`,
+        [fmtTok(v.tin), "вход"],
+        [fmtTok(v.tout), "выход"],
+        [fmtNum(v.requests), "запросов"],
+        [fmtNum(v.ok), "успех"],
+        [fmtNum(v.failed), "ошибок"],
       ]
-      const hint = `${time} — ${lines.join(", ")}`
+      const hint = `${time} — ${lines.map(([value, name]) => `${name} ${value}`).join(", ")}`
       // Right-edge columns extend the hint leftwards, left-edge ones rightwards;
       // the middle ones stay centred over the column.
       const edge = i >= 20 ? " hour-hint-right" : i <= 3 ? " hour-hint-left" : ""
       return `<div class="hour-col${empty ? " empty" : ""}" tabindex="0" aria-label="${esc(hint)}">
-        <span class="hour-hint${edge}"><strong class="hour-hint-time">${time}</strong>${lines.map((line) => `<span>${line}</span>`).join("")}</span>
+        <span class="hour-hint${edge}"><strong class="hour-hint-time">${time}</strong>${lines.map(([value, name]) => `<span class="hour-hint-line"><b>${value}</b>${name}</span>`).join("")}</span>
         <div class="hour-col-stack"><span class="hour-bar" style="height:${((v.tin / maxTokens) * 100).toFixed(1)}%"></span></div>
         <span class="hour-label">${label(v.at)}</span>
       </div>`
@@ -531,6 +533,9 @@ async function load() {
     const chainsChanged = removeImageModelsFromChains()
     if (chainsChanged) save()
     renderAll()
+    // The uptime tab may already be the open one; its script loads after this
+    // file, so the first draw happens here and not in tabs.js.
+    if (tab === "uptime" && typeof refreshUptimeTab === "function") refreshUptimeTab()
     applyTheme(appSettings().theme)
     debugLog("boot-ok", { providers: Object.keys(cfg.providers).length, chains: Object.keys(cfg.models).length })
     // Providers bookmarked "all models" refresh before anything renders, so the

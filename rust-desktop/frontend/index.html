@@ -171,8 +171,9 @@
           <span class="muted">Если файл уже изменён вручную, приложение предложит его обновить.</span>
         </div>
       </div>
-      <div class="row" style="margin-top:12px">
-        <button type="button" id="integrations-advanced">Скиллы</button>
+      <div class="integration-management" role="group" aria-label="Управление интеграциями">
+        <button type="button" id="integrations-advanced">Управление скиллами</button>
+        <button type="button" id="integrations-agents">Управление агентами</button>
       </div>
     </div>
   </section>
@@ -271,11 +272,11 @@
         <h2>Логи</h2>
       <button type="button" class="field-help" data-hint="Записи прокси: переключения между провайдерами, ошибки апстримов и ответы моделей." aria-label="Что на вкладке «Логи»">?</button>
     </div>
+    <div class="log-pager" id="log-pager"></div>
     <div class="log-controls">
       <label class="search-field"><span class="sr-only">Поиск по логам</span><input id="log-search" type="search" placeholder="Поиск" aria-label="Поиск"><button id="log-filter-menu" class="search-filter" type="button" aria-label="Фильтр событий" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="log-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
     </div>
     <div class="logbox" id="logbox">-</div>
-    <div class="log-pager" id="log-pager"></div>
   </section>
 
   <section data-tab="usage">
@@ -366,14 +367,17 @@
       <h2>Аптайм</h2>
       <button type="button" class="field-help" data-hint="Доступность провайдеров и моделей по данным скрипта аптайма." aria-label="Что на вкладке «Аптайм»">?</button>
     </div>
-    <!-- Both views are placeholders: the tab exists so the section has a home,
-         the contents land in a later change. -->
+    <div class="filter-bar uptime-filter-bar">
+      <label class="search-field"><span class="sr-only">Поиск по аптайму</span><input id="uptime-search" type="search" placeholder="Поиск" autocomplete="off"><button id="uptime-search-filter" class="search-filter" type="button" aria-label="Фильтр аптайма" data-tip="Фильтр" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.5 8v5.5L10 21v-8Z"></path></svg></button><button id="uptime-search-clear" class="search-clear" type="button" aria-label="Очистить поиск" data-tip="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button></label>
+      <div id="uptime-tab-window" class="uptime-window" role="group" aria-label="Окно аптайма" hidden></div>
+      <button type="button" id="uptime-tab-refresh" class="pm-icon-button" aria-label="Обновить аптайм" data-tip="Обновить аптайм"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
+    </div>
     <div id="uptime-groups" class="usage-groups" role="tablist" aria-label="Разрезы аптайма">
       <button type="button" class="usage-group active" data-uptime-group="providers" role="tab" aria-selected="true">По провайдерам</button>
       <button type="button" class="usage-group" data-uptime-group="models" role="tab" aria-selected="false">По моделям</button>
     </div>
-    <div class="uptime-panel active" data-uptime-panel="providers"></div>
-    <div class="uptime-panel" data-uptime-panel="models"></div>
+    <div class="uptime-panel active" data-uptime-panel="providers"><div id="uptime-providers"></div></div>
+    <div class="uptime-panel" data-uptime-panel="models"><div id="uptime-models"></div></div>
   </section>
 
   <section data-tab="settings" class="settings-page">
@@ -411,89 +415,14 @@
         </div>
       </div>
       <div class="settings-block wide">
-        <h3>Защита от сбоев</h3>
-        <p>Время блокировки upstream после лимита или временной ошибки.</p>
-        <div class="settings-grid reset-grid">
-          <label for="s-limit">
-            <span class="field-label">Блокировка после лимита, сек
-              <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты." aria-label="Что значит «Блокировка после лимита»">?</button>
-            </span>
-            <span class="reset-input"><input id="s-limit" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-limit" aria-label="Сбросить блокировку после лимита" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
-          <label for="s-error">
-            <span class="field-label">Блокировка после ошибки, сек
-              <button type="button" class="field-help" data-hint="Сколько не отправлять запросы после сетевой ошибки или ответа 5xx." aria-label="Что значит «Блокировка после ошибки»">?</button>
-            </span>
-            <span class="reset-input"><input id="s-error" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-error" aria-label="Сбросить блокировку после ошибки" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
-          <label for="s-header">
-            <span class="field-label">Таймаут ответа, сек
-              <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
-            </span>
-            <span class="reset-input"><input id="s-header" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-header" aria-label="Сбросить таймаут ответа" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
-          <label for="s-stream-idle">
-            <span class="field-label">Тишина в потоке, сек
-              <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
-            </span>
-            <span class="reset-input"><input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-stream-idle" aria-label="Сбросить тишину в потоке" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
-          <label for="s-session-gap">
-            <span class="field-label">Пауза сессии, сек
-              <button type="button" class="field-help" data-hint="Длительность сессии — сумма пауз между запросами. Пауза длиннее этого значения считается простоем и не входит в длительность." aria-label="Что значит «Пауза сессии»">?</button>
-            </span>
-            <span class="reset-input"><input id="s-session-gap" type="number" min="30" max="86400" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-session-gap" aria-label="Сбросить паузу сессии" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
+        <h3>Общее</h3>
+        <p>Поведение запросов к моделям.</p>
+        <div class="settings-grid">
           <label class="setting-option reset-option" id="s-retry-forever-wrap">
             <input id="s-retry-forever" type="checkbox">
             <span>Повторять, пока модель не ответит<small>При любой ошибке прокси пробует модель снова. До 1 часа.</small></span>
             <button type="button" class="field-reset" data-reset="s-retry-forever" aria-label="Сбросить повторение запросов" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button>
           </label>
-          <label for="s-pending-buffer">
-            <span class="field-label">Буфер размышлений
-              <button type="button" class="field-help" data-hint="Сколько модель может думать вслух, прежде чем прокси сочтёт попытку пустой и перейдёт к следующей. Больше — терпимее к долгим размышлениям, но больше памяти на активный запрос." aria-label="Что значит «Буфер размышлений»">?</button>
-            </span>
-            <span class="reset-input"><select id="s-pending-buffer">
-              <option value="16384">16 КиБ</option>
-              <option value="262144">256 КиБ</option>
-              <option value="1048576">1 МиБ</option>
-              <option value="2097152">2 МиБ</option>
-              <option value="4194304">4 МиБ</option>
-              <option value="8388608">8 МиБ</option>
-              <option value="16777216">16 МиБ</option>
-            </select><button type="button" class="field-reset" data-reset="s-pending-buffer" aria-label="Сбросить буфер размышлений" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
-          </label>
-        </div>
-      </div>
-      <div class="settings-block">
-        <h3>Внешний вид и запуск</h3>
-        <p>Настрой интерфейс и запуск приложения.</p>
-        <div class="settings-grid">
-          <label for="s-theme-open">
-            <span class="field-label">Тема интерфейса
-              <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола. Остальные темы — фиксированные палитры." aria-label="Что значит «Тема интерфейса»">?</button>
-            </span>
-            <button type="button" id="s-theme-open" class="theme-open-button"><span id="s-theme-current">Тёмная</span></button>
-          </label>
-          <label class="setting-option" id="s-tag-categories-wrap">
-            <input id="s-tag-categories" type="checkbox">
-            <span>Показывать теги как категории<small>Ряд тегов под поиском на вкладках «Цепочки» и «Модели»: один клик фильтрует список.</small></span>
-          </label>
-          <label class="setting-option" id="s-autostart-wrap">
-            <input id="s-autostart" type="checkbox">
-            <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
-          </label>
-          <label class="setting-option is-disabled" id="s-autostart-tray-wrap">
-            <input id="s-autostart-tray" type="checkbox">
-            <span>Стартовать свёрнутым в трей<small id="s-autostart-tray-help">Без окна — только значок в трее. Работает вместе с автозапуском.</small></span>
-          </label>
-          <div class="setting-option setting-action" id="s-shortcut-wrap">
-            <span>Ярлыки приложения</span>
-            <div class="row shortcut-actions">
-              <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
-              <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
-            </div>
-          </div>
         </div>
       </div>
       <div class="settings-block">
@@ -518,20 +447,138 @@
           </div>
         </div>
       </div>
-      <div class="settings-block wide">
-        <h3>Импорт и экспорт конфигурации</h3>
-        <p>JSON-файл для переноса настроек. Секреты входят в экспорт только если включён этот пункт.</p>
+      <div class="settings-block">
+        <h3>Внешний вид и запуск</h3>
+        <p>Настрой интерфейс и запуск приложения.</p>
         <div class="settings-grid">
-          <label class="setting-option"><input id="config-export-keys" type="checkbox" checked><span>Ключи и токен доступа<small>API-ключи провайдеров и authToken</small></span></label>
-          <label class="setting-option"><input id="config-export-chains" type="checkbox" checked><span>Цепочки<small>Модели failover из вкладки «Цепочки»</small></span></label>
-          <label class="setting-option"><input id="config-export-models" type="checkbox" checked><span>Модели<small>Прямые модели из вкладки «Модели»</small></span></label>
-        </div>
-        <div class="row" style="margin-top:12px">
-          <button type="button" id="config-export">Экспортировать JSON</button>
-          <button type="button" id="config-import">Импортировать JSON</button>
-          <input id="config-import-file" type="file" accept="application/json,.json" hidden>
+          <label for="s-theme-open">
+            <span class="field-label">Тема интерфейса
+              <button type="button" class="field-help" data-hint="«Как в системе» следует текущей теме рабочего стола. Остальные темы — фиксированные палитры." aria-label="Что значит «Тема интерфейса»">?</button>
+            </span>
+            <button type="button" id="s-theme-open" class="theme-open-button"><span id="s-theme-current">Тёмная</span></button>
+          </label>
+          <label class="setting-option" id="s-tag-categories-wrap">
+            <input id="s-tag-categories" type="checkbox">
+            <span>Показывать теги как категории<small>Ряд тегов под поиском на вкладках «Цепочки» и «Модели»: один клик фильтрует список.</small></span>
+          </label>
+          <label class="setting-option" id="s-logs-reversed-wrap">
+            <input id="s-logs-reversed" type="checkbox">
+            <span>Отзеркалить логи<small>Старые записи сверху, новые снизу. Поиск и фильтры уходят под список, пагинация — над ним.</small></span>
+          </label>
+          <label class="setting-option" id="s-autostart-wrap">
+            <input id="s-autostart" type="checkbox">
+            <span>Запускать приложение вместе с системой<small id="s-autostart-help">Windows и Linux</small></span>
+          </label>
+          <label class="setting-option is-disabled" id="s-autostart-tray-wrap">
+            <input id="s-autostart-tray" type="checkbox">
+            <span>Стартовать свёрнутым в трей<small id="s-autostart-tray-help">Без окна — только значок в трее. Работает вместе с автозапуском.</small></span>
+          </label>
         </div>
       </div>
+      <div class="settings-block">
+        <h3>Прочее</h3>
+        <p>Ярлыки для запуска приложения.</p>
+        <div class="settings-grid">
+          <div class="setting-option setting-action" id="s-shortcut-wrap">
+            <span>Ярлыки приложения</span>
+            <div class="row shortcut-actions">
+              <button type="button" id="s-create-shortcut-menu">В меню приложений</button>
+              <button type="button" id="s-create-shortcut-desktop">На рабочем столе</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <details class="settings-block wide settings-advanced">
+        <summary>Расширенные настройки</summary>
+        <div class="settings-page-grid">
+        <div class="settings-block wide">
+          <h3>Защита от сбоев</h3>
+          <p>Время блокировки upstream после лимита или временной ошибки.</p>
+          <div class="settings-grid reset-grid">
+            <label for="s-limit">
+              <span class="field-label">Блокировка после лимита, сек
+                <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к провайдеру после ответа 429 или исчерпания квоты." aria-label="Что значит «Блокировка после лимита»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-limit" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-limit" aria-label="Сбросить блокировку после лимита" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-error">
+              <span class="field-label">Блокировка после ошибки, сек
+                <button type="button" class="field-help" data-hint="Сколько не отправлять запросы после сетевой ошибки или ответа 5xx." aria-label="Что значит «Блокировка после ошибки»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-error" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-error" aria-label="Сбросить блокировку после ошибки" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-single">
+              <span class="field-label">Блок одиночной модели, сек
+                <button type="button" class="field-help" data-hint="Сколько не отправлять запросы к модели, у которой в цепочке нет запасной: блокируется после того же, что и остальные, но не дольше этого значения. Этот же предел — сколько ждать полностью заблокированную цепочку, прежде чем снять блоки и попробовать снова." aria-label="Что значит «Блок одиночной модели»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-single" type="number" min="1" max="3600" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-single" aria-label="Сбросить блок одиночной модели" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-header">
+              <span class="field-label">Таймаут ответа, сек
+                <button type="button" class="field-help" data-hint="Ожидание заголовков ответа. Пока стрим идёт, таймаут не считается." aria-label="Что значит «Таймаут ответа»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-header" type="number" min="1" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-header" aria-label="Сбросить таймаут ответа" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-stream-idle">
+              <span class="field-label">Тишина в потоке, сек
+                <button type="button" class="field-help" data-hint="Сколько ждать хоть одного байта от провайдера после ответа 200. Если молчит дольше — попытка считается неудачной и цепочка берёт следующего." aria-label="Что значит «Тишина в потоке»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-stream-idle" type="number" min="10" max="3600" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-stream-idle" aria-label="Сбросить тишину в потоке" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-session-gap">
+              <span class="field-label">Пауза сессии, сек
+                <button type="button" class="field-help" data-hint="Длительность сессии — сумма пауз между запросами. Пауза длиннее этого значения считается простоем и не входит в длительность." aria-label="Что значит «Пауза сессии»">?</button>
+              </span>
+              <span class="reset-input"><input id="s-session-gap" type="number" min="30" max="86400" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-session-gap" aria-label="Сбросить паузу сессии" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+            <label for="s-pending-buffer">
+              <span class="field-label">Буфер размышлений
+                <button type="button" class="field-help" data-hint="Сколько модель может думать вслух, прежде чем прокси сочтёт попытку пустой и перейдёт к следующей. Больше — терпимее к долгим размышлениям, но больше памяти на активный запрос." aria-label="Что значит «Буфер размышлений»">?</button>
+              </span>
+              <span class="reset-input"><select id="s-pending-buffer">
+                <option value="16384">16 КиБ</option>
+                <option value="262144">256 КиБ</option>
+                <option value="1048576">1 МиБ</option>
+                <option value="2097152">2 МиБ</option>
+                <option value="4194304">4 МиБ</option>
+                <option value="8388608">8 МиБ</option>
+                <option value="16777216">16 МиБ</option>
+              </select><button type="button" class="field-reset" data-reset="s-pending-buffer" aria-label="Сбросить буфер размышлений" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+            </label>
+          </div>
+        </div>
+          <div class="settings-block">
+            <h3>Аптайм</h3>
+            <p>Фоновое обновление и аптайм цепочек.</p>
+            <div class="settings-grid">
+              <label for="s-uptime-refresh">
+                <span class="field-label">Обновлять аптайм, мин
+                  <button type="button" class="field-help" data-hint="Раз в столько минут опрашивать провайдеров со скриптом аптайма, по очереди. 0 — не обновлять автоматически; вручную аптайм всё равно доступен." aria-label="Что значит «Обновлять аптайм»">?</button>
+                </span>
+                <span class="reset-input"><input id="s-uptime-refresh" type="number" min="0" max="1440" step="1" inputmode="numeric"><button type="button" class="field-reset" data-reset="s-uptime-refresh" aria-label="Сбросить период обновления аптайма" data-tip="Сбросить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"></path><path d="M3 3v5h5"></path></svg></button></span>
+              </label>
+              <label class="setting-option" id="s-uptime-chain-average-wrap">
+                <input id="s-uptime-chain-average" type="checkbox">
+                <span>Аптайм цепочки по среднему<small>По умолчанию у цепочки берётся лучший аптайм её моделей: одна живая модель держит цепочку. Среднее показывает всю цепочку.</small></span>
+              </label>
+            </div>
+          </div>
+        <div class="settings-block wide">
+          <h3>Импорт и экспорт конфигурации</h3>
+          <p>JSON-файл для переноса настроек. Секреты входят в экспорт только если включён этот пункт.</p>
+          <div class="settings-grid">
+            <label class="setting-option"><input id="config-export-keys" type="checkbox" checked><span>Ключи и токен доступа<small>API-ключи провайдеров и authToken</small></span></label>
+            <label class="setting-option"><input id="config-export-chains" type="checkbox" checked><span>Цепочки<small>Модели failover из вкладки «Цепочки»</small></span></label>
+            <label class="setting-option"><input id="config-export-models" type="checkbox" checked><span>Модели<small>Прямые модели из вкладки «Модели»</small></span></label>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button type="button" id="config-export">Экспортировать JSON</button>
+            <button type="button" id="config-import">Импортировать JSON</button>
+            <input id="config-import-file" type="file" accept="application/json,.json" hidden>
+          </div>
+        </div>
+        </div>
+      </details>
     </div>
     <div class="settings-page-actions">
       <button type="button" id="settings-shutdown" class="danger">Выйти из приложения</button>
@@ -592,11 +639,10 @@
             <button type="button" class="field-help" data-hint="Python-скрипт, который печатает JSON вида {&quot;bars&quot;:[{&quot;label&quot;:&quot;модель&quot;,&quot;percent&quot;:97.5}]} в stdout. Переменные окружения: PP_PROXY_URL, PP_PROXY_TOKEN, PP_PROVIDER, PP_MODELS_API." aria-label="Что значит «Скрипт аптайма»">?</button>
           </span>
           <div class="file-pick">
-            <label class="file-pick-button">
-              <input id="dp-uptime-file" type="file" accept=".py,.python,.txt,text/x-python,text/plain">
-              <span>Выбрать файл</span>
-            </label>
+            <button type="button" id="dp-uptime-pick" class="file-pick-button">Выбрать файл</button>
+            <input id="dp-uptime-file" class="file-pick-input" type="file" accept=".py,.python,.txt,text/x-python,text/plain">
             <span id="dp-uptime-name" class="file-pick-name muted">файл не выбран</span>
+            <button type="button" id="dp-uptime-reload" class="icon-action" data-tip="Перечитать файл" aria-label="Перечитать файл" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path><path d="M21 3v5h-5"></path></svg></button>
             <button type="button" id="dp-uptime-clear" class="icon-action" data-tip="Убрать скрипт" aria-label="Убрать скрипт" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6M14 11v6"></path></svg></button>
           </div>
         </div>
@@ -732,6 +778,38 @@
     </div>
     <div class="dialog-actions">
       <button value="close">Закрыть</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Диалог: управление агентами OpenCode -->
+<dialog id="dlg-integration-agents" aria-labelledby="integration-agents-title">
+  <form method="dialog" class="dialog-form">
+    <div class="dialog-header">
+      <h3 id="integration-agents-title">Управление агентами</h3>
+      <p>Выбери модель для фоновых задач OpenCode. Основная модель сессии не меняется.</p>
+    </div>
+    <div class="dialog-body agent-settings-list">
+      <label class="agent-setting" for="agent-compaction">
+        <span><strong>Compaction</strong><small>Сжатие истории диалога</small></span>
+        <select id="agent-compaction"></select>
+      </label>
+      <label class="agent-setting" for="agent-explore">
+        <span><strong>Explore</strong><small>Поиск и исследование без правок</small></span>
+        <select id="agent-explore"></select>
+      </label>
+      <label class="agent-setting" for="agent-title">
+        <span><strong>Title</strong><small>Создание названия сессии</small></span>
+        <select id="agent-title"></select>
+      </label>
+      <label class="agent-setting" for="agent-summary">
+        <span><strong>Summary</strong><small>Краткая сводка сессии</small></span>
+        <select id="agent-summary"></select>
+      </label>
+      <p id="agent-settings-status" class="muted" role="status"></p>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="integration-agents-cancel">Закрыть</button>
     </div>
   </form>
 </dialog>

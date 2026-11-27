@@ -143,6 +143,9 @@ pub fn start_server(
         usage_day: Arc::new(Mutex::new(usage_day)),
         lifetime: Arc::new(Mutex::new(lifetime)),
         lifetime_persisted: Arc::new(Mutex::new(None)),
+        uptime: Arc::new(Mutex::new(Default::default())),
+        uptime_bars: Arc::new(Mutex::new(HashMap::new())),
+        last_outcome: Arc::new(Mutex::new(HashMap::new())),
         image_tasks: Arc::new(Mutex::new(HashMap::new())),
         // Streaming responses must not have a total request timeout: the
         // upstream may spend a long time producing the first token and then
@@ -157,7 +160,7 @@ pub fn start_server(
     };
     push_log(
         &state,
-        format!("provider_proxy Rust on http://127.0.0.1:{actual_port}/v1 — desktop GUI"),
+        format!("Приложение запущено — provider_proxy Rust on http://127.0.0.1:{actual_port}/v1 — desktop GUI"),
     );
     let persistence_state = state.clone();
     std::thread::Builder::new()
@@ -240,6 +243,8 @@ fn router(state: AppState) -> Router {
             get(handlers::provider_models_list),
         )
         .route("/api/uptime/run", post(handlers::run_uptime))
+        .route("/api/uptime/answers", get(handlers::get_uptime_answers))
+        .route("/api/uptime/bars", post(handlers::put_uptime_bars))
         .route("/api/image-tasks", post(handlers::image_task_create))
         .route(
             "/api/image-tasks/{provider}/{task_id}",

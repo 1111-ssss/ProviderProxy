@@ -151,6 +151,52 @@ pub(crate) fn build_chains(config: &Value) -> HashMap<String, Vec<Upstream>> {
             }
         }
     }
+    if let Some(agent_models) = config.get("opencodeAgentModels").and_then(Value::as_object) {
+        let tags: std::collections::BTreeSet<&str> = agent_models
+            .values()
+            .filter_map(Value::as_str)
+            .filter_map(|value| value.strip_prefix("tag:"))
+            .collect();
+        for tag in tags {
+            let mut members = Vec::new();
+            if let Some(models) = config.get("models").and_then(Value::as_object) {
+                for (name, definition) in models {
+                    if definition.get("enabled").and_then(Value::as_bool) == Some(false)
+                        || !definition
+                            .get("tags")
+                            .and_then(Value::as_array)
+                            .is_some_and(|tags| tags.iter().any(|value| value.as_str() == Some(tag)))
+                    {
+                        continue;
+                    }
+                    members.extend(result.get(name).into_iter().flatten().cloned());
+                }
+            }
+            if let Some(direct) = config.get("opencodeModels").and_then(Value::as_object) {
+                for (provider, definition) in direct {
+                    if definition.get("enabled").and_then(Value::as_bool) == Some(false)
+                        || !definition
+                            .get("tags")
+                            .and_then(Value::as_array)
+                            .is_some_and(|tags| tags.iter().any(|value| value.as_str() == Some(tag)))
+                    {
+                        continue;
+                    }
+                    for model in direct_model_ids(
+                        providers.and_then(|all| all.get(provider)).unwrap_or(&Value::Null),
+                        definition,
+                    ) {
+                        if let Some(upstream) = result.get(&format!("{provider}/{model}")) {
+                            members.extend(upstream.iter().cloned());
+                        }
+                    }
+                }
+            }
+            if !members.is_empty() {
+                result.insert(format!("agent-tag:{tag}"), members);
+            }
+        }
+    }
     result
 }
 
@@ -227,6 +273,51 @@ pub(crate) fn failover_status(status: axum::http::StatusCode) -> bool {
             | axum::http::StatusCode::REQUEST_TIMEOUT
             | axum::http::StatusCode::TOO_MANY_REQUESTS
     ) || status.is_server_error()
+}
+
+/// Upstreams in the order this request should try them.
+///
+/// Three things decide it, in the order the user asked for: the position in the
+/// configured chain, what the provider's own status page says about the model
+/// right now, and whether its last attempt answered. The first link keeps a
+/// strong vote, so a healthy chain still starts where the user put it; a dead
+/// first link (0 % external, failed last time) drops below a live second one.
+pub(crate) fn rank_chain(
+    chain: &[Upstream],
+    uptime: &HashMap<String, HashMap<String, f64>>,
+    last_outcome: &HashMap<String, bool>,
+) -> Vec<Upstream> {
+    let count = chain.len().max(1) as f64;
+    let mut ranked: Vec<(f64, usize, Upstream)> = chain
+        .iter()
+        .enumerate()
+        .map(|(index, upstream)| {
+            let priority = 1.0 - index as f64 / count;
+            let external = uptime
+                .get(&upstream.name)
+                .and_then(|models| models.get(&upstream.model))
+                .map(|percent| (percent / 100.0).clamp(0.0, 1.0))
+                .unwrap_or(0.5);
+            let answered = match last_outcome.get(&format!("{}|{}", upstream.name, upstream.model)) {
+                Some(true) => 1.0,
+                Some(false) => 0.0,
+                // Never tried: the middle, so it neither wins nor loses.
+                None => 0.5,
+            };
+            (
+                2.0 * priority + 1.5 * external + answered,
+                index,
+                upstream.clone(),
+            )
+        })
+        .collect();
+    // The index breaks ties, which keeps the user's own order stable.
+    ranked.sort_by(|a, b| {
+        b.0.partial_cmp(&a.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.cmp(&b.1))
+    });
+    ranked.into_iter().map(|(_, _, upstream)| upstream).collect()
 }
 
 pub(crate) fn add_model_metadata(

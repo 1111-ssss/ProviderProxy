@@ -175,6 +175,42 @@ test("removing connection models cleans chains and direct models", () => {
   assert.equal(run("cfg.opencodeModels.unselected"), undefined)
 })
 
+test("the hour hint names the numbers in Russian and keeps them in a column", () => {
+  const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
+  const source = usage.slice(usage.indexOf("function renderUsageHourChart"), usage.indexOf("// Compact two-row-per-record table"))
+  const chart = { innerHTML: "", onpointermove: null, onfocusin: null }
+  const title = { textContent: "" }
+  const sandbox = {
+    fmtNum: String,
+    fmtTok: (v) => `${v}`,
+    esc: (s) => String(s ?? ""),
+    $: (id) => (id === "u-hour-chart" ? chart : title),
+    Date,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  // One hour with every outcome, so all five hint lines are drawn.
+  vm.runInContext(
+    // A past date: "today" would be a rolling window and the fixed hour would
+    // drop out of it as the clock moves.
+    'renderUsageHourChart({ date: "2026-11-26", hours: { "10": { tokensIn: 1200, tokensOut: 90, requests: 5, ok: 4, failed: 1 } } }, { days: [] }, "2026-11-27")',
+    sandbox,
+  )
+  // The labels read as words, not as "Ok"/"Err" abbreviations.
+  assert.match(chart.innerHTML, /успех/)
+  assert.match(chart.innerHTML, /ошибок/)
+  assert.doesNotMatch(chart.innerHTML, />Ok /)
+  assert.doesNotMatch(chart.innerHTML, />Err /)
+  // Every hint line puts the value before its name, so digits line up.
+  for (const [, value, name] of chart.innerHTML.matchAll(/<span class="hour-hint-line"><b>([^<]+)<\/b>([^<]+)<\/span>/g)) {
+    assert.ok(value.trim().length, "a hint line must carry a value")
+    assert.ok(["вход", "выход", "запросов", "успех", "ошибок"].includes(name.trim()), `unexpected hint label: ${name}`)
+  }
+  assert.match(chart.innerHTML, /<b>1200<\/b>вход/)
+  assert.match(chart.innerHTML, /<b>4<\/b>успех/)
+  assert.match(chart.innerHTML, /<b>1<\/b>ошибок/)
+})
+
 test("lifetime panel shows request-based favourites and generated images, not speed", () => {
   const usage = readFileSync(new URL("js/usage.js", FRONTEND), "utf8")
   const source = usage.slice(usage.indexOf("function renderLifetimePanel"), usage.indexOf("const usageDayLabel"))
@@ -665,6 +701,35 @@ test("askConfirm resolves ok/cancel and Escape counts as cancel", async () => {
   assert.equal(await resetRun, false)
 })
 
+test("a catalog refresh drops models the provider no longer serves", () => {
+  const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
+  const source = connections.slice(
+    connections.indexOf("function applyProviderCatalog"),
+    connections.indexOf("async function syncAutoAllProvider"),
+  )
+  const sandbox = {
+    mergeProviderModelDetails(provider, details) { provider.modelInfo = { ...(provider.modelInfo ?? {}), ...details } },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + "\nthis.applyProviderCatalog = applyProviderCatalog", sandbox)
+  const provider = {
+    // `gone` was picked from an old catalog, `hand` was typed in, `served` is
+    // what the provider still lists.
+    models: ["gone", "served"],
+    manualModels: ["hand"],
+    modelAvailability: { gone: { available: true, checkedAt: "2026-11-01T00:00:00Z" } },
+  }
+  sandbox.applyProviderCatalog(provider, ["served", "fresh"], { served: { contextLength: 8192 } })
+  assert.deepEqual(Object.keys(provider.modelAvailability).sort(), ["fresh", "gone", "hand", "served"])
+  assert.equal(provider.modelAvailability.served.available, true, "a served model is available")
+  assert.equal(provider.modelAvailability.fresh.available, true, "a new model is recorded")
+  // The stale entries stay but are marked unavailable: the map is rebuilt from
+  // the answer, so a model cannot keep `true` forever.
+  assert.equal(provider.modelAvailability.gone.available, false)
+  assert.equal(provider.modelAvailability.hand.available, false, "a manual model the provider lacks is marked too")
+  assert.equal(provider.modelInfo.served.contextLength, 8192, "details still merge")
+})
+
 test("connections bulk select ticks everything and deselect cleans references", () => {
   const connections = readFileSync(new URL("js/connections.js", FRONTEND), "utf8")
   const source = connections.slice(connections.indexOf("function pmBulkSelect"), connections.indexOf('$("pm-menu").onclick'))
@@ -871,7 +936,7 @@ test("the log facet list is ordered by last activity once per opening", () => {
 test("log filters join groups with AND and values inside a group with OR", () => {
   const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
   const source = logs.slice(logs.indexOf("const LOG_PAGE_SIZE"), logs.indexOf("function logFilterActive"))
-  const sandbox = { document: { addEventListener() {} } }
+  const sandbox = { document: { addEventListener() {} }, appSettings: () => ({ logsReversed: false }) }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   const answer = "[2026-11-23 10:00:00] router → ответ: router (p/m) [ses:a]"
@@ -931,7 +996,7 @@ test("a drag pick is staged until the pointer is released", () => {
 test("log search also matches the session title", () => {
   const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
   const source = logs.slice(logs.indexOf("const LOG_PAGE_SIZE"), logs.indexOf("function renderLogs"))
-  const sandbox = { document: { addEventListener() {} } }
+  const sandbox = { document: { addEventListener() {} }, appSettings: () => ({ logsReversed: false }) }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
   vm.runInContext('logSessionTitles = { ses_abc123: "Починить меню" }', sandbox)
@@ -1086,54 +1151,456 @@ test("the tag category row follows the setting and filters on one click", () => 
   assert.match(box.innerHTML, /class="tag-chip tag-toggle is-on" data-tag="дешёвый"/, "the picked chip stays lit")
 })
 
-test("the uptime button appears only for a provider with a script and draws its bars", async () => {
-  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
-  const source = providers.slice(providers.indexOf("function renderProviders()"), providers.indexOf('$("p-checkins").onclick'))
-  const box = { innerHTML: "", querySelectorAll: () => [] }
+test("the uptime dialog draws bars, their time cells and both windows", async () => {
+  // The script is the provider's own; the dialog only maps its answer onto the
+  // shared bar markup. Cells are the strip a status page draws.
+  const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
+  const draw = uptime.slice(uptime.indexOf("let uptimeProvider = null"), uptime.indexOf('$("uptime-refresh").onclick'))
+  const element = () => ({ innerHTML: "", hidden: false, textContent: "", dataset: {}, buttons: [], querySelectorAll() { return this.buttons } })
+  const body = element()
+  // The switch is wired once the markup lands, so the stub hands back the same
+  // button objects it parsed: the handler the code sets is the one clicked.
+  body.querySelectorAll = function () {
+    for (const [, value] of this.innerHTML.matchAll(/data-uptime-window="([^"]+)"/g)) {
+      if (!this.buttons.some((button) => button.dataset.uptimeWindow === value)) {
+        this.buttons.push({ dataset: { uptimeWindow: value }, onclick: null })
+      }
+    }
+    return this.buttons
+  }
+  const meta = { textContent: "" }
+  let payload = { bars: [{ label: "m1", percent: 99.5 }, { label: "m2", percent: 40 }] }
   const sandbox = {
-    cfg: { providers: {
-      scripted: { baseURL: "https://a.example/v1", models: ["m"], uptimeScript: "print(1)" },
-      plain: { baseURL: "https://b.example/v1", models: ["m"] },
-    } },
-    providersFilter: "",
+    fmtUptimeMs: (v) => `${Math.round(v)} мс`,
     esc: (s) => String(s ?? ""),
-    emptyStateHtml: () => "",
-    $: (id) => id === "providers" ? box : { style: {}, innerHTML: "" },
-    openProviderDialog() {}, openUrl() {}, openUptimeDialog() {},
+    plural: (n, one) => `${n} ${one}`,
+    apiErrorMessage: (p, fallback) => p?.error?.message ?? fallback,
+    api: async () => ({ ok: true, status: 200, json: async () => payload }),
+    $: (id) => (id === "uptime-body" ? body : meta),
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    debugLog() {},
+    cfg: { providers: {} },
+    document: {},
+    // The tab lives below this slice; the dialog only tells it to redraw.
+    renderUptimeTab() {},
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(draw, sandbox)
+  vm.runInContext('uptimeProvider = "p"', sandbox)
+  await vm.runInContext("loadUptime()", sandbox)
+  assert.match(body.innerHTML, /m1/, "every bar is drawn")
+  assert.match(body.innerHTML, /99\.5%/, "the percentage is shown as the script reported it")
+  assert.match(body.innerHTML, /uptime-row-percent success/, "a healthy model gets the success colour")
+  assert.match(body.innerHTML, /uptime-row-percent error/, "a low one gets the problem colour")
+  assert.doesNotMatch(body.innerHTML, /token-track|token-fill/, "the duplicate progress bar is gone")
+  assert.match(meta.textContent, /2 модель/, "the header counts the bars")
+  assert.match(meta.textContent, /за 24 часа/, "a bar with one percentage names its window")
+  assert.doesNotMatch(body.innerHTML, /uptime-window/, "one window needs no switch")
+  assert.doesNotMatch(body.innerHTML, /token-row-foot/, "no metrics, no empty row")
+
+  // Optional numbers: speed, first token and ping are drawn only when sent.
+  payload = { bars: [{ label: "m1", percent: 97, tps: 12.34, ttftMs: 820, latencyMs: 1500 }] }
+  await vm.runInContext("loadUptime()", sandbox)
+  assert.match(body.innerHTML, /12\.3 ток\/с/)
+  assert.match(body.innerHTML, /1-й токен 820 мс/, "first token is spelled out, not ttft")
+  assert.match(body.innerHTML, /ping 1\.5 с/, "a slow ping switches to seconds")
+
+  // Both windows: a switch appears and picks the percentage to show.
+  payload = { window: "24h", bars: [{ label: "m1", percent: 99, percent24h: 97.5, percent1h: 50 }] }
+  await vm.runInContext("loadUptime()", sandbox)
+  assert.match(body.innerHTML, /data-uptime-window="24h"/, "the switch names the open window")
+  assert.match(body.innerHTML, /97\.5%/, "24h is the default")
+  body.querySelectorAll()
+  body.buttons.find((b) => b.dataset.uptimeWindow === "1h").onclick()
+  assert.match(body.innerHTML, /50\.0%/, "the switch redraws with the hour window")
+  assert.match(meta.textContent, /за 1 час/)
+
+  // Time cells: one box per interval, its time and share in the tip, and the
+  // strip follows the open window.
+  vm.runInContext("uptimeWindow = ''", sandbox)
+  payload = {
+    window: "24h",
+    bars: [{
+      label: "m1",
+      percent: 90,
+      percent24h: 90,
+      percent1h: 100,
+      cells24h: [{ percent: 100, t: "2026-11-26T10:00:00Z" }, { percent: 20, t: "2026-11-26T11:00:00Z" }],
+      cells1h: [{ percent: 100, t: "2026-11-26T11:45:00Z" }],
+    }],
+  }
+  await vm.runInContext("loadUptime()", sandbox)
+  const dayCells = [...body.innerHTML.matchAll(/class="uptime-cell ([a-z]+)" data-tip="([^"]*)"(?: style="background:([^"]*)")?/g)]
+  assert.equal(dayCells.length, 2, "one box per day bucket")
+  assert.deepEqual(dayCells.map((m) => m[1]), ["success", "error"], "a box is coloured by its own share")
+  // The colour is a gradient, not three buckets: 100 % green, 0 % red, and the
+  // two neighbours of 50 % land on yellow without a step.
+  assert.match(dayCells[0][3], /hsl\(140 /, "a full box is green: " + dayCells[0][3])
+  assert.match(dayCells[1][3], /hsl\(19\.2 /, "a failed box is red: " + dayCells[1][3])
+  assert.match(dayCells[0][2], /100\.0%/)
+  assert.match(dayCells[0][2], /\d{2}:00/, "the box tip names the bucket time")
+  vm.runInContext("uptimeWindow = '1h'", sandbox)
+  await vm.runInContext("renderUptimeBars()", sandbox)
+  assert.equal([...body.innerHTML.matchAll(/class="uptime-cell /g)].length, 1, "the hour window shows the hour strip")
+  vm.runInContext("uptimeWindow = ''", sandbox)
+
+  // A bar with one plain percentage keeps it in either window.
+  payload = { bars: [{ label: "a", percent: 88, percent24h: 88, percent1h: 88 }, { label: "b", percent: 99 }] }
+  await vm.runInContext("loadUptime()", sandbox)
+  assert.match(body.innerHTML, /99\.0%/, "a bar without windowed percentages falls back to percent")
+
+  // A failure is cached and named, not drawn as a zero bar.
+  payload = { error: { message: "нет интернета" } }
+  sandbox.api = async () => ({ ok: false, status: 422, json: async () => payload })
+  await vm.runInContext("loadUptime()", sandbox)
+  assert.match(body.innerHTML, /нет интернета/)
+})
+
+test("the uptime round takes scripted providers in turn and never overlaps", async () => {
+  const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
+  // Only the fetch half: the dialog and the tab sit below their own sections.
+  const source = uptime.slice(
+    uptime.indexOf("// provider -> { at, payload }"),
+    uptime.indexOf("// --- Dialog"),
+  )
+  const calls = []
+  // Each request parks until the test releases it, so a second round can only
+  // start while the first is still in flight.
+  const waiting = []
+  const sandbox = {
+    cfg: {
+      providers: {
+        a: { uptimeScript: "print(1)" },
+        b: { baseURL: "https://b.example/v1" },
+        c: { uptimeScriptPath: "/tmp/c.py" },
+      },
+    },
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    debugLog() {},
+    apiErrorMessage: (p, fallback) => p?.error?.message ?? fallback,
+    api: (path, opts) => {
+      // The bars push is best effort and must not count as a script run.
+      if (path === "/api/uptime/bars") return Promise.resolve({ ok: true })
+      const provider = JSON.parse(opts.body).provider
+      calls.push(provider)
+      return new Promise((resolve) => waiting.push(() => resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ bars: [{ label: `${provider}-m`, percent: 100 }] }),
+      })))
+    },
+    renderUptimeTab() {},
+    uptimeCache: new Map(),
   }
   vm.createContext(sandbox)
   vm.runInContext(source, sandbox)
-  vm.runInContext("renderProviders()", sandbox)
-  const rows = box.innerHTML.split("<tr data-provider=")
-  const scripted = rows.find((html) => html.startsWith('"scripted"'))
-  const plain = rows.find((html) => html.startsWith('"plain"'))
-  assert.match(scripted, /data-a="uptime"/, "a script adds the uptime button")
-  assert.doesNotMatch(plain, /data-a="uptime"/, "without a script there is no dead button")
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-  // The dialog maps the script's answer onto the shared bar markup.
+  assert.deepEqual([...vm.runInContext("uptimeProviders()", sandbox)], ["a", "c"], "only providers with a script are asked")
+
+  const round = vm.runInContext("refreshAllUptime()", sandbox)
+  await flush()
+  assert.deepEqual(calls, ["a"], "the first provider is asked first, alone")
+  const skipped = await vm.runInContext("refreshAllUptime()", sandbox)
+  assert.equal(skipped, false, "a round in flight makes the next tick skip")
+  assert.deepEqual(calls, ["a"], "and does not start a second queue")
+  waiting.shift()()
+  await flush()
+  assert.deepEqual(calls, ["a", "c"], "then the next provider, one at a time")
+  waiting.shift()()
+  assert.equal(await round, true)
+  assert.deepEqual([...vm.runInContext("[...uptimeCache.keys()]", sandbox)], ["a", "c"])
+
+  // With the round finished, the next one may start again.
+  const again = vm.runInContext("refreshAllUptime()", sandbox)
+  await flush()
+  assert.deepEqual(calls, ["a", "c", "a"])
+  waiting.shift()()
+  await flush()
+  waiting.shift()()
+  await again
+})
+
+test("the uptime tab sorts by uptime, folds providers and drops models without data", () => {
   const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
-  const draw = uptime.slice(uptime.indexOf("async function loadUptime"), uptime.indexOf('$("uptime-refresh").onclick'))
-  const body = { innerHTML: "" }
-  const meta = { textContent: "" }
-  const drawSandbox = {
-    uptimeProvider: "p",
+  // From the shared bar helpers, through the dialog (whose wiring only needs a
+  // stub) and into the tab the test draws.
+  const source = uptime.slice(
+    uptime.indexOf("const uptimeSharesBoth"),
+    uptime.indexOf("/// Called when the tab opens"),
+  )
+  const elements = {}
+  const node = (id) => (elements[id] ??= {
+    innerHTML: "",
+    hidden: false,
+    textContent: "",
+    querySelectorAll: () => [],
+    classList: { toggle() {} },
+    addEventListener() {},
+  })
+  const sandbox = {
+    cfg: {
+      providers: {
+        // `catalog-only` is what the provider listed but the user never picked:
+        // the provider view must still show it. `dropped` was picked long ago
+        // and the provider no longer serves it: it must not be listed, or the
+        // view fills with models that have been gone for days.
+        a: {
+          uptimeScript: "print(1)",
+          models: ["m1", "low", "unreported", "dropped"],
+          manualModels: ["hand-added"],
+          modelAvailability: { "catalog-only": { available: true }, dropped: { available: false } },
+        },
+        b: { uptimeScript: "print(2)", models: ["m2"] },
+        bare: { baseURL: "https://x.example/v1", models: ["bare-model"] },
+      },
+      // c has no script, so its model can never report uptime.
+      opencodeModels: { a: { models: ["m1"] }, b: { models: ["m2"] }, c: { models: ["m3"] } },
+      models: {
+        chain: { upstreams: [{ provider: "a", model: "m1" }, { provider: "b", model: "m2" }] },
+        dead: { upstreams: [{ provider: "c", model: "m3" }] },
+      },
+    },
+    uptimeCache: new Map([
+      ["a", { at: Date.now(), payload: { bars: [
+        { label: "m1", percent: 99, percent24h: 99, percent1h: 100 },
+        { label: "low", percent: 20, percent24h: 20, percent1h: 20 },
+      ] } }],
+      ["b", { at: Date.now(), payload: { bars: [{
+        label: "m2",
+        percent: 40,
+        percent24h: 40,
+        percent1h: 20,
+        cells24h: [{ t: "2026-11-26T10:00:00", percent: 40 }],
+        cells1h: [{ t: "2026-11-26T10:55:00", percent: 20 }],
+      }] } }],
+    ]),
+    uptimeQuery: "",
+    uptimeFilterProviders: new Set(),
+    uptimeTabWindow: "24h",
     esc: (s) => String(s ?? ""),
-    plural: (n, one, few, many) => `${n} ${one}`,
-    apiErrorMessage: (payload, fallback) => payload?.error?.message ?? fallback,
-    api: async () => ({ ok: true, status: 200, json: async () => ({ bars: [
-      { label: "m1", percent: 99.5 },
-      { label: "m2", percent: 40 },
-    ] }) }),
-    $: (id) => (id === "uptime-body" ? body : meta),
+    plural: (n, one, few, many) => `${n} ${many}`,
+    emptyStateHtml: (message) => `<div class="sessions-empty">${message}</div>`,
+    appSettings: () => ({ uptimeChainAverage: false }),
+    directModelIds: (provider) => sandbox.cfg.opencodeModels[provider]?.models ?? [],
+    isImageModel: () => false,
+    fmtUptimeMs: (v) => `${v} мс`,
+    $: node,
+    dlgUptime: { addEventListener() {} },
+    openSearchMenu() {},
+    openSearchMenuContent() {},
+    searchMenu: { innerHTML: "" },
+    searchMenuAnchor: null,
+    positionSearchMenu() {},
+    // The scripted providers come from the same helper the round uses.
+    uptimeProviders: () => ["a", "b"],
   }
-  vm.createContext(drawSandbox)
-  vm.runInContext(draw, drawSandbox)
-  await vm.runInContext("loadUptime()", drawSandbox)
-  assert.match(body.innerHTML, /m1/, "every bar is drawn")
-  assert.match(body.innerHTML, /99\.5%/, "the percentage is shown as the script reported it")
-  assert.match(body.innerHTML, /token-fill success/, "a healthy model gets the success colour")
-  assert.match(body.innerHTML, /token-fill error/, "a low one gets the problem colour")
-  assert.match(meta.textContent, /2 модель/, "the header counts the bars")
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  // The slice declares `uptimeAnswers` itself, so the answers are set after it
+  // runs: model `a/m1` answered twice, chain `chain` once out of two.
+  vm.runInContext(`uptimeAnswers = {
+    models: { "a/m1": { percent: 100, percent24h: 100, percent1h: 100, ok: 2, total: 2, cells24h: [{ t: "2026-11-26T10:00:00", percent: 100, ok: 2, total: 2 }], cells1h: [{ t: "2026-11-26T10:55:00", percent: 100, ok: 2, total: 2 }] } },
+    chains: { chain: { percent: 50, percent24h: 50, percent1h: 0, ok: 1, total: 2, cells24h: [{ t: "2026-11-26T11:00:00", percent: 50, ok: 1, total: 2 }], cells1h: [{ t: "2026-11-26T10:55:00", percent: null, ok: 0, total: 0 }] } },
+  }`, sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+
+  // By providers: a card per scripted provider, ordered by its average uptime.
+  const providers = elements["uptime-providers"].innerHTML
+  assert.match(providers, />a</)
+  assert.match(providers, />b</)
+  assert.doesNotMatch(providers, />bare</, "a provider without a script has nothing to draw")
+  assert.ok(providers.indexOf(">a<") < providers.indexOf(">b<"), "the better average leads")
+  // Inside a provider the models are ordered by their own uptime.
+  const cardA = providers.slice(providers.indexOf(">a<"), providers.indexOf(">b<"))
+  assert.ok(cardA.indexOf("m1") < cardA.indexOf("low"), "the best model leads its card")
+  assert.match(providers, /среднее 59\.5%/, "the card names its average")
+  assert.match(providers, /99\.0%/, "the day window is the default")
+  assert.match(providers, /unreported/, "provider view retains catalog models without uptime")
+  assert.match(providers, /нет данных/, "unreported catalog models are explicitly marked")
+  assert.match(providers, /catalog-only/, "the provider view is the whole catalog, not the selection")
+  assert.doesNotMatch(providers, /dropped/, "a model the provider no longer serves is not listed")
+  assert.match(providers, /hand-added/, "a model typed in by hand is listed")
+  // The second strip is the proxy's own answers: only where there are some.
+  assert.match(providers, /uptime-strip-answers/, "a model with answers gets a second strip")
+  // Both strips carry their name, or the second one reads as more of the first.
+  assert.match(providers, /uptime-strip-tag">Внешний</, "the script strip is labelled")
+  assert.match(providers, /ответы 100\.0%/, "the answers number is shown next to the script's")
+  const rowUnreported = providers.slice(providers.indexOf("unreported"), providers.indexOf("catalog-only"))
+  assert.doesNotMatch(rowUnreported, /uptime-strip-answers/, "no answers, no second strip")
+  assert.match(elements["uptime-tab-window"].innerHTML, /data-uptime-tab-window="1h"/, "two windows bring the switch")
+
+  // By models: added models and chains with a number, best first, no holes.
+  const models = elements["uptime-models"].innerHTML
+  assert.match(models, /uptime-strip-tag">ответы</, "the proxy's strip is labelled")
+  assert.match(models, /uptime-strip-tag">Внешний</, "the script's strip is labelled in the models view too")
+  assert.match(models, /a\/m1/)
+  assert.match(models, /b\/m2/)
+  assert.match(models, /chain/, "a chain with live members stays")
+  assert.doesNotMatch(models, /dead/, "a chain with nothing to report is not drawn")
+  assert.doesNotMatch(models, /c\/m3/, "a model without uptime is not drawn")
+  assert.doesNotMatch(models, /нет данных/, "no placeholder rows in the models view")
+  assert.doesNotMatch(models, /максимум|среднее/, "the plain chain names no aggregation mode")
+  assert.ok(models.indexOf("a/m1") < models.indexOf("b/m2"), "the highest uptime leads")
+  // A chain's second strip is the chain's own answers, not its members'.
+  assert.match(models, /ответы 50\.0%/, "the chain shows its own answer rate")
+  assert.doesNotMatch(models, /no-such-model/, "the provider's whole catalog is not the list")
+
+  // The switch redraws with the hour numbers, and it moves the answers strip
+  // too: a five-minute slot without traffic is a grey box, not a red one.
+  vm.runInContext("uptimeTabWindow = '1h'", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-providers"].innerHTML, /100\.0%/)
+  assert.match(elements["uptime-models"].innerHTML, /100\.0%/)
+  assert.match(elements["uptime-models"].innerHTML, /uptime-cell empty/, "an empty slot is grey")
+  assert.match(elements["uptime-providers"].innerHTML, /ответы 100\.0%/, "the answers number follows the window")
+
+  // The setting turns the chain into the average of its members.
+  sandbox.appSettings = () => ({ uptimeChainAverage: true })
+  vm.runInContext("uptimeTabWindow = '24h'", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-models"].innerHTML, /среднее/)
+  assert.match(elements["uptime-models"].innerHTML, /69\.5%/, "(99 + 40) / 2")
+
+  // Search and the provider filter narrow both views.
+  vm.runInContext("uptimeQuery = 'm2'", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-models"].innerHTML, /b\/m2/)
+  assert.doesNotMatch(elements["uptime-models"].innerHTML, /a\/m1/)
+  vm.runInContext("uptimeQuery = ''", sandbox)
+  vm.runInContext("uptimeFilterProviders.clear(); uptimeFilterProviders.add('b')", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.doesNotMatch(elements["uptime-models"].innerHTML, /a\/m1/, "a provider filter drops the other provider's models")
+  assert.match(elements["uptime-models"].innerHTML, /b\/m2/)
+  assert.doesNotMatch(elements["uptime-providers"].innerHTML, />a</, "and drops its card")
+
+  // A threshold keeps only what passes it, in the chosen direction.
+  vm.runInContext("uptimeFilterProviders.clear()", sandbox)
+  vm.runInContext("uptimeFilterThreshold = 50; uptimeFilterDirection = 'below'", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-models"].innerHTML, /b\/m2/, "40% is below 50")
+  assert.doesNotMatch(elements["uptime-models"].innerHTML, /a\/m1/, "99% is not")
+  // The card keeps the models that pass, so the 20% model holds it on screen
+  // even though the provider's average is over 50%.
+  assert.match(elements["uptime-providers"].innerHTML, />a</)
+  assert.match(elements["uptime-providers"].innerHTML, /low/)
+  assert.doesNotMatch(elements["uptime-providers"].innerHTML, /m1/, "the passing models stay, the rest go")
+  vm.runInContext("uptimeFilterDirection = 'above'", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-models"].innerHTML, /a\/m1/)
+  assert.doesNotMatch(elements["uptime-models"].innerHTML, /b\/m2/)
+  assert.doesNotMatch(elements["uptime-providers"].innerHTML, /m2/, "a provider whose models all fail is gone")
+  vm.runInContext("uptimeFilterThreshold = null", sandbox)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-providers"].innerHTML, /m1/, "no threshold shows everything again")
+
+  // The provider card folds its models away, and the choice survives a redraw.
+  vm.runInContext("toggleUptimeProvider('b')", sandbox)
+  const folded = elements["uptime-providers"].innerHTML.split(">b<")[1]
+  assert.match(folded, /class="token-bars" hidden/, "a folded card hides its bars")
+  assert.match(elements["uptime-providers"].innerHTML, /aria-expanded="false"/)
+  vm.runInContext("renderUptimeTab()", sandbox)
+  assert.match(elements["uptime-providers"].innerHTML, /class="token-bars" hidden/, "the fold persists")
+  vm.runInContext("toggleUptimeProvider('b')", sandbox)
+  assert.doesNotMatch(elements["uptime-providers"].innerHTML.split(">b<")[1], /class="token-bars" hidden/)
+
+  // The counter is gone: the filter bar shows no "N из M". ("из" now appears
+  // only inside the answers tooltip, which is a different thing.)
+  assert.equal(elements["uptime-count"], undefined, "no counter element is written")
+})
+
+test("the uptime filter menu pages providers and offers an uptime threshold", () => {
+  const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
+  const source = uptime.slice(
+    uptime.indexOf("const uptimeSharesBoth"),
+    uptime.indexOf("/// Called when the tab opens"),
+  )
+  const elements = {}
+  const node = (id) => (elements[id] ??= {
+    innerHTML: "",
+    hidden: false,
+    textContent: "",
+    querySelectorAll: () => [],
+    classList: { toggle() {} },
+    addEventListener() {},
+  })
+  const names = Array.from({ length: 14 }, (_, i) => `p${String(i).padStart(2, "0")}`)
+  const sandbox = {
+    cfg: { providers: Object.fromEntries(names.map((n) => [n, { uptimeScript: "x" }])), opencodeModels: {}, models: {} },
+    uptimeCache: new Map(),
+    uptimeQuery: "",
+    uptimeFilterProviders: new Set(),
+    uptimeTabWindow: "24h",
+    esc: (s) => String(s ?? ""),
+    plural: (n, one, few, many) => `${n} ${many}`,
+    emptyStateHtml: (m) => `<div>${m}</div>`,
+    appSettings: () => ({ uptimeChainAverage: false }),
+    directModelIds: () => [],
+    isImageModel: () => false,
+    fmtUptimeMs: String,
+    $: node,
+    dlgUptime: { addEventListener() {} },
+    openSearchMenu() {},
+    openSearchMenuContent() {},
+    searchMenu: { innerHTML: "" },
+    searchMenuAnchor: null,
+    positionSearchMenu() {},
+    uptimeProviders: () => names,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  const menu = { innerHTML: "", className: "", querySelectorAll: () => [], querySelector: () => null }
+  vm.runInContext("renderUptimeFilterMenu", sandbox)(menu)
+  assert.match(menu.innerHTML, /data-uptime-filter-view="providers"/)
+  assert.match(menu.innerHTML, /data-uptime-filter-view="threshold"/, "the threshold has its own tab")
+  // Ten providers per page, so the pager is real with fourteen of them.
+  assert.equal([...menu.innerHTML.matchAll(/data-tip="p\d\d"/g)].length, 10, "a page of ten providers")
+  assert.match(menu.innerHTML, /data-uptime-page="1"/)
+  assert.match(menu.innerHTML, /data-uptime-filter-search/, "the provider list can be searched")
+
+  // The slider, direction choices, and explicit off switch replace the old
+  // five percentage buttons and explanatory footer.
+  vm.runInContext("uptimeFilterView = 'threshold'", sandbox)
+  vm.runInContext("renderUptimeFilterMenu", sandbox)(menu)
+  assert.match(menu.innerHTML, /type="range" min="0" max="100" step="10"/)
+  assert.match(menu.innerHTML, /data-uptime-direction="above"/)
+  assert.match(menu.innerHTML, /data-uptime-direction="below"/)
+  assert.match(menu.innerHTML, /data-uptime-threshold-off/)
+  assert.doesNotMatch(menu.innerHTML, /data-uptime-threshold="|порог выключен/)
+
+  // Dragging the slider only moves its own label; the filter is applied when
+  // the pointer is released, so the tab is not rebuilt on every pixel.
+  let redraws = 0
+  const slider = {
+    value: "50",
+    listeners: {},
+    addEventListener(type, handler) { this.listeners[type] = handler },
+  }
+  const head = { textContent: "" }
+  const direction = { dataset: { uptimeDirection: "below" }, classList: { toggle() {}, remove() {} }, setAttribute() {} }
+  const off = { classList: { toggle() {}, remove() {}, add() {} }, setAttribute() {} }
+  menu.querySelector = (selector) => (selector === ".uptime-threshold-slider" ? slider : null)
+  menu.querySelectorAll = (selector) => (selector === "[data-uptime-direction]" ? [direction] : [])
+  sandbox.renderUptimeTab = () => { redraws++ }
+  sandbox.document = { querySelectorAll: () => [] }
+  // The label node is looked up through the same menu stub.
+  const menuWithHead = {
+    ...menu,
+    querySelector: (selector) => (selector === ".uptime-threshold-slider" ? slider : selector === ".uptime-threshold-head b" ? head : null),
+  }
+  vm.runInContext("renderUptimeFilterMenu", sandbox)(menuWithHead)
+  slider.listeners.input({ target: { value: "80" } })
+  assert.equal(vm.runInContext("uptimeFilterThreshold", sandbox), null, "dragging does not apply the threshold")
+  assert.equal(vm.runInContext("uptimeThresholdValue", sandbox), 80, "the slider position is kept")
+  assert.equal(redraws, 0, "no redraw while dragging")
+  assert.equal(head.textContent, "80%", "the label follows the drag")
+  slider.listeners.change({ target: { value: "80" } })
+  assert.equal(vm.runInContext("uptimeFilterThreshold", sandbox), 80, "releasing applies it")
+  assert.equal(redraws, 1, "one redraw per release")
 })
 
 test("changing the auth token saves under the old token, then switches", async () => {
@@ -1240,34 +1707,170 @@ test("the images panel has two separate last-model cards and no history table", 
   assert.match(styles, /\.last-models \{[^}]*auto-fit/, "the block is responsive")
 })
 
+test("saveNow waits for the queued write before it resolves", async () => {
+  const core = readFileSync(new URL("js/core.js", FRONTEND), "utf8")
+  const source = core.slice(core.indexOf("function saveNow"), core.indexOf("// A save queued"))
+  let written = false
+  let scheduled = false
+  const sandbox = {
+    // Stands in for save(): the real one only schedules the debounce.
+    save() { scheduled = true },
+    saveChain: Promise.resolve(),
+    setTimeout,
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source, sandbox)
+  // A write that lands after save() returns, like the debounced PUT.
+  sandbox.saveChain = new Promise((resolve) => setTimeout(() => { written = true; resolve() }, 30))
+  await vm.runInContext("saveNow()", sandbox)
+  assert.equal(scheduled, true, "the save is queued")
+  assert.equal(written, true, "the script runs after the catalog is on the server, not before")
+})
+
+test("settings split into General, Miscellaneous and folded Advanced", () => {
+  const order = [...indexHtml.matchAll(/<h3>([^<]+)<\/h3>/g)].map((m) => m[1])
+  // Server and Connection come first as a pair; the request behaviour follows
+  // them as one wide block, not a narrow card beside them.
+  assert.ok(order.indexOf("Сервер") < order.indexOf("Подключение"), "Server and Connection open the page")
+  assert.ok(order.indexOf("Подключение") < order.indexOf("Общее"), "Общее follows the pair")
+  const general = indexHtml.slice(indexHtml.indexOf("<h3>Общее</h3>"), indexHtml.indexOf("<h3>Обновления</h3>"))
+  assert.match(general, /s-retry-forever/)
+  assert.match(
+    indexHtml.slice(indexHtml.indexOf("<h3>Общее</h3>") - 200, indexHtml.indexOf("<h3>Общее</h3>")),
+    /settings-block wide/,
+    "Общее spans the whole page",
+  )
+  // "Прочее" holds the shortcuts; "Внешний вид и запуск" lost them.
+  const misc = indexHtml.slice(indexHtml.indexOf("<h3>Прочее</h3>"), indexHtml.indexOf("<summary>Расширенные настройки</summary>"))
+  assert.match(misc, /s-shortcut-wrap/)
+  const look = indexHtml.slice(indexHtml.indexOf("<h3>Внешний вид и запуск</h3>"), indexHtml.indexOf("<h3>Прочее</h3>"))
+  assert.doesNotMatch(look, /s-shortcut-wrap/)
+  assert.doesNotMatch(look, /s-uptime-refresh|s-uptime-chain-average/, "uptime moved out of appearance")
+  // Advanced: folded, holds fault protection, the uptime pair and import/export.
+  const advanced = indexHtml.slice(indexHtml.indexOf("<summary>Расширенные настройки</summary>"), indexHtml.indexOf("settings-page-actions"))
+  assert.match(advanced, /Защита от сбоев/)
+  assert.match(advanced, /s-uptime-refresh/)
+  assert.match(advanced, /s-uptime-chain-average/)
+  assert.match(advanced, /config-export/)
+  assert.match(advanced, /config-import/)
+  const before = indexHtml.slice(indexHtml.indexOf('data-tab="settings"'), indexHtml.indexOf("<summary>Расширенные настройки</summary>"))
+  assert.doesNotMatch(before, /Защита от сбоев|config-export/, "the moved groups are only inside the fold")
+  // The mirror switch lives in appearance and flips the log layout.
+  assert.match(look, /s-logs-reversed/)
+})
+
+test("log mirroring flips the card order and swaps pager and search rows", () => {
+  const logs = readFileSync(new URL("js/logs.js", FRONTEND), "utf8")
+  const render = logs.slice(logs.indexOf("function renderLogs"), logs.indexOf("async function loadOlderLogs"))
+  const cards = []
+  const line = (n) => `[2026-11-23 10:00:0${n}] p → ответ: p/m [ses:s${n}]`
+  const sandbox = {
+    LOG_PAGE_SIZE: 50,
+    logLines: [line(0), line(1), line(2)],
+    logIds: [3, 2, 1],
+    logHasMore: false,
+    logHasRenderedRecords: false,
+    logPage: 0,
+    logQuery: "",
+    logFilters: new Set(),
+    logChatFilters: new Set(),
+    logModelFilters: new Set(),
+    logSessionTitles: {},
+    logReversed: false,
+    logFacetDrag: null,
+    logFacetDraft: null,
+    appSettings: () => ({ logsReversed: false }),
+    syncLogFilterButton() {},
+    logPageSlice: (lines) => lines,
+    logMatches: () => true,
+    logType: () => "info",
+    logCard: (text) => { cards.push(text); return { dataset: { logLine: text }, getBoundingClientRect: () => ({ bottom: 0, top: 0 }) } },
+    logEmpty: () => ({ dataset: {} }),
+    $: () => box,
+    getComputedStyle: () => ({ overflowY: "auto" }),
+    document: { addEventListener() {} },
+    Object,
+  }
+  const box = {
+    closest: () => ({ getBoundingClientRect: () => ({ top: 0 }), classList: { toggle() {} }, scrollTop: 0 }),
+    getBoundingClientRect: () => ({ top: 0 }),
+    querySelectorAll: () => [],
+    classList: { toggle() {} },
+    scrollTop: 0,
+    replaceChildren(...children) { this.children = children },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(render, sandbox)
+  vm.runInContext("renderLogs()", sandbox)
+  // The default order: lines arrive newest first and stay that way.
+  const shown = () => [...box.children].map((card) => card.dataset.logLine)
+  assert.deepEqual(shown(), [line(0), line(1), line(2)])
+  assert.doesNotMatch(shown().join(), /за сутки/, "the per-day counter is gone from the pager")
+  vm.runInContext("logReversed = true", sandbox)
+  vm.runInContext("renderLogs()", sandbox)
+  assert.deepEqual(shown(), [line(2), line(1), line(0)], "mirrored: oldest on top")
+  // The pager names are direction words now.
+  assert.match(logs, />Назад<\/button>/)
+  assert.match(logs, />Вперёд<\/button>/)
+  assert.doesNotMatch(logs, />Новее<|>Старее</)
+})
+
 test("the information group holds logs, statistics and uptime", () => {
   assert.match(indexHtml, /<span>Информация<\/span>/, "the group is renamed")
   assert.doesNotMatch(indexHtml, /Статистика и логи/)
   assert.match(indexHtml, /data-tab="uptime"/)
   const uptime = readFileSync(new URL("js/uptime.js", FRONTEND), "utf8")
-  assert.match(uptime, /renderUptimeTab/, "the tab draws its placeholders")
-  // Both views are placeholders, and neither fetches anything yet.
-  const tab = uptime.slice(uptime.indexOf("function renderUptimeTab"))
-  assert.match(tab, /в разработке/)
-  assert.doesNotMatch(tab, /api\(/, "the placeholder makes no requests")
+  assert.match(uptime, /function renderUptimeTab/, "the tab draws the cached answers")
+  assert.doesNotMatch(uptime, /в разработке/, "the placeholder is gone")
   assert.match(indexHtml, /data-uptime-group="providers"/)
   assert.match(indexHtml, /data-uptime-group="models"/)
+  // Search is the top row; the two visual grouping tabs follow it.
+  const uptimeSection = indexHtml.slice(indexHtml.indexOf('<section data-tab="uptime">'), indexHtml.indexOf('<section data-tab="settings"'))
+  assert.ok(uptimeSection.indexOf('id="uptime-search"') < uptimeSection.indexOf('id="uptime-groups"'))
+  assert.doesNotMatch(uptimeSection, /uptime-count/, "the result counter is gone")
+  assert.match(uptime, /data-uptime-toggle/, "provider headers fold their model list")
+  assert.match(uptime, /uptime-threshold-slider/, "the threshold is a slider, not a row of buttons")
+  assert.doesNotMatch(uptime, /data-uptime-threshold="\$\{value\}"|UPTIME_THRESHOLDS/, "the five fixed steps are gone")
+  // Clearing the search also drops the provider filter and the threshold, and
+  // closes the filter menu: one button resets the whole filter bar.
+  const clearBlock = uptime.slice(uptime.indexOf('$("uptime-search-clear").onclick'), uptime.indexOf('$("uptime-search-filter").onclick'))
+  assert.match(clearBlock, /uptimeFilterProviders\.clear\(\)/)
+  assert.match(clearBlock, /uptimeFilterThreshold = null/)
+  assert.match(clearBlock, /closeSearchMenu\(\)/)
+  assert.match(uptime, /UPTIME_FILTER_PAGE_SIZE = 10/, "provider filtering is paged")
+  // Search and filters work in both views, and the window switch sits in the search row.
+  for (const id of ["uptime-search", "uptime-search-filter", "uptime-search-clear", "uptime-tab-window"]) {
+    assert.match(indexHtml, new RegExp(`id="${id}"`), `${id} must exist`)
+    assert.match(uptime, new RegExp(`\\$\\("${id}"\\)`), `${id} must be wired`)
+  }
 })
 
-test("the provider dialog hides optional fields and picks the uptime script from a file", () => {
-  const providers = readFileSync(new URL("js/dialogs-provider.js", FRONTEND), "utf8")
+test("the provider dialog keeps a path to the uptime script so an edited file is re-read", () => {
+  const dialog = readFileSync(new URL("js/dialogs-provider.js", FRONTEND), "utf8")
   const htmlBlock = indexHtml.slice(indexHtml.indexOf('id="dlg-provider"'), indexHtml.indexOf('id="dlg-model"'))
   assert.match(htmlBlock, /<details id="dp-more"/, "optional fields fold away")
-  assert.match(htmlBlock, /id="dp-uptime-file" type="file"/, "the script is a file input")
+  // The desktop picker is a button, not a label: a label's file input cannot
+  // hand back a path, and without a path an edit on disk stays invisible.
+  assert.match(htmlBlock, /id="dp-uptime-pick"/, "the picker is a button")
+  // The browser fallback stays rendered (opacity 0): a display:none file input
+  // may refuse a programmatic click.
+  assert.match(htmlBlock, /id="dp-uptime-file" class="file-pick-input" type="file"/, "the browser fallback is invisible but clickable")
+  assert.match(htmlBlock, /id="dp-uptime-reload"/, "the reload icon is present")
+  const pickerRow = htmlBlock.slice(htmlBlock.indexOf('class="file-pick"'), htmlBlock.indexOf('</div>', htmlBlock.indexOf('id="dp-uptime-clear"')))
+  assert.ok(pickerRow.indexOf('id="dp-uptime-reload"') < pickerRow.indexOf('id="dp-uptime-clear"'), "reload is left of clear")
   assert.doesNotMatch(htmlBlock, /id="dp-uptime"/, "the code textarea is gone")
   // The three required fields stay outside the fold.
   const beforeFold = htmlBlock.slice(0, htmlBlock.indexOf("<details"))
   for (const id of ["dp-name", "dp-url", "dp-key"]) assert.match(beforeFold, new RegExp(`id="${id}"`), `${id} stays visible`)
-  assert.match(providers, /uptimeScriptFile/, "the picked file name is stored")
-  assert.match(providers, /file\.text\(\)/, "the file content becomes the script")
-  // Clearing removes both halves, so no dead button is left behind.
-  const clear = providers.slice(providers.indexOf('$("dp-uptime-clear").onclick'), providers.indexOf('$("dp-delete").onclick'))
-  assert.match(clear, /uptimeDraft = \{ script: "", file: "" \}/)
+  assert.match(dialog, /uptimeScriptPath/, "the path is stored next to the text")
+  assert.match(dialog, /__TAURI__\?\.dialog/, "the desktop picker asks for a path")
+  assert.match(dialog, /read_uptime_file/, "the text comes from the file on disk")
+  // The reload icon reads the stored path instead of asking again.
+  const reload = dialog.slice(dialog.indexOf('$("dp-uptime-reload").onclick'), dialog.indexOf('$("dp-uptime-clear").onclick'))
+  assert.match(reload, /readUptimeFile\(uptimeDraft\.path\)/)
+  // Clearing removes all three halves, so no dead button is left behind.
+  const clear = dialog.slice(dialog.indexOf('$("dp-uptime-clear").onclick'), dialog.indexOf('$("dp-delete").onclick'))
+  assert.match(clear, /uptimeDraft = \{ script: "", file: "", path: "" \}/)
 })
 
 test("the config preview shows two rows and hides the toggle when nothing else is left", async () => {
@@ -1476,11 +2079,23 @@ test("the tag registry searches and pages without losing the row it edits", () =
 })
 
 test("the skills dialog lists installed skills and keeps a placeholder browser", () => {
-  assert.match(indexHtml, /id="integrations-advanced"[^>]*>Скиллы</, "the button is named Скиллы")
-  assert.doesNotMatch(indexHtml, /Расширенные настройки/)
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  assert.match(indexHtml, /id="integrations-advanced"[^>]*>Управление скиллами</, "the button names skill management")
+  assert.match(indexHtml, /id="integrations-agents"[^>]*>Управление агентами</)
+  assert.match(indexHtml, /class="integration-management"[\s\S]*id="integrations-advanced"[\s\S]*id="integrations-agents"/)
+  for (const agent of ["compaction", "explore", "title", "summary"]) {
+    assert.match(indexHtml, new RegExp(`id="agent-${agent}"`))
+  }
+  assert.match(indexHtml, /Основная модель сессии не меняется/)
+  assert.match(providers, /cfg\.opencodeAgentModels\[key\] = value/)
+  assert.match(providers, /tag:\$\{tag\}/)
+  assert.match(providers, /Цепочка из всех моделей с тегом/)
+  // The settings page has its own folded "Расширенные настройки" now.
+  assert.doesNotMatch(indexHtml, /class="search-menu[\s\S]*Расширенные настройки/)
+  assert.match(indexHtml, /<details class="settings-block wide settings-advanced">/)
+  assert.match(indexHtml, /<summary>Расширенные настройки<\/summary>/)
   assert.match(indexHtml, /data-skills-tab="installed"[^>]*>Установленные</)
   assert.match(indexHtml, /data-skills-tab="browse"[^>]*>Браузер</)
-  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
   const dialog = providers.slice(providers.indexOf("function renderSkillsDialog"), providers.indexOf('$("image-settings-cancel")'))
   assert.match(dialog, /emptyInlineHtml\("в разработке"\)/, "the browser tab is a placeholder")
   // The image skill lives in the Opencode card again; the dialog lists it too,
@@ -1535,6 +2150,44 @@ test("the images panel renders its tiles from the day's image entries", () => {
   const used = report.indexOf("imageEntries.reduce")
   assert.ok(declared > 0, "the image entries are computed")
   assert.ok(declared < used, "and before the tiles that use them")
+})
+
+test("each agent setting offers default, chains, models and a tag chain", () => {
+  const providers = readFileSync(new URL("js/providers.js", FRONTEND), "utf8")
+  const source = providers.slice(
+    providers.indexOf("function agentModelOptions"),
+    providers.indexOf('$("integrations-agents").onclick'),
+  )
+  const sandbox = {
+    esc: (s) => String(s ?? ""),
+    directModelIds: (provider, definition) => definition.models ?? [],
+    tagRegistryNames: () => ["cheap"],
+    cfg: {
+      models: {
+        "fast-chain": { upstreams: [{ provider: "p", model: "m" }] },
+        "off-chain": { enabled: false, upstreams: [{ provider: "p", model: "m" }] },
+      },
+      opencodeModels: {
+        p: { models: ["model-a"] },
+        off: { enabled: false, models: ["model-b"] },
+      },
+      opencodeAgentModels: { compaction: "chain:fast-chain", summary: "gone" },
+    },
+  }
+  vm.createContext(sandbox)
+  vm.runInContext(source + "\nthis.options = agentModelOptions", sandbox)
+  // The list obeys the same visibility rules as the OpenCode map: a disabled
+  // chain or provider is not offered.
+  const html = sandbox.options("chain:fast-chain")
+  assert.match(html, /По умолчанию OpenCode/)
+  assert.match(html, /value="chain:fast-chain" selected>Цепочка · fast-chain/)
+  assert.match(html, /value="model:p\/model-a">Модель · p\/model-a/)
+  assert.match(html, /value="tag:cheap">Тег · cheap/)
+  assert.doesNotMatch(html, /off-chain|model-b/)
+
+  // A selection that disappeared from the config stays visible, so "default"
+  // is a real choice rather than a silent reset.
+  assert.match(sandbox.options("gone"), /value="gone" selected>Недоступно · gone/)
 })
 
 test("the skills dialog lists every skill folder, not only the bundled one", () => {

@@ -20,6 +20,8 @@
     "allow-set-autostart",
     "allow-create-app-shortcut",
     "allow-list-versions",
-    "allow-rollback-to"
+    "allow-rollback-to",
+    "allow-read-uptime-file",
+    "dialog:default"
   ]
 }
